@@ -62,3 +62,12 @@ No se ejecutaron POST/PATCH/DELETE en el backend productivo, no se alteró Kali,
 | Android código corregido | **Pendiente de confirmación**, no se declara PASS hasta que cierren los trabajos | [Android #11](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38468448092) |
 
 Los scans OSV/Semgrep no revisan por completo las bibliotecas nativas Gradle y no son pentests. Las pruebas de backend, idempotencia y QA físico siguen siendo requisitos abiertos. 
+
+
+## Fe de erratas — validación de cliente HTTP
+
+El primer parche de `production_api.dart` se aplicó incorrectamente y duplicó secciones: Android #10 y #11 detectaron y **bloquearon** el archivo durante `flutter analyze`. No se generó una APK aprobada de esas modificaciones.
+
+Se recuperó el archivo completo desde la baseline Android #9 y se reconstruyó el cambio de forma acotada, verificando que las clases y métodos relevantes aparecen una sola vez. Último commit del código HTTP: `3416cac`. El build correspondiente es [Android #13](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38469446698) y **debe terminar PASS antes de usar nuevas APK**.
+
+Hallazgos de seguimiento: [#7 idempotencia de pedidos](https://github.com/AlanPalacios23/tala-eats-mobile/issues/7), [#8 fijar dependencias](https://github.com/AlanPalacios23/tala-eats-mobile/issues/8), [#9 total diario parcial del repartidor](https://github.com/AlanPalacios23/tala-eats-mobile/issues/9). Sigue vigente la baseline [Android #9 PASS](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38458314045), sin cambios de backend.
