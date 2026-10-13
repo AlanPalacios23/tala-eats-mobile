@@ -47,7 +47,7 @@ void main() {
       expect(request.url.scheme, 'https');
       expect(request.url.path, '/api/v1/auth/login');
       expect(request.headers.entries.where((e) => e.key.toLowerCase() == 'x-talaeats-client').single.value, 'restaurant-mobile');
-      expect(request.headers.entries.where((e) => e.key.toLowerCase() == 'x-talaeats-app-version').single.value, '0.7.5');
+      expect(request.headers.entries.where((e) => e.key.toLowerCase() == 'x-talaeats-app-version').single.value, '0.7.6');
       expect(request.headers.keys.any((k) => k.toLowerCase() == 'authorization'), isFalse);
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       expect(body['email'], 'restaurante@example.com');
