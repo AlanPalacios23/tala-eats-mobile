@@ -97,8 +97,11 @@ Future<String> readBoundedUtf8Response(
 }
 
 class TalaApi {
-  TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+
+  TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+$'), '');
 
+  final String baseUrl;
+  final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
+  String? token;
   Future<dynamic> get(String path) => _request('GET', path);
   Future<dynamic> delete(String path) => _request('DELETE', path);
   Future<dynamic> post(String path, [Object? body]) => _request('POST', path, body: body);
