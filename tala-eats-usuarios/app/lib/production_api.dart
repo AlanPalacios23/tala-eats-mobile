@@ -79,8 +79,125 @@ class NativeBridge {
   }
 }
 
+/// Read an HTTP response without allowing an unbounded JSON payload to use
+/// all available memory on an Android device.
+Future<String> readBoundedUtf8Response(
+  Stream<List<int>> source, {
+  int maxBytes = 4 * 1024 * 1024,
+}) async {
+  if (maxBytes <= 0) throw ArgumentError.value(maxBytes, 'maxBytes');
+  final bytes = <int>[];
+  await for (final chunk in source.timeout(const Duration(seconds: 20))) {
+    if (chunk.length > maxBytes - bytes.length) {
+      throw ApiException(502, 'La respuesta del servidor excedió el tamaño permitido.');
+    }
+    bytes.addAll(chunk);
+  }
+  return utf8.decode(bytes);
+}
+
 class TalaApi {
-  TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+$'), '');
+  TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+
+
+  Future<dynamic> get(String path) => _request('GET', path);
+  Future<dynamic> delete(String path) => _request('DELETE', path);
+  Future<dynamic> post(String path, [Object? body]) => _request('POST', path, body: body);
+  Future<dynamic> patch(String path, [Object? body]) => _request('PATCH', path, body: body);
+  Future<dynamic> put(String path, [Object? body]) => _request('PUT', path, body: body);
+
+  Future<dynamic> _request(String method, String path, {Object? body}) async {
+    // Snapshot the credential before any await. Logout clears the in-memory
+    // session immediately but its server revocation must still be authenticated.
+    final String? requestToken = token;
+    final Uri uri = Uri.parse('$baseUrl${path.startsWith('/') ? path : '/$path'}');
+    HttpClientRequest req;
+    try {
+      req = await _client.openUrl(method, uri).timeout(const Duration(seconds: 15));
+    } on TimeoutException {
+      throw ApiException(0, 'El servidor tardó demasiado en responder.');
+    } on SocketException {
+      throw ApiException(0, 'No pudimos conectar con Tala Eats. Revisa tu internet.');
+    } on TlsException {
+      throw ApiException(0, 'No se pudo validar la conexión HTTPS de Tala Eats.');
+    }
+    req.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    req.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+    req.headers.set('X-TalaEats-Client', 'mobile');
+    if (requestToken != null && requestToken.isNotEmpty) {
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $requestToken');
+    }
+    if (body != null) req.write(jsonEncode(body));
+    HttpClientResponse res;
+    try {
+      res = await req.close().timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw ApiException(0, 'La operación tardó demasiado. Inténtalo otra vez.');
+    } on SocketException {
+      throw ApiException(0, 'Se perdió la conexión. Verifica el estado antes de repetir la operación.');
+    } on TlsException {
+      throw ApiException(0, 'No se pudo establecer una conexión HTTPS segura.');
+    }
+    String raw;
+    try {
+      raw = await readBoundedUtf8Response(res);
+    } on TimeoutException {
+      throw ApiException(0, 'El servidor tardó demasiado en enviar la respuesta.');
+    } on SocketException {
+      throw ApiException(0, 'Se interrumpió la respuesta. Verifica el estado antes de reintentar.');
+    } on TlsException {
+      throw ApiException(0, 'Falló la conexión HTTPS segura.');
+    }
+    dynamic decoded;
+    if (raw.isNotEmpty) {
+      try { decoded = jsonDecode(raw); } catch (_) { decoded = raw; }
+    }
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      String message = 'No pudimos completar la operación.';
+      if (decoded is Map && decoded['detail'] != null) message = decoded['detail'].toString();
+      throw ApiException(res.statusCode, message, decoded);
+    }
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> login(String email, String password, {String otp = ''}) async {
+    final dynamic data = await post('/auth/login', <String, dynamic>{'email': email, 'password': password, 'otp': otp});
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> register(String name, String email, String password) async {
+    final dynamic data = await post('/auth/register', <String, dynamic>{'name': name, 'email': email, 'password': password});
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await get('/auth/me')) as Map);
+  Future<Map<String, dynamic>> bootstrap() async => Map<String, dynamic>.from((await get('/platform/bootstrap')) as Map);
+  Future<List<dynamic>> restaurants() async => List<dynamic>.from((await get('/restaurants')) as List);
+  Future<Map<String, dynamic>> restaurant(int id) async => Map<String, dynamic>.from((await get('/restaurants/$id')) as Map);
+  Future<List<dynamic>> addresses() async => List<dynamic>.from((await get('/platform/addresses')) as List);
+  Future<List<dynamic>> orders() async => List<dynamic>.from((await get('/orders/mine')) as List);
+  Future<List<dynamic>> favorites() async => List<dynamic>.from((await get('/platform/favorites')) as List);
+  Future<Map<String, dynamic>> wallet() async => Map<String, dynamic>.from((await get('/platform/wallet')) as Map);
+  Future<List<dynamic>> notifications() async => List<dynamic>.from((await get('/platform/notifications')) as List);
+
+  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await post('/orders', payload)) as Map);
+  Future<Map<String, dynamic>> checkout(int orderId) async => Map<String, dynamic>.from((await post('/payments/mercadopago/orders/$orderId/checkout')) as Map);
+  Future<Map<String, dynamic>> stripeConfig() async => Map<String, dynamic>.from((await get('/payments/stripe/config')) as Map);
+  Future<Map<String, dynamic>> stripePaymentIntent(int orderId) async => Map<String, dynamic>.from((await post('/payments/stripe/orders/$orderId/payment-intent')) as Map);
+  Future<Map<String, dynamic>> liveOrder(int orderId) async => Map<String, dynamic>.from((await get('/v11/orders/$orderId/live')) as Map);
+
+  Future<void> forgotPassword(String email) async { await post('/auth/password/forgot', <String, dynamic>{'email': email}); }
+  Future<void> resetPassword(String resetToken, String password) async { await post('/auth/password/reset', <String, dynamic>{'token': resetToken, 'password': password}); }
+  Future<Map<String, dynamic>> addAddress(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await post('/platform/addresses', payload)) as Map);
+  Future<void> deleteAddress(int id) async { await delete('/platform/addresses/$id'); }
+  Future<bool> toggleFavorite(int id) async {
+    final dynamic data = await post('/platform/favorites/$id');
+    return (data as Map)['favorite'] == true;
+  }
+  Future<Map<String, dynamic>> createSupport(String message, {String category = 'general', int? orderId}) async => Map<String, dynamic>.from((await post('/platform/support', <String, dynamic>{'order_id': orderId, 'category': category, 'message': message})) as Map);
+  Future<Map<String, dynamic>> privacy() async => Map<String, dynamic>.from((await get('/v11/privacy/preferences')) as Map);
+  Future<Map<String, dynamic>> updatePrivacy(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await put('/v11/privacy/preferences', payload)) as Map);
+}
+), '');
 
   final String baseUrl;
   final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 12);

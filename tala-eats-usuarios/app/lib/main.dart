@@ -263,10 +263,21 @@ class TalaModel extends ChangeNotifier {
       signedIn = true;
       await refreshAll();
       if (pendingOrderId > 0) tabIndex = 2;
-    } catch (_) {
-      await NativeBridge.clearToken();
-      api.token = null;
+    } on ApiException catch (e) {
       signedIn = false;
+      lastError = e.message;
+      online = e.statusCode != 0;
+      // An offline device or a 5xx response is not proof of a revoked token.
+      // Keep the encrypted session for a subsequent startup/retry.
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        await NativeBridge.clearToken();
+        api.token = null;
+      }
+    } catch (_) {
+      // An unexpected local failure must not destroy a potentially valid
+      // encrypted session. Server-side revocation is checked at next startup.
+      signedIn = false;
+      lastError = 'No pudimos verificar tu sesión. Inténtalo de nuevo.';
     }
   }
 
