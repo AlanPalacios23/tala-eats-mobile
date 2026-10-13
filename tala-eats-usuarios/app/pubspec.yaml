@@ -1,0 +1,21 @@
+name: talaeats_users
+description: Tala Eats Usuarios Android production frontend.
+publish_to: 'none'
+version: 1.0.19+30
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_stripe: 14.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/

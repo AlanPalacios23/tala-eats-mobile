@@ -1,0 +1,19 @@
+# Local Flutter/Dart/Android build products
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/build/
+**/.gradle/
+**/local.properties
+**/android/key.properties
+**/android/app/*.jks
+**/android/app/*.keystore
+**/ci-logs/
+**/*.apk
+**/*.aab
+.DS_Store
+# Font binaries: recovered/downloaded only on runner, never redistributed.
+app/assets/fonts/*.ttf

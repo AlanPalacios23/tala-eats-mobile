@@ -1,0 +1,9 @@
+TALA EATS USUARIOS — FRONTEND PRODUCTION v1.0.12
+
+API por defecto: https://talaeats.alan-palacios-dev.com/api/v1
+Package: com.talaeats.app
+
+No contiene restaurantes, productos, precios, credenciales ni fotos comerciales demo en runtime.
+Los métodos de pago se cargan del backend. Stripe se integra con PaymentSheet; Google Pay aparece en Android cuando es elegible. Apple Pay se habilitará en la build iOS con Merchant ID/capability.
+
+Ejecuta INSTALAR-ANDROID-CABLE.cmd para correr el gate completo e instalar por USB.
