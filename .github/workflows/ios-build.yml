@@ -1,15 +1,8 @@
 name: Tala Eats | Verificar iOS sin firma
 
+# Android-first: iOS solo a solicitud para no consumir minutos macOS.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'tala-eats-usuarios/**'
-      - 'tala-eats-restaurante/**'
-      - 'tala-eats-repartidor/**'
-      - 'ci/bootstrap_ios.py'
-      - '.github/workflows/ios-build.yml'
 
 permissions:
   contents: read
