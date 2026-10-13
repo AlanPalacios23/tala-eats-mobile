@@ -8,6 +8,7 @@ on:
       - 'tala-eats-usuarios/**'
       - 'tala-eats-restaurante/**'
       - 'tala-eats-repartidor/**'
+      - 'ci/security_android_gate.py'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
@@ -117,6 +118,9 @@ jobs:
       - name: Crear Android nativo temporal
         shell: bash
         run: python3 "tala-eats-${{ matrix.rol }}/ci/bootstrap_android.py" --role "${{ matrix.rol }}"
+      - name: P0 Seguridad Android y secretos
+        shell: bash
+        run: python3 ci/security_android_gate.py --role "${{ matrix.rol }}"
       - name: Preparar fuentes open-source de Restaurante
         if: matrix.rol == 'restaurante'
         run: python3 tala-eats-restaurante/ci/prepare_fonts.py
