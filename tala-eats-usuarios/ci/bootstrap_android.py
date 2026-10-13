@@ -57,8 +57,9 @@ def setup(role):
     if not match: raise RuntimeError('Missing Android manifest root element')
     content=content[:match.end()]+'\n'+permission_lines+content[match.end():]
     content=re.sub(r'android:label="[^"]*"',f'android:label="{cfg["label"]}"',content,count=1)
-    if role in ('restaurante','repartidor'):
-        content=replace_once(content,'<application','<application android:allowBackup="false" android:usesCleartextTraffic="false"','application policy')
+    # Todos los roles almacenan sesiones; nunca permitir copias de seguridad
+    # Android de datos locales ni trafico HTTP de texto claro en produccion.
+    content=replace_once(content,'<application','<application android:allowBackup="false" android:usesCleartextTraffic="false"','application policy')
     if role == 'repartidor':
         content=replace_once(content,'android:icon="@mipmap/ic_launcher"','android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"','round icon')
     if role == 'usuarios':
