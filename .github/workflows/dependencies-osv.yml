@@ -55,14 +55,17 @@ jobs:
   osv:
     name: Segunda comprobación OSV — vulnerabilidades conocidas
     needs: lockfiles
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0
-    with:
-      download-artifact: tala-eats-lockfiles-osv
-      upload-sarif: false
-      fail-on-vuln: true
-      scan-args: |-
-        --recursive
-        ./
-    permissions:
-      contents: read
-      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Descargar lockfiles auditables
+        uses: actions/download-artifact@v4
+        with:
+          name: tala-eats-lockfiles-osv
+          path: ./
+      - name: Escaneo OSV de dependencias Flutter
+        uses: google/osv-scanner-action/osv-scanner-action@0a65f82af05cd58cf587827b0bb0489548c18346 # v2.7.0
+        with:
+          scan-args: |-
+            --recursive
+            ./
