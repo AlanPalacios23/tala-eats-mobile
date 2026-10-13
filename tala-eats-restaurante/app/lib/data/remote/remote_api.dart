@@ -217,7 +217,7 @@ class RemoteApi {
     final headers = <String, String>{
       'Accept': 'application/json',
       'X-TalaEats-Client': 'restaurant-mobile',
-      'X-TalaEats-App-Version': '0.7.5',
+      'X-TalaEats-App-Version': '0.7.6',
       'X-Device-ID': await session.deviceId(),
       'X-Request-ID': 'rest-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(0x7fffffff).toRadixString(16)}',
     };
