@@ -1,17 +1,29 @@
-# TALA EATS — Aplicaciones móviles
+# TALA EATS · Apps Flutter Android
 
-Repositorio **privado** confirmado. Destinado a las tres aplicaciones Flutter:
+Repositorio privado para **Usuarios (v1.0.19)**, **Restaurante (v0.7.6)** y **Repartidor (v1.2.7)**.
 
-- **Usuarios:** v1.0.19
-- **Restaurante:** v0.7.6
-- **Repartidor:** v1.2.7
+## Estado actual
 
-## Estado de la configuración
+- ✅ Repositorio privado.
+- ✅ Workflow `.github/workflows/android-apk.yml` publicado.
+- ⏳ Falta **una sola carga** del ZIP inicial con el código fuente.
+- ⏳ Sin ejecuciones PASS ni APK reales verificadas todavía.
 
-**Pendiente:** subir las carpetas completas de código Flutter y activar GitHub Actions. La transferencia automática de los archivos desde ChatGPT no se completó debido a una restricción de seguridad; se retiraron los fragmentos importados que se pudieron eliminar. El contenido de `archives/source.parts/`, si existe, es un fragmento incompleto y no sirve para compilar.
+## Activación (una sola vez, sin instalar nada en Windows)
 
-Todavía **no existe una APK compilada ni una ejecución PASS en GitHub Actions**. No se ha tocado el backend de Kali ni Stripe LIVE.
+1. Descargar el archivo **`TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip`** desde la conversación de ChatGPT.
+2. Abrir la página principal del repositorio y pulsar **Add file → Upload files**.
+3. Subir **ese ZIP intacto**, con el mismo nombre, directamente a la **raíz** del repositorio (no a una subcarpeta). No hace falta descomprimirlo.
+4. Pulsar **Commit changes** en la rama `main`.
 
-## Paquete listo para subir
+El flujo en la pestaña **Actions** se activa con esa carga. Primero valida y extrae el kit en los tres directorios `tala-eats-usuarios/`, `tala-eats-restaurante/` y `tala-eats-repartidor/`, los guarda como archivos editables en Git y elimina el ZIP de la rama principal. Después ejecuta tres trabajos Android independientes.
 
-En la conversación ChatGPT está disponible `TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip`: contiene los tres proyectos completos y sus workflows separados. El kit sirve para poblar el monorepositorio; no subas el ZIP solamente como un archivo, extrae su contenido y conserva las carpetas.
+En cada app: Flutter 3.47.6, Java 21, bootstrap Android, `flutter pub get`, `flutter analyze`, `flutter test`, `flutter build apk --debug`. Si todas las etapas pasan, la APK aparece en **Actions → ejecución → Artifacts**. Los diagnósticos se guardan incluso cuando una etapa falla.
+
+### Importante
+
+- Las APK son de **prueba/debug**, no versiones finales firmadas para tiendas ni garantía de funcionar sin defectos.
+- Si una app falla QA, no se publica su APK: consultar el artefacto de diagnóstico de ese trabajo.
+- La primera ejecución puede descubrir incompatibilidades reales de dependencias, Android/Gradle o tests.
+- No publicar claves privadas, credenciales, contraseñas ni archivos de firma.
+- Este flujo no despliega ni modifica el backend de Kali, Stripe LIVE, PostgreSQL, Redis, Cloudflared ni la web.
