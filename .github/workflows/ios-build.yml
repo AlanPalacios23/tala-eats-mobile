@@ -1,0 +1,109 @@
+name: Tala Eats | Verificar iOS sin firma
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tala-eats-usuarios/**'
+      - 'tala-eats-restaurante/**'
+      - 'tala-eats-repartidor/**'
+      - 'ci/bootstrap_ios.py'
+      - '.github/workflows/ios-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tala-eats-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ios-unsigned:
+    name: ${{ matrix.rol }} | iOS sin firma (NO instalable)
+    runs-on: macos-15
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        rol: [usuarios, restaurante, repartidor]
+    steps:
+      - name: Descargar código privado
+        uses: actions/checkout@v4
+      - name: Verificar Xcode/macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          pod --version
+      - name: Flutter 3.47.6
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Preparar iOS temporal y diagnósticos
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "tala-eats-${{ matrix.rol }}/app/ci-logs"
+          flutter --version | tee "tala-eats-${{ matrix.rol }}/app/ci-logs/flutter-version.log"
+          python3 ci/bootstrap_ios.py --role "${{ matrix.rol }}"
+      - name: Preparar fuentes tipográficas (Restaurante)
+        if: matrix.rol == 'restaurante'
+        run: python3 tala-eats-restaurante/ci/prepare_fonts.py
+      - name: Instalar dependencias Flutter
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -o pipefail
+          flutter pub get 2>&1 | tee ci-logs/pub-get.log
+      - name: Análisis Flutter
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos 2>&1 | tee ci-logs/analyze.log
+      - name: Ejecutar tests
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded 2>&1 | tee ci-logs/test.log
+      - name: Compilar iOS release SIN firma
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -euo pipefail
+          case "${{ matrix.rol }}" in
+            usuarios)
+              flutter build ios --release --no-codesign --dart-define=TALAEATS_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1 2>&1 | tee ci-logs/ios-build.log
+              ;;
+            restaurante)
+              flutter build ios --release --no-codesign --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1 2>&1 | tee ci-logs/ios-build.log
+              ;;
+            repartidor)
+              flutter build ios --release --no-codesign 2>&1 | tee ci-logs/ios-build.log
+              ;;
+          esac
+          test -d build/ios/iphoneos/Runner.app
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app "ci-logs/TalaEats-${{ matrix.rol }}-iOS-UNSIGNED.zip"
+          echo "Se generó una app iOS SIN firma; NO se puede instalar directamente en iPhone."
+      - name: Publicar artefacto iOS NO instalable solo si todo pasa
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-${{ matrix.rol }}-ios-UNSIGNED-${{ github.run_number }}
+          path: tala-eats-${{ matrix.rol }}/app/ci-logs/TalaEats-${{ matrix.rol }}-iOS-UNSIGNED.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Guardar diagnósticos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-${{ matrix.rol }}-ios-logs-${{ github.run_number }}
+          path: |
+            tala-eats-${{ matrix.rol }}/app/ci-logs/*.log
+          if-no-files-found: ignore
+          retention-days: 7
