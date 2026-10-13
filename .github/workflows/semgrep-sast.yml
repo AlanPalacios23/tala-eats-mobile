@@ -20,11 +20,13 @@ jobs:
     steps:
       - name: Descargar código privado
         uses: actions/checkout@v4
+      - name: Python aislado para scanner
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Instalar Semgrep (versión fijada)
         shell: bash
-        run: |
-          python3 -m pip install --disable-pip-version-check --user semgrep==1.180.0
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        run: python -m pip install --disable-pip-version-check semgrep==1.180.0
       - name: Revisar fuente productiva, sin pruebas ni archivos binarios
         shell: bash
         run: |
