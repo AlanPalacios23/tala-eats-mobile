@@ -18,9 +18,9 @@ void main() {
     await tester.tap(button);
     await tester.pumpAndSettle();
 
-    // Pantalla A con aviso honesto: no se mueve dinero ni se inventa saldo.
+    // Aviso de bloqueos: no envía ganancias al banco ni inventa saldo.
     expect(find.text('Mis retiros'), findsOneWidget);
-    expect(find.textContaining('no se mueve dinero'), findsOneWidget);
+    expect(find.textContaining('Enviar ganancias al banco sigue bloqueado'), findsOneWidget);
     expect(find.text('Saldo no disponible'), findsOneWidget);
     expect(find.textContaining(r'$0'), findsNothing);
 

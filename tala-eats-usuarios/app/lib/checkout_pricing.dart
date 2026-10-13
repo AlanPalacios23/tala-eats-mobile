@@ -92,7 +92,7 @@ class CheckoutPricingPreview {
     if (hasCoupon || plusMember) {
       return 'Referencia antes de cupones y beneficios Plus. El envío real depende de la distancia; el servidor confirma el total.';
     }
-    if (policy!.version == '1.6.2') return 'Referencia mínima de envío, no cotización: $35 hasta 2 km y $5 por cada km adicional. El total definitivo lo confirma el servidor antes del cobro.';
+    if (policy!.version == '1.6.2') return 'Referencia mínima de envío, no cotización: \$35 hasta 2 km y \$5 por cada km adicional. El total definitivo lo confirma el servidor antes del cobro.';
     return 'Importe estimado. El envío puede subir por distancia y los precios/promociones se verifican al confirmar el pedido.';
   }
 }
