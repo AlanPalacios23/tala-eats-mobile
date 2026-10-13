@@ -79,6 +79,19 @@ class NativeBridge {
   }
 }
 
+/// Bound JSON responses to avoid unbounded memory growth.
+Future<String> readBoundedUtf8Response(Stream<List<int>> source, {int maxBytes = 4 * 1024 * 1024}) async {
+  if (maxBytes <= 0) throw ArgumentError.value(maxBytes, 'maxBytes');
+  final bytes = <int>[];
+  await for (final chunk in source.timeout(const Duration(seconds: 20))) {
+    if (chunk.length > maxBytes - bytes.length) {
+      throw ApiException(502, 'La respuesta del servidor excedió el tamaño permitido.');
+    }
+    bytes.addAll(chunk);
+  }
+  return utf8.decode(bytes);
+}
+
 class TalaApi {
   TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+$'), '');
 
@@ -93,6 +106,8 @@ class TalaApi {
   Future<dynamic> put(String path, [Object? body]) => _request('PUT', path, body: body);
 
   Future<dynamic> _request(String method, String path, {Object? body}) async {
+    // Preserve credentials for a logout request already in flight.
+    final String? requestToken = token;
     final Uri uri = Uri.parse('$baseUrl${path.startsWith('/') ? path : '/$path'}');
     HttpClientRequest req;
     try {
@@ -105,7 +120,9 @@ class TalaApi {
     req.headers.set(HttpHeaders.acceptHeader, 'application/json');
     req.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
     req.headers.set('X-TalaEats-Client', 'mobile');
-    if (token != null && token!.isNotEmpty) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    if (requestToken != null && requestToken.isNotEmpty) {
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $requestToken');
+    }
     if (body != null) req.write(jsonEncode(body));
     HttpClientResponse res;
     try {
@@ -113,7 +130,14 @@ class TalaApi {
     } on TimeoutException {
       throw ApiException(0, 'La operación tardó demasiado. Inténtalo otra vez.');
     }
-    final String raw = await utf8.decoder.bind(res).join();
+    String raw;
+    try {
+      raw = await readBoundedUtf8Response(res);
+    } on TimeoutException {
+      throw ApiException(0, 'El servidor tardó demasiado en enviar la respuesta.');
+    } on SocketException {
+      throw ApiException(0, 'Se interrumpió la respuesta. Verifica el pedido antes de reintentar.');
+    }
     dynamic decoded;
     if (raw.isNotEmpty) {
       try { decoded = jsonDecode(raw); } catch (_) { decoded = raw; }
