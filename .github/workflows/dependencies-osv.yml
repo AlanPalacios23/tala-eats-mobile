@@ -1,0 +1,68 @@
+name: Tala Eats | Auditoría de dependencias OSV
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 12 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'tala-eats-usuarios/app/pubspec.yaml'
+      - 'tala-eats-restaurante/app/pubspec.yaml'
+      - 'tala-eats-repartidor/app/pubspec.yaml'
+      - '.github/workflows/dependencies-osv.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lockfiles:
+    name: Resolver dependencias sin modificar producción
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout privado
+        uses: actions/checkout@v4
+      - name: Flutter 3.47.6
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Resolver lockfiles de las tres apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          for role in usuarios restaurante repartidor; do
+            (
+              cd "tala-eats-$role/app"
+              flutter pub get
+              test -s pubspec.lock
+              echo "DEPENDENCIES_RESOLVED $role"
+            )
+          done
+      - name: Publicar solo lockfiles para OSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: tala-eats-lockfiles-osv
+          path: |
+            tala-eats-usuarios/app/pubspec.lock
+            tala-eats-restaurante/app/pubspec.lock
+            tala-eats-repartidor/app/pubspec.lock
+          if-no-files-found: error
+          retention-days: 3
+
+  osv:
+    name: Segunda comprobación OSV — vulnerabilidades conocidas
+    needs: lockfiles
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0
+    with:
+      download-artifact: tala-eats-lockfiles-osv
+      upload-sarif: false
+      fail-on-vuln: true
+      scan-args: |-
+        --recursive
+        ./
+    permissions:
+      contents: read
+      actions: read
