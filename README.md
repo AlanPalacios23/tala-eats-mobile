@@ -1,19 +1,17 @@
-# TALA EATS — apps móviles Flutter
+# TALA EATS — Aplicaciones móviles
 
-Repositorio **privado** para las aplicaciones Android/iOS de **Usuarios**, **Restaurante** y **Repartidor**.
+Repositorio **privado** confirmado. Destinado a las tres aplicaciones Flutter:
 
-| Aplicación | Directorio | Versión inicial |
-|---|---|---|
-| Usuarios | `tala-eats-usuarios/app/` | `1.0.19` |
-| Restaurante | `tala-eats-restaurante/app/` | `0.7.6` |
-| Repartidor | `tala-eats-repartidor/app/` | `1.2.7` |
+- **Usuarios:** v1.0.19
+- **Restaurante:** v0.7.6
+- **Repartidor:** v1.2.7
 
-## Compilación automática
+## Estado de la configuración
 
-En **Actions** ejecuta el flujo **TALA EATS · Android CI & APK**. Cada cambio en `main` verifica las tres apps en Ubuntu + Flutter 3.47.6, ejecuta `flutter pub get`, análisis estático, pruebas y genera una APK **debug** descargable cuando todo pasa. Si falla, descarga el artefacto `diagnostico` correspondiente para ver los logs; no se marcará como aprobada una APK que no haya superado los pasos.
+**Pendiente:** subir las carpetas completas de código Flutter y activar GitHub Actions. La transferencia automática de los archivos desde ChatGPT no se completó debido a una restricción de seguridad; se retiraron los fragmentos importados que se pudieron eliminar. El contenido de `archives/source.parts/`, si existe, es un fragmento incompleto y no sirve para compilar.
 
-La importación inicial desde partes compactadas la realiza el mismo flujo en un commit adicional. Este diseño permite que los archivos fuente se mantengan legibles/editables en el repositorio, en vez de depender de scripts `.cmd` de Windows.
+Todavía **no existe una APK compilada ni una ejecución PASS en GitHub Actions**. No se ha tocado el backend de Kali ni Stripe LIVE.
 
-**Seguridad:** no incluir `.env`, claves de firma, credenciales de Stripe, TOTP, contraseñas ni tokens. Los builds debug no están listos para Google Play. Este CI no modifica el backend de Kali ni el servidor de producción.
+## Paquete listo para subir
 
-**Estado:** código preparado desde nuestros ZIP de Biblioteca; un resultado PASS solo existe cuando GitHub Actions lo confirma.
+En la conversación ChatGPT está disponible `TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip`: contiene los tres proyectos completos y sus workflows separados. El kit sirve para poblar el monorepositorio; no subas el ZIP solamente como un archivo, extrae su contenido y conserva las carpetas.
