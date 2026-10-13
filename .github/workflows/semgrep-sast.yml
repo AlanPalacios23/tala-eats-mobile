@@ -1,0 +1,41 @@
+name: Tala Eats | SAST Semgrep Dart
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 12 * * 2'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/semgrep-sast.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dart-sast:
+    name: Segunda revisión estática (Dart, Java y Python)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Descargar código privado
+        uses: actions/checkout@v4
+      - name: Instalar Semgrep (versión fijada)
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check --user semgrep==1.180.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Revisar fuente productiva, sin pruebas ni archivos binarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-audit
+          semgrep scan             --config p/default             --metrics off             --error             --json --output ci-audit/semgrep.json             --exclude '*/test/*'             --exclude '*/assets/*'             --exclude '*/.dart_tool/*'             tala-eats-usuarios/app/lib tala-eats-restaurante/app/lib tala-eats-repartidor/app/lib             tala-eats-usuarios/app/tools/native
+      - name: Conservar evidencia del scanner
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Semgrep-SAST-${{ github.run_number }}
+          path: ci-audit/semgrep.json
+          if-no-files-found: ignore
+          retention-days: 7
