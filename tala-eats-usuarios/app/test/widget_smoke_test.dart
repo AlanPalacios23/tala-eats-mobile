@@ -281,7 +281,7 @@ void main() {
   // v1.0.9 — Checkout nunca debe quedar en negro/blanco: renderiza su
   // estructura y un estado claro cuando el pago en línea no está disponible.
   testWidgets('Checkout renderiza estado claro sin pago en línea', (WidgetTester tester) async {
-    final TalaModel model = TalaModel();
+    final TalaModel model = TalaModel(apiClient: _CheckoutPaymentMethodsQaApi(cash: false, mercadoPago: false, stripe: false));
     model.restaurants.add(const Restaurant(
       id: 55,
       name: 'Restaurante Checkout QA',
