@@ -1,0 +1,168 @@
+name: Tala Eats | Verificar y compilar APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip'
+      - 'tala-eats-usuarios/**'
+      - 'tala-eats-restaurante/**'
+      - 'tala-eats-repartidor/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tala-eats-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  importar-fuentes:
+    name: Importar kit Flutter (solo la primera vez)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Descargar repositorio privado
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Verificar e importar las tres aplicaciones
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f tala-eats-usuarios/app/lib/main.dart ] && \
+             [ -f tala-eats-restaurante/app/lib/main.dart ] && \
+             [ -f tala-eats-repartidor/app/lib/main.dart ]; then
+            echo 'Las tres aplicaciones ya están importadas; no se sobrescribe el código.'
+            exit 0
+          fi
+          test -s TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip || {
+            echo 'ERROR: falta el kit ZIP en la raíz del repositorio.'
+            exit 1
+          }
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+          archive=Path('TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip')
+          allowed={
+            'tala-eats-usuarios',
+            'tala-eats-restaurante',
+            'tala-eats-repartidor',
+          }
+          with ZipFile(archive) as z:
+            names=z.namelist()
+            if len(names)>1500 or sum(f.file_size for f in z.infolist())>60_000_000:
+              raise RuntimeError('Archivo demasiado grande o inesperado')
+            for info in z.infolist():
+              p=PurePosixPath(info.filename)
+              if p.is_absolute() or '..' in p.parts or '\\' in info.filename:
+                raise RuntimeError(f'Ruta insegura: {info.filename}')
+              if not p.parts or p.parts[0] not in allowed:
+                continue
+              if info.external_attr >> 16 & 0o170000 == 0o120000:
+                raise RuntimeError(f'Enlace simbólico no admitido: {info.filename}')
+              z.extract(info)
+          for role in ('usuarios','restaurante','repartidor'):
+            root=Path(f'tala-eats-{role}')
+            for required in ('app/lib/main.dart','app/pubspec.yaml','ci/bootstrap_android.py'):
+              if not (root/required).is_file():
+                raise RuntimeError(f'{root}/{required} no se encontró')
+          print('Tres proyectos Flutter importados correctamente desde ZIP')
+          PY
+          git add tala-eats-usuarios tala-eats-restaurante tala-eats-repartidor
+          git rm -f TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: importar fuentes Flutter de las tres aplicaciones'
+            git push origin HEAD:main
+          fi
+
+  android-apk:
+    name: ${{ matrix.rol }} | Analizar, probar y compilar
+    needs: importar-fuentes
+    if: ${{ needs.importar-fuentes.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        rol: [usuarios, restaurante, repartidor]
+    steps:
+      - name: Obtener versión más reciente del código
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Flutter 3.47.6
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Crear carpeta de diagnóstico
+        shell: bash
+        run: |
+          mkdir -p "tala-eats-${{ matrix.rol }}/app/ci-logs"
+          flutter --version | tee "tala-eats-${{ matrix.rol }}/app/ci-logs/flutter-version.log"
+          flutter doctor -v | tee "tala-eats-${{ matrix.rol }}/app/ci-logs/flutter-doctor.log"
+      - name: Crear Android nativo temporal
+        shell: bash
+        run: python3 "tala-eats-${{ matrix.rol }}/ci/bootstrap_android.py" --role "${{ matrix.rol }}"
+      - name: Preparar fuentes open-source de Restaurante
+        if: matrix.rol == 'restaurante'
+        run: python3 tala-eats-restaurante/ci/prepare_fonts.py
+      - name: Instalar dependencias
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -o pipefail
+          flutter pub get 2>&1 | tee ci-logs/pub-get.log
+      - name: Adaptar Stripe Android (Usuarios)
+        if: matrix.rol == 'usuarios'
+        run: python3 tala-eats-usuarios/ci/stripe_jvm.py
+      - name: Análisis estático
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos 2>&1 | tee ci-logs/analyze.log
+      - name: Ejecutar tests
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded 2>&1 | tee ci-logs/test.log
+      - name: Compilar APK debug (sin claves de publicación)
+        shell: bash
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          set -euo pipefail
+          case '${{ matrix.rol }}' in
+            usuarios) flutter build apk --debug --dart-define=TALAEATS_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1 2>&1 | tee ci-logs/build.log ;;
+            restaurante) flutter build apk --debug --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1 2>&1 | tee ci-logs/build.log ;;
+            repartidor) flutter build apk --debug 2>&1 | tee ci-logs/build.log ;;
+          esac
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Adjuntar APK (solo con pruebas y compilación PASS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-${{ matrix.rol }}-debug-${{ github.run_number }}
+          path: tala-eats-${{ matrix.rol }}/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Guardar logs incluso ante errores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-${{ matrix.rol }}-diagnostico-${{ github.run_number }}
+          path: tala-eats-${{ matrix.rol }}/app/ci-logs/
+          if-no-files-found: ignore
+          retention-days: 7
