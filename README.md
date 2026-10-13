@@ -1,5 +1,27 @@
 # TALA EATS · Apps Flutter Android
 
+## Prioridad actual · Android-first (13 oct 2026)
+
+✅ **Android CI:** las tres APK debug compilaron y pasaron análisis/tests en [ejecución #3](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38451662979).
+
+🧪 **Aún pendiente:** pruebas de inicio de sesión, navegación, GPS, pedidos y sincronización entre tres roles en teléfonos Android reales. Los tests de widget/unidad y una APK compilada no equivalen a un flujo E2E validado contra backend.
+
+🍎 **iOS:** flujo configurado en GitHub, pero pausado en modo **solo manual** mientras se prioriza Android y se controla gasto macOS.
+
+**Plan de trabajo / seguimiento**
+
+1. **[P0: Pedido completo Usuarios → Restaurante → Repartidor](https://github.com/AlanPalacios23/tala-eats-mobile/issues/1).**
+2. **[Usuarios: catálogo, carrito, checkout y precios](https://github.com/AlanPalacios23/tala-eats-mobile/issues/2).**
+3. **[Restaurante: onboarding, menú, KDS, pagos y ubicación](https://github.com/AlanPalacios23/tala-eats-mobile/issues/3).**
+4. **[Repartidor: GPS, asignaciones, pruebas de entrega y ganancias](https://github.com/AlanPalacios23/tala-eats-mobile/issues/4).**
+
+Guías: [QA Android](docs/QA-ANDROID.md) · [iOS y TestFlight](docs/IOS-TESTFLIGHT.md).
+
+**Seguridad:** las APK debug apuntan al endpoint configurado de Tala Eats; no ejecutar cobros o retiros reales para QA y no usar cuentas personales, bancarias ni credenciales en capturas/logs. El backend de Kali **no se modifica** desde este repositorio.
+
+---
+
+
 Repositorio privado para **Usuarios (v1.0.19)**, **Restaurante (v0.7.6)** y **Repartidor (v1.2.7)**.
 
 ## Estado actual
