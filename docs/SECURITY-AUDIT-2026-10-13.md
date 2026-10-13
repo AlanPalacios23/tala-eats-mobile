@@ -49,3 +49,16 @@
 
 ## Seguridad operativa
 No se ejecutaron POST/PATCH/DELETE en el backend productivo, no se alteró Kali, Stripe LIVE, configuración de Cloudflared, balances ni certificados. No se publicaron secretos en este documento.
+
+
+## Resultados de herramientas independientes (13/10/2026)
+
+| Control | Resultado confirmado | Evidencia |
+|---|---|---|
+| OSV dependencias Flutter | **PASS** — 31 paquetes Usuarios, 107 Restaurante y 109 Repartidor (247 apariciones, pueden solaparse), **0 vulnerabilidades conocidas reportadas** | [OSV #2](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38467948926) |
+| Semgrep revisión estática | **PASS** — 94 archivos, 165 reglas ejecutadas, **0 hallazgos reportados** | [SAST #2](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38468644890) |
+| Android control nativo, tests y APK base | **PASS 3/3** en código anterior a las correcciones de sesión | [Android #9](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38458314045) |
+| Android primeras correcciones de sesión | **FAIL en análisis** por error de sintaxis introducido durante la edición; la línea se reparó | [Android #10](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38467725983) |
+| Android código corregido | **Pendiente de confirmación**, no se declara PASS hasta que cierren los trabajos | [Android #11](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38468448092) |
+
+Los scans OSV/Semgrep no revisan por completo las bibliotecas nativas Gradle y no son pentests. Las pruebas de backend, idempotencia y QA físico siguen siendo requisitos abiertos. 
