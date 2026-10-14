@@ -94,6 +94,45 @@ def setup(role):
             s,c2=re.subn(r'(<style name="NormalTheme" parent=")[^"]+("[^>]*>)',r'\1Theme.MaterialComponents.DayNight.NoActionBar\2',s)
             if c1!=1 or c2!=1: raise RuntimeError(f'Unexpected native theme format: {file}')
             write(file,s)
+        # El splash de Android es un breve handoff del sistema operativo.
+        # No mostrar el icono genérico "T" ni repetir la pantalla Flutter:
+        # Android 12+ restringe las imágenes fullscreen en su splash nativo.
+        resources=target/'app/src/main/res'
+        blank_background='''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+</layer-list>
+'''
+        for directory in ('drawable','drawable-v21'):
+            dest=resources/directory/'launch_background.xml'
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            write(dest,blank_background)
+        blank_icon=resources/'drawable'/'tala_launch_blank.xml'
+        write(blank_icon,'''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#00FFFFFF" />
+</shape>
+''')
+        modern=resources/'values-v31'/'styles.xml'
+        modern.parent.mkdir(parents=True,exist_ok=True)
+        theme=(resources/'values'/'styles.xml').read_text(encoding='utf-8')
+        theme=replace_once(theme,'<style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">',
+            '<style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">\n'
+            '        <item name="android:windowSplashScreenBackground">@android:color/white</item>\n'
+            '        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_launch_blank</item>',
+            'Android 12 splash theme')
+        if modern.exists():
+            # Fusionar únicamente los atributos nuevos, preservar el resto del tema.
+            current=modern.read_text(encoding='utf-8')
+            if 'name="LaunchTheme"' not in current:
+                raise RuntimeError('No LaunchTheme in Android 12 themes')
+            current=re.sub(r'(<style name="LaunchTheme"[^>]*>)',
+                r'\\1\\n        <item name="android:windowSplashScreenBackground">@android:color/white</item>\n'
+                r'        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_launch_blank</item>',
+                current,count=1)
+            write(modern,current)
+        else:
+            write(modern,theme)
         write(target/'app/proguard-rules.pro','''-dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivity$g
 -dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Args
 -dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Error
