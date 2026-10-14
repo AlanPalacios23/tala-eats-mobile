@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / 'app'
 ROLES = {
-    'usuarios': {'name':'app', 'package':'com.talaeats.app', 'label':'Tala Eats', 'permissions':['INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']},
+    'usuarios': {'name':'app', 'package':'com.talaeats.app', 'label':'Tala Eats', 'permissions':['INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION','POST_NOTIFICATIONS']},
     'restaurante': {'name':'restaurant', 'package':'com.talaeats.restaurant', 'label':'Tala Eats Restaurante', 'permissions':['INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']},
     'repartidor': {'name':'driver', 'package':'com.talaeats.driver', 'label':'Tala Eats Repartidor', 'permissions':['INTERNET','CAMERA','ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION']},
 }
@@ -78,7 +78,10 @@ def setup(role):
             </intent-filter>
 '''
         content=replace_once(content,'</activity>',deep_links+'        </activity>','user deep links')
-        content=replace_once(content,'</application>','        <meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true" />\n    </application>','wallet metadata')
+        content=replace_once(content,'</application>',
+            '        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="orders" />\\n'
+            '        <meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true" />\\n'
+            '    </application>','wallet and push metadata')
         source=APP/'tools/native/MainActivity.java'
         if not source.is_file(): raise RuntimeError('Missing project-native Stripe/secure MainActivity.java')
         dest=target/'app/src/main/java/com/talaeats/app/MainActivity.java'
