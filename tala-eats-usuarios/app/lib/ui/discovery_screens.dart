@@ -29,8 +29,25 @@ int cartItemCount(TalaModel model) => model.cart.fold<int>(0, (int total, CartLi
 /// model replaces a cart that belongs to another restaurant.
 Future<bool> addItemWithGuard(BuildContext context, TalaModel model, FoodItem item, int quantity, {String note = ''}) async {
   final Restaurant? target = restaurantFor(model, item.restaurantId);
-  if (target != null && !target.isOpen) {
+  if (target == null) {
+    showMessage(context, 'Este comercio ya no está disponible. Actualiza el catálogo.');
+    return false;
+  }
+  if (!target.isOpen) {
     showMessage(context, 'Este restaurante está cerrado por ahora.');
+    return false;
+  }
+  // Una ficha abierta puede quedar obsoleta tras actualizar el catálogo.
+  // El servidor seguirá validando stock/precio al confirmar el pedido.
+  FoodItem? latest;
+  for (final FoodItem current in model.menu) {
+    if (current.restaurantId == item.restaurantId && current.id == item.id) {
+      latest = current;
+      break;
+    }
+  }
+  if (latest == null || latest.price != item.price) {
+    showMessage(context, 'Este platillo cambió o dejó de estar disponible. Actualiza el menú.');
     return false;
   }
   if (model.cart.isNotEmpty && model.cartRestaurantId != null && model.cartRestaurantId != item.restaurantId) {
