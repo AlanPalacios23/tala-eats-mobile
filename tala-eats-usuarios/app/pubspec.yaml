@@ -23,4 +23,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
-    - assets/images/auth_food_cover.webp
+    - assets/images/launch_cover.jpg
+    - assets/images/auth_login.jpg
+    - assets/images/auth_register.jpg
