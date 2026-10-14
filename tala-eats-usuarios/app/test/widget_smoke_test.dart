@@ -158,8 +158,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Crear cuenta'), findsWidgets);
-    expect(find.text('Contraseña'), findsOneWidget);
-    expect(find.text('Confirmar contraseña'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(
+        find.byKey(const ValueKey<String>('signup-password')),
+      ).decoration!.hintText,
+      'Contraseña',
+    );
+    expect(
+      tester.widget<TextField>(
+        find.byKey(const ValueKey<String>('signup-confirm-password')),
+      ).decoration!.hintText,
+      'Confirmar contraseña',
+    );
   });
 
   testWidgets('Recuperación production está disponible sin tocar red', (WidgetTester tester) async {
