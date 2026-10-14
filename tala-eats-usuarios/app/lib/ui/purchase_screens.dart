@@ -872,9 +872,15 @@ class CashOrderConfirmationScreen extends StatelessWidget {
             TalaCard(padding: const EdgeInsets.all(16), child: OrderStatusTimeline(order: order, compact: true)),
             const SizedBox(height: 22),
             FilledButton.icon(
-              onPressed: () => Navigator.of(context).pushReplacement(premiumRoute(OrderDetailScreen(model: model, order: order))),
-              icon: const Icon(Icons.receipt_long_rounded),
-              label: const Text('Ver mi pedido'),
+              onPressed: () => Navigator.of(context).pushReplacement(
+                premiumRoute(
+                  delivery
+                      ? TrackingScreen(model: model, order: order)
+                      : OrderDetailScreen(model: model, order: order),
+                ),
+              ),
+              icon: Icon(delivery ? Icons.near_me_rounded : Icons.receipt_long_rounded),
+              label: Text(delivery ? 'Seguir mi entrega' : 'Ver mi pedido'),
             ),
             const SizedBox(height: 6),
             TextButton(onPressed: () => Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst), child: const Text('Volver a Inicio')),
@@ -1116,9 +1122,19 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
                 ),
               ] else
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).pushReplacement(premiumRoute(OrderDetailScreen(model: widget.model, order: order))),
-                  icon: const Icon(Icons.receipt_long_rounded),
-                  label: const Text('Ver mi pedido'),
+                  onPressed: () => Navigator.of(context).pushReplacement(
+                    premiumRoute(
+                      order.deliveryMode == 'delivery'
+                          ? TrackingScreen(model: widget.model, order: order)
+                          : OrderDetailScreen(model: widget.model, order: order),
+                    ),
+                  ),
+                  icon: Icon(order.deliveryMode == 'delivery'
+                      ? Icons.near_me_rounded
+                      : Icons.receipt_long_rounded),
+                  label: Text(order.deliveryMode == 'delivery'
+                      ? 'Seguir mi entrega'
+                      : 'Ver mi pedido'),
                 ),
               const SizedBox(height: 6),
               TextButton(
