@@ -112,6 +112,22 @@ public class MainActivity extends FlutterFragmentActivity {
                         result.success(latestUri.isEmpty() ? null : latestUri); break;
                     case "pushDeviceId":
                         result.success(pushDeviceId()); break;
+                    case "getPushEnabled":
+                        result.success(getSharedPreferences(PUSH_PREFS, Context.MODE_PRIVATE)
+                                .getBoolean("push_enabled", true)); break;
+                    case "setPushEnabled":
+                        Boolean pushEnabled = call.argument("enabled");
+                        getSharedPreferences(PUSH_PREFS, Context.MODE_PRIVATE)
+                                .edit().putBoolean("push_enabled", Boolean.TRUE.equals(pushEnabled)).apply();
+                        result.success(null); break;
+                    case "getPushMarketing":
+                        result.success(getSharedPreferences(PUSH_PREFS, Context.MODE_PRIVATE)
+                                .getBoolean("push_marketing", false)); break;
+                    case "setPushMarketing":
+                        Boolean pushMarketing = call.argument("enabled");
+                        getSharedPreferences(PUSH_PREFS, Context.MODE_PRIVATE)
+                                .edit().putBoolean("push_marketing", Boolean.TRUE.equals(pushMarketing)).apply();
+                        result.success(null); break;
                     case "openAppSettings":
                         Intent settingsIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())); startActivity(settingsIntent); result.success(null); break;
                     case "currentLocation":
