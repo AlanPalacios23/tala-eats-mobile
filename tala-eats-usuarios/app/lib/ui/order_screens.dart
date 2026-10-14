@@ -746,13 +746,38 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  if (!terminal) const LiveBadge() else const StatusPill(label: 'Finalizado', color: kGreen, background: kSoftGreen),
-                  const Spacer(),
-                  AnimatedSwitcher(
-                    duration: TalaMotion.of(context, TalaMotion.select),
-                    child: refreshing
-                        ? const SizedBox(key: ValueKey<String>('r'), width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Estimado ${order.eta}', key: ValueKey<String>(order.eta), style: TalaText.caption),
+                  Flexible(
+                    flex: 3,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: !terminal
+                          ? const LiveBadge()
+                          : const StatusPill(label: 'Finalizado', color: kGreen, background: kSoftGreen),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 2,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: AnimatedSwitcher(
+                        duration: TalaMotion.of(context, TalaMotion.select),
+                        child: refreshing
+                            ? const SizedBox(
+                                key: ValueKey<String>('r'),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                'Estimado ${order.eta}',
+                                key: ValueKey<String>(order.eta),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TalaText.caption,
+                              ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -973,7 +998,14 @@ class LiveBadge extends StatelessWidget {
         children: <Widget>[
           Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          const Text('Actualización periódica', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          const Flexible(
+            child: Text(
+              'Actualización periódica',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
         ],
       ),
     );
