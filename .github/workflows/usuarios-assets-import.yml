@@ -1,0 +1,57 @@
+name: Tala Eats | Importar fotos originales Usuarios (una sola vez)
+
+# No compila ni instala Android. Sube únicamente los tres recursos entregados
+# por el propietario; el disparador se elimina después de la importación.
+on:
+  push:
+    branches:
+      - feature/usuarios-v1020-chat-repartidor-ui
+    paths:
+      - 'tala-eats-usuarios/ci/IMPORT_MEDIA_REQUEST.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  original-images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout para importar recursos
+        uses: actions/checkout@v4
+      - name: Descargar originales y verificar SHA-256 antes de integrarlos
+        shell: bash
+        env:
+          SOURCE_SPLASH: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3JRVgcDQUmpH7yGXahR2Kecqub1/d9442d6e-42ce-4031-8fa7-a3edc4cae4c5.png'
+          SOURCE_LOGIN: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3JRVgcDQUmpH7yGXahR2Kecqub1/d529ef09-a4c4-452b-8b78-94be5ff56880.png'
+          SOURCE_REGISTER: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3JRVgcDQUmpH7yGXahR2Kecqub1/e6f1c112-e297-4ec2-b44c-e914676e1176.png'
+        run: |
+          set -euo pipefail
+          dest=tala-eats-usuarios/app/assets/images
+          mkdir -p "$dest"
+          curl -fLsS --retry 3 --max-time 90 "$SOURCE_SPLASH" -o "$dest/launch_cover.jpg"
+          curl -fLsS --retry 3 --max-time 90 "$SOURCE_LOGIN" -o "$dest/auth_login.jpg"
+          curl -fLsS --retry 3 --max-time 90 "$SOURCE_REGISTER" -o "$dest/auth_register.jpg"
+          (
+            cd "$dest"
+            echo '63471d0cb76bb52a5928bbea2274b0d056a44bb5b244061e7292e25a5e48095a  launch_cover.jpg'
+            echo '8d549bc60e7e8638279e80f84529cf236fab0e5a0aadd1b350a9c2973ec7b2ff  auth_login.jpg'
+            echo '16f86aac5a5966c3a3f1235dcaeaecb8a664c9887e648b8153c31297b6feb45c  auth_register.jpg'
+          ) | (cd "$dest" && sha256sum --check --status)
+          test -s "$dest/launch_cover.jpg"
+          test -s "$dest/auth_login.jpg"
+          test -s "$dest/auth_register.jpg"
+          echo 'ORIGINAL_IMAGES_INTACT'
+      - name: Guardar recursos en el repositorio privado
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tala-eats-usuarios/app/assets/images/launch_cover.jpg \
+                  tala-eats-usuarios/app/assets/images/auth_login.jpg \
+                  tala-eats-usuarios/app/assets/images/auth_register.jpg
+          if ! git diff --cached --quiet; then
+            git commit -m 'assets(users): imágenes originales para splash, login y registro'
+            git push
+          fi
