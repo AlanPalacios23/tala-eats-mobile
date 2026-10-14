@@ -1151,7 +1151,12 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
   void _listenToAuth() {
     if (_previousAuth == model.signedIn) return;
     _previousAuth = model.signedIn;
-    if (model.signedIn) unawaited(push.onAuthChanged());
+    if (model.signedIn) {
+      unawaited(push.onAuthChanged());
+    } else {
+      // Cierre de sesión forzado/401: invalidar token push también.
+      push.signOut();
+    }
   }
 
   @override
