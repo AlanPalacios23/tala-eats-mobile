@@ -257,7 +257,7 @@ class PremiumBottomDock extends StatelessWidget {
                     child: Semantics(
                       selected: selected,
                       button: true,
-                      label: item.$3,
+                      label: i == 2 && activeOrder ? 'Pedidos, tienes un pedido en curso' : item.$3,
                       excludeSemantics: true,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
