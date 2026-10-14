@@ -1,15 +1,9 @@
 name: Tala Eats | Usuarios QA y APK (solo manual)
 
-# GitHub connector no expone dispatch; un commit del marcador desencadena
-# UNA ejecución del lote. Otros cambios de código NO disparan compilaciones.
-# La vía workflow_dispatch continúa para ejecuciones manuales futuras.
+# Compilación a solicitud expresa; nunca activar con push ni PR.
+# Seleccionar la rama correspondiente al iniciar el workflow manualmente.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/usuarios-v1020-chat-repartidor-ui
-    paths:
-      - 'tala-eats-usuarios/ci/BUILD_APK_REQUEST.txt'
 
 permissions:
   contents: read
