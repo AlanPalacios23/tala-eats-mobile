@@ -1,0 +1,83 @@
+name: Tala Eats | Usuarios PR - QA y APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tala-eats-usuarios/**'
+      - '.github/workflows/usuarios-pr-qa.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: talaeats-users-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  usuarios-qa:
+    name: Usuarios | Analizar, probar y compilar rama del PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout del PR (no main)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Flutter 3.47.6
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Preparar Android nativo efímero
+        run: python3 tala-eats-usuarios/ci/bootstrap_android.py --role usuarios
+      - name: Puerta de seguridad Android
+        run: python3 ci/security_android_gate.py --role usuarios
+      - name: Preparar logs
+        run: mkdir -p tala-eats-usuarios/app/ci-logs
+      - name: Instalar dependencias
+        working-directory: tala-eats-usuarios/app
+        run: |
+          set -o pipefail
+          flutter pub get 2>&1 | tee ci-logs/pub-get.log
+      - name: Ajustar Stripe Android
+        run: python3 tala-eats-usuarios/ci/stripe_jvm.py
+      - name: flutter analyze
+        working-directory: tala-eats-usuarios/app
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos 2>&1 | tee ci-logs/analyze.log
+      - name: flutter test
+        working-directory: tala-eats-usuarios/app
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded 2>&1 | tee ci-logs/test.log
+      - name: flutter build apk --debug
+        working-directory: tala-eats-usuarios/app
+        run: |
+          set -euo pipefail
+          flutter build apk --debug \
+            --dart-define=TALAEATS_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1 \
+            2>&1 | tee ci-logs/build.log
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Adjuntar APK solo si QA PASS
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Usuarios-PR-${{ github.event.pull_request.number }}-debug
+          path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Guardar diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Usuarios-PR-${{ github.event.pull_request.number }}-diagnostico
+          path: tala-eats-usuarios/app/ci-logs/
+          if-no-files-found: ignore
+          retention-days: 7
