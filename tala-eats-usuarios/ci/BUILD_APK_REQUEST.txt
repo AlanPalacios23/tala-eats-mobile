@@ -6,3 +6,5 @@ Solo esta rama y app Usuarios. Sin tocar backend/Kali/Stripe LIVE.
 Reintento 2 (2026-10-14): resolver firebase_core 4.9.0 + firebase_messaging 16.2.2.
 
 Reintento 3: InputDecorationThemeData en pantalla de login Flutter 3.47.6.
+
+Reintento 4: corregidos Material ancestor en QA Buscar, pruebas con scroll, texto Privacidad y overflow layout registro.
