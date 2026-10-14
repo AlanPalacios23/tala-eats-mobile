@@ -154,6 +154,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   late final TextEditingController coupon = TextEditingController(text: widget.model.coupon);
   bool placing = false;
   bool refreshingPayment = false;
+  bool confirmationUncertain = false;
   String error = '';
 
   @override
@@ -211,6 +212,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     setState(() {
       placing = true;
+      confirmationUncertain = false;
       error = '';
     });
     try {
@@ -227,14 +229,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         HapticFeedback.mediumImpact();
         setState(() {
           placing = false;
-          error = e.message;
+          confirmationUncertain = e.statusCode == 0 || e.statusCode >= 500;
+          error = confirmationUncertain
+              ? 'No sabemos si tu pedido se registró. Revisa Mis pedidos antes de volver a confirmar.'
+              : e.message;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
           placing = false;
-          error = 'No pudimos confirmar el pedido. Revisa tu conexión y vuelve a intentarlo.';
+          confirmationUncertain = true;
+          error = 'No sabemos si tu pedido se registró. Revisa Mis pedidos antes de volver a confirmar.';
         });
       }
     }
@@ -497,7 +503,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ? const SizedBox(width: double.infinity)
                     : Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: AuthNotice(icon: Icons.info_outline_rounded, text: error, danger: true),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            AuthNotice(
+                              icon: Icons.info_outline_rounded,
+                              text: error,
+                              danger: true,
+                            ),
+                            if (confirmationUncertain) ...<Widget>[
+                              const SizedBox(height: 10),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  model.setTab(2);
+                                  Navigator.of(context).popUntil(
+                                    (Route<dynamic> route) => route.isFirst,
+                                  );
+                                },
+                                icon: const Icon(Icons.receipt_long_outlined),
+                                label: const Text('Revisar Mis pedidos'),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
               ),
             ],
