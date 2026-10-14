@@ -141,6 +141,7 @@ class OrderEntry {
     this.paymentStatus = 'pending',
     this.paymentMethod = 'cash',
     this.rawStatus = 'received',
+    this.driverId = 0,
     this.driverName = '',
     this.driverVehicle = '',
     this.driverRating = 0,
@@ -157,9 +158,18 @@ class OrderEntry {
   String paymentStatus;
   final String paymentMethod;
   String rawStatus;
-  final String driverName;
-  final String driverVehicle;
-  final double driverRating;
+  int driverId;
+  String driverName;
+  String driverVehicle;
+  double driverRating;
+
+  /// Chat privado: la asignación real viene de OrderPublic del servidor.
+  /// El envío sigue desactivado hasta tener un endpoint exclusivo por rol.
+  bool get canContactDriver =>
+      deliveryMode == 'delivery' &&
+      driverId > 0 &&
+      !<String>{'delivered', 'cancelled'}.contains(rawStatus) &&
+      !isAwaitingOnlinePayment;
 
   bool get isOnlinePayment => paymentMethod == 'stripe' || paymentMethod == 'mercadopago';
   bool get isAwaitingOnlinePayment => isOnlinePayment && paymentStatus != 'paid' && rawStatus != 'cancelled';
@@ -776,7 +786,14 @@ class TalaModel extends ChangeNotifier {
     final Map<String, dynamic> live = await api.liveOrder(order.id);
     final Map<String, dynamic> raw = Map<String, dynamic>.from(live['order'] as Map);
     final OrderEntry fresh = _orderFromJson(raw);
-    order.status = fresh.status; order.rawStatus = fresh.rawStatus; order.paymentStatus = fresh.paymentStatus; order.eta = fresh.eta;
+    order.status = fresh.status;
+    order.rawStatus = fresh.rawStatus;
+    order.paymentStatus = fresh.paymentStatus;
+    order.eta = fresh.eta;
+    order.driverId = fresh.driverId;
+    order.driverName = fresh.driverName;
+    order.driverVehicle = fresh.driverVehicle;
+    order.driverRating = fresh.driverRating;
     notifyListeners();
   }
 
@@ -981,7 +998,7 @@ class TalaModel extends ChangeNotifier {
     }
     final int eta=_asInt(raw['estimated_minutes']);
     final Map<String,dynamic> driver=raw['driver_info'] is Map ? Map<String,dynamic>.from(raw['driver_info'] as Map) : <String,dynamic>{};
-    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']));
+    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverId:_asInt(raw['driver_id'] ?? driver['id']),driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']));
   }
 
   Restaurant? _restaurantById(int id) { for (final Restaurant r in restaurants) { if (r.id==id) return r; } return null; }
