@@ -1039,19 +1039,30 @@ class NotificationsScreen extends StatelessWidget {
             child: model.notifications.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    children: const <Widget>[
-                      SizedBox(height: 80),
-                      StatusView(icon: Icons.notifications_none_rounded, title: 'Sin notificaciones', body: 'Aquí verás avisos de tus pedidos, pagos y cuenta.'),
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                    children: <Widget>[
+                      if (model.pushService != null)
+                        PushSetupCard(model: model, service: model.pushService!),
+                      const SizedBox(height: 38),
+                      const StatusView(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Sin notificaciones',
+                        body: 'Aquí verás avisos de tus pedidos, pagos y cuenta.',
+                      ),
                     ],
                   )
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-                    itemCount: model.notifications.length,
+                    itemCount: model.notifications.length + (model.pushService == null ? 0 : 1),
                     itemBuilder: (BuildContext context, int index) {
-                      final NotificationEntry n = model.notifications[index];
+                      if (model.pushService != null && index == 0) {
+                        return PushSetupCard(model: model, service: model.pushService!);
+                      }
+                      final int notificationIndex = index - (model.pushService == null ? 0 : 1);
+                      final NotificationEntry n = model.notifications[notificationIndex];
                       return Reveal(
-                        index: index,
+                        index: notificationIndex,
                         child: PremiumNotificationCard(
                           icon: _icon(n.kind),
                           accent: n.isRead ? kMuted : kBrand,
@@ -1064,6 +1075,97 @@ class NotificationsScreen extends StatelessWidget {
                       );
                     },
                   ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+class PushSetupCard extends StatelessWidget {
+  const PushSetupCard({super.key, required this.model, required this.service});
+
+  final TalaModel model;
+  final CustomerPushService service;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: service,
+      builder: (BuildContext context, Widget? child) {
+        final bool active = service.registered;
+        return TalaCard(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: active ? kSoftGreen : kSoftOrange,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      active ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                      color: active ? kGreen : kBrandDeep,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('Avisos en tu celular', style: TalaText.title),
+                        SizedBox(height: 4),
+                        Text(
+                          'Recibe cambios de tus pedidos aunque la app esté cerrada.',
+                          style: TalaText.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(service.message, style: TalaText.muted),
+              const SizedBox(height: 14),
+              if (service.configured) ...<Widget>[
+                SizedBox(
+                  width: double.infinity,
+                  child: active
+                      ? OutlinedButton.icon(
+                          onPressed: service.busy ? null : () => service.disable(),
+                          icon: const Icon(Icons.notifications_off_outlined),
+                          label: const Text('Desactivar avisos en este celular'),
+                        )
+                      : FilledButton.icon(
+                          onPressed: service.busy ? null : () => service.enable(),
+                          icon: const Icon(Icons.notifications_active_outlined),
+                          label: const Text('Activar avisos de pedidos'),
+                        ),
+                ),
+                if (active) ...<Widget>[
+                  const SizedBox(height: 8),
+                  NotificationPreferenceTile(
+                    icon: Icons.campaign_outlined,
+                    title: 'Ofertas y promociones',
+                    subtitle: 'Opcional. No desactiva los avisos de pedidos.',
+                    value: model.marketing && model.promoPush,
+                    onChanged: (bool value) => service.setMarketing(value),
+                  ),
+                ],
+              ] else
+                const QuietNote(
+                  icon: Icons.info_outline_rounded,
+                  text: 'Los avisos requieren configurar Firebase y habilitar el envío en el servidor.',
+                ),
+            ],
           ),
         );
       },
