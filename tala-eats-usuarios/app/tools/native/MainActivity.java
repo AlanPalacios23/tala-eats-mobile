@@ -9,6 +9,9 @@ import android.location.LocationManager;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.provider.Settings;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
@@ -21,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -33,6 +37,7 @@ import io.flutter.plugin.common.MethodChannel;
 public class MainActivity extends FlutterFragmentActivity {
     private static final String CHANNEL = "com.talaeats.app/native";
     private static final String PREFS = "talaeats_secure";
+    private static final String PUSH_PREFS = "talaeats_push_install";
     private static final String KEY_ALIAS = "talaeats_session_key_v1";
     private static final String PREF_TOKEN = "session_token";
     private static final String PREF_IV = "session_iv";
@@ -47,6 +52,33 @@ public class MainActivity extends FlutterFragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         captureIntent(getIntent());
+        createPushChannels();
+    }
+
+    private void createPushChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        NotificationChannel orders = new NotificationChannel(
+                "orders", "Estado de tus pedidos", NotificationManager.IMPORTANCE_HIGH);
+        orders.setDescription("Confirmaciones, repartidores y entregas de Tala Eats.");
+        orders.enableVibration(true);
+        manager.createNotificationChannel(orders);
+
+        NotificationChannel promotions = new NotificationChannel(
+                "promotions", "Promociones", NotificationManager.IMPORTANCE_DEFAULT);
+        promotions.setDescription("Ofertas que puedes desactivar desde la aplicación.");
+        manager.createNotificationChannel(promotions);
+    }
+
+    private String pushDeviceId() {
+        SharedPreferences preferences = getSharedPreferences(PUSH_PREFS, Context.MODE_PRIVATE);
+        String id = preferences.getString("installation_id", null);
+        if (id == null || id.length() < 8) {
+            id = UUID.randomUUID().toString();
+            preferences.edit().putString("installation_id", id).apply();
+        }
+        return id;
     }
 
     @Override
@@ -78,6 +110,8 @@ public class MainActivity extends FlutterFragmentActivity {
                         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); result.success(null); break;
                     case "initialUri":
                         result.success(latestUri.isEmpty() ? null : latestUri); break;
+                    case "pushDeviceId":
+                        result.success(pushDeviceId()); break;
                     case "openAppSettings":
                         Intent settingsIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())); startActivity(settingsIntent); result.success(null); break;
                     case "currentLocation":
