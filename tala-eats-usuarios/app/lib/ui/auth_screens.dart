@@ -5,6 +5,106 @@ part of '../main.dart';
 // Same flows and model calls as v1.0.8; only layout, rhythm and feedback.
 // ---------------------------------------------------------------------------
 
+/// Campo de autenticación con placeholder no flotante. El texto de ayuda
+/// desaparece al enfocar y solo vuelve si el campo se queda vacío sin foco.
+class CleanAuthTextField extends StatefulWidget {
+  const CleanAuthTextField({
+    super.key,
+    required this.fieldKey,
+    required this.controller,
+    required this.placeholder,
+    required this.prefixIcon,
+    this.suffixIcon,
+    this.keyboardType,
+    this.textInputAction,
+    this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
+    this.autocorrect = true,
+    this.obscureText = false,
+    this.onChanged,
+    this.onSubmitted,
+  });
+
+  final Key fieldKey;
+  final TextEditingController controller;
+  final String placeholder;
+  final Widget prefixIcon;
+  final Widget? suffixIcon;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
+  final bool autocorrect;
+  final bool obscureText;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<CleanAuthTextField> createState() => _CleanAuthTextFieldState();
+}
+
+class _CleanAuthTextFieldState extends State<CleanAuthTextField> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_refresh);
+    widget.controller.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(CleanAuthTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_refresh);
+      widget.controller.addListener(_refresh);
+    }
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_refresh);
+    _focus.removeListener(_refresh);
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String? hint = !_focus.hasFocus && widget.controller.text.isEmpty
+        ? widget.placeholder
+        : null;
+    return Semantics(
+      label: widget.placeholder,
+      child: TextField(
+        key: widget.fieldKey,
+        focusNode: _focus,
+        controller: widget.controller,
+        keyboardType: widget.keyboardType,
+        textInputAction: widget.textInputAction,
+        autofillHints: widget.autofillHints,
+        textCapitalization: widget.textCapitalization,
+        autocorrect: widget.autocorrect,
+        obscureText: widget.obscureText,
+        onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
+        style: const TextStyle(color: kInk),
+        decoration: InputDecoration(
+          hintText: hint,
+          floatingLabelBehavior: FloatingLabelBehavior.never,
+          prefixIcon: widget.prefixIcon,
+          suffixIcon: widget.suffixIcon,
+        ),
+      ),
+    );
+  }
+}
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.model});
 
@@ -56,36 +156,30 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            TextField(
-              key: const ValueKey<String>('login-email'),
+            CleanAuthTextField(
+              fieldKey: const ValueKey<String>('login-email'),
               controller: email,
+              placeholder: 'Correo electrónico',
+              prefixIcon: const Icon(Icons.alternate_email_rounded),
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.email],
               autocorrect: false,
-              style: const TextStyle(color: kInk),
-              decoration: const InputDecoration(
-                labelText: 'Correo electrónico',
-                prefixIcon: Icon(Icons.alternate_email_rounded),
-              ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey<String>('login-password'),
+            CleanAuthTextField(
+              fieldKey: const ValueKey<String>('login-password'),
               controller: password,
+              placeholder: 'Contraseña',
+              prefixIcon: const Icon(Icons.lock_outline_rounded),
               obscureText: hidePassword,
-              style: const TextStyle(color: kInk),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) { if (!loading) submit(); },
               autofillHints: const <String>[AutofillHints.password],
-              decoration: InputDecoration(
-                labelText: 'Contraseña',
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                suffixIcon: IconButton(
-                  tooltip: hidePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                  onPressed: () => setState(() => hidePassword = !hidePassword),
-                  icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                ),
+              suffixIcon: IconButton(
+                tooltip: hidePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                onPressed: () => setState(() => hidePassword = !hidePassword),
+                icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               ),
             ),
             Align(
@@ -222,53 +316,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return FoodPhotoAuthScaffold(
       title: 'Crear cuenta',
       showBack: true,
+      backgroundAsset: 'assets/images/auth_register.jpg',
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            TextField(
-              key: const ValueKey<String>('signup-name'),
+            CleanAuthTextField(
+              fieldKey: const ValueKey<String>('signup-name'),
               controller: name,
+              placeholder: 'Nombre',
+              prefixIcon: const Icon(Icons.person_outline_rounded),
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.name],
-              style: const TextStyle(color: kInk),
-              decoration: const InputDecoration(
-                labelText: 'Nombre',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
             ),
             const SizedBox(height: 10),
-            TextField(
-              key: const ValueKey<String>('signup-email'),
+            CleanAuthTextField(
+              fieldKey: const ValueKey<String>('signup-email'),
               controller: email,
+              placeholder: 'Correo electrónico',
+              prefixIcon: const Icon(Icons.alternate_email_rounded),
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autocorrect: false,
               autofillHints: const <String>[AutofillHints.email],
-              style: const TextStyle(color: kInk),
-              decoration: const InputDecoration(
-                labelText: 'Correo electrónico',
-                prefixIcon: Icon(Icons.alternate_email_rounded),
-              ),
             ),
             const SizedBox(height: 10),
-            TextField(
-              key: const ValueKey<String>('signup-password'),
+            CleanAuthTextField(
+              fieldKey: const ValueKey<String>('signup-password'),
               controller: password,
+              placeholder: 'Contraseña',
+              prefixIcon: const Icon(Icons.lock_outline_rounded),
               obscureText: hidePassword,
               onChanged: (_) => setState(() {}),
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.newPassword],
-              style: const TextStyle(color: kInk),
-              decoration: InputDecoration(
-                labelText: 'Contraseña',
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                suffixIcon: IconButton(
-                  tooltip: hidePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                  onPressed: () => setState(() => hidePassword = !hidePassword),
-                  icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                ),
+              suffixIcon: IconButton(
+                tooltip: hidePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                onPressed: () => setState(() => hidePassword = !hidePassword),
+                icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               ),
             ),
             if (password.text.isNotEmpty) ...<Widget>[
@@ -286,21 +372,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ],
             const SizedBox(height: 10),
-            TextField(
-              key: const ValueKey<String>('signup-confirm-password'),
+            CleanAuthTextField(
+              fieldKey: const ValueKey<String>('signup-confirm-password'),
               controller: confirm,
+              placeholder: 'Confirmar contraseña',
+              prefixIcon: const Icon(Icons.verified_user_outlined),
               obscureText: hideConfirm,
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => submit(),
-              style: const TextStyle(color: kInk),
-              decoration: InputDecoration(
-                labelText: 'Confirmar contraseña',
-                prefixIcon: const Icon(Icons.verified_user_outlined),
-                suffixIcon: IconButton(
-                  tooltip: hideConfirm ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                  onPressed: () => setState(() => hideConfirm = !hideConfirm),
-                  icon: Icon(hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                ),
+              suffixIcon: IconButton(
+                tooltip: hideConfirm ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                onPressed: () => setState(() => hideConfirm = !hideConfirm),
+                icon: Icon(hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               ),
             ),
             const SizedBox(height: 7),
@@ -504,19 +587,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 key: const ValueKey<String>('auth-recover-form'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  TextField(
-                    key: const ValueKey<String>('recover-email'),
+                  CleanAuthTextField(
+                    fieldKey: const ValueKey<String>('recover-email'),
                     controller: email,
+                    placeholder: 'Correo electrónico',
+                    prefixIcon: const Icon(Icons.alternate_email_rounded),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     autocorrect: false,
                     autofillHints: const <String>[AutofillHints.email],
-                    style: const TextStyle(color: kInk),
                     onSubmitted: (_) { if (!loading) submit(); },
-                    decoration: const InputDecoration(
-                      labelText: 'Correo electrónico',
-                      prefixIcon: Icon(Icons.alternate_email_rounded),
-                    ),
                   ),
                   if (error.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 12),
@@ -743,11 +823,13 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
     required this.child,
     this.title,
     this.showBack = false,
+    this.backgroundAsset = 'assets/images/auth_login.jpg',
   });
 
   final Widget child;
   final String? title;
   final bool showBack;
+  final String backgroundAsset;
 
   static final ButtonStyle whiteLink = TextButton.styleFrom(
     foregroundColor: Colors.white,
@@ -770,13 +852,14 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
         resizeToAvoidBottomInset: true,
         body: Stack(
           children: <Widget>[
-            const Positioned.fill(
-              child: Image(
-                key: ValueKey<String>('auth-food-photo'),
-                image: AssetImage('assets/images/auth_food_cover.webp'),
+            Positioned.fill(
+              child: Image.asset(
+                backgroundAsset,
+                key: const ValueKey<String>('auth-food-photo'),
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
-                filterQuality: FilterQuality.medium,
+                filterQuality: FilterQuality.high,
+                excludeFromSemantics: true,
               ),
             ),
             const Positioned.fill(
@@ -836,7 +919,7 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
                                       fillColor: const Color(0xF5FFFFFF),
                                       hintStyle: const TextStyle(color: kMuted),
                                       labelStyle: const TextStyle(color: kInkSoft),
-                                      floatingLabelStyle: const TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700),
+                                      floatingLabelBehavior: FloatingLabelBehavior.never,
                                       prefixIconColor: kInkSoft,
                                       suffixIconColor: kInkSoft,
                                     ),
