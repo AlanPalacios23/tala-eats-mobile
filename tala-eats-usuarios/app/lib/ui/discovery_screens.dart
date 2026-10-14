@@ -600,9 +600,9 @@ class RestaurantCard extends StatelessWidget {
     );
     final String? tag = heroTag;
     if (tag != null) media = Hero(tag: tag, child: media);
-    final String fee = !restaurant.delivery
-        ? 'Solo recoger'
-        : (restaurant.deliveryFee <= 0 ? 'Envío gratis' : 'Envío ${money(restaurant.deliveryFee)}');
+    // El envío final depende de la ubicación del cliente y se confirma
+    // por el backend. No anunciar aquí un precio estático como cotización.
+    final String fee = restaurant.delivery ? 'Entrega disponible' : 'Solo recoger';
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Semantics(
@@ -721,6 +721,45 @@ class RestaurantCardSkeleton extends StatelessWidget {
 // Buscar
 // ---------------------------------------------------------------------------
 
+enum DiscoveryFilter { all, open, delivery, pickup, favorites }
+
+bool discoveryMatchesFilter(
+  Restaurant restaurant,
+  DiscoveryFilter filter,
+  Set<int> favorites,
+) {
+  switch (filter) {
+    case DiscoveryFilter.all:
+      return true;
+    case DiscoveryFilter.open:
+      return restaurant.isOpen;
+    case DiscoveryFilter.delivery:
+      return restaurant.delivery;
+    case DiscoveryFilter.pickup:
+      return restaurant.pickup;
+    case DiscoveryFilter.favorites:
+      return favorites.contains(restaurant.id);
+  }
+}
+
+/// Pure presentation filter: uses only catalog data returned by the server.
+/// Preserves backend ordering (including any sponsored placement).
+List<Restaurant> filterDiscoveryRestaurants({
+  required List<Restaurant> restaurants,
+  required Set<int> favorites,
+  String term = '',
+  DiscoveryFilter filter = DiscoveryFilter.all,
+}) {
+  final String query = _fold(term.trim());
+  return restaurants.where((Restaurant restaurant) {
+    if (!discoveryMatchesFilter(restaurant, filter, favorites)) return false;
+    if (query.isEmpty) return true;
+    return _fold(restaurant.name).contains(query) ||
+        _fold(restaurant.category).contains(query) ||
+        _fold(restaurant.description).contains(query);
+  }).toList();
+}
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, required this.model});
 
@@ -732,11 +771,45 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController controller = TextEditingController();
+  final FocusNode searchFocus = FocusNode();
   String query = '';
+  DiscoveryFilter filter = DiscoveryFilter.all;
+  bool _wasSearchTab = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _wasSearchTab = widget.model.tabIndex == 1;
+    widget.model.addListener(_followTab);
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.model != widget.model) {
+      oldWidget.model.removeListener(_followTab);
+      widget.model.addListener(_followTab);
+      _wasSearchTab = widget.model.tabIndex == 1;
+    }
+  }
+
+  /// Opening Buscar from Inicio or the dock places the cursor in the field.
+  /// When visiting another tab the keyboard is dismissed by the existing dock.
+  void _followTab() {
+    final bool active = widget.model.tabIndex == 1;
+    if (active && !_wasSearchTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.model.tabIndex == 1) searchFocus.requestFocus();
+      });
+    }
+    _wasSearchTab = active;
+  }
 
   @override
   void dispose() {
+    widget.model.removeListener(_followTab);
     controller.dispose();
+    searchFocus.dispose();
     super.dispose();
   }
 
@@ -744,12 +817,22 @@ class _SearchScreenState extends State<SearchScreen> {
     controller.text = value;
     controller.selection = TextSelection.collapsed(offset: value.length);
     setState(() => query = value);
+    searchFocus.requestFocus();
     HapticFeedback.selectionClick();
   }
 
   void clear() {
     controller.clear();
     setState(() => query = '');
+    searchFocus.requestFocus();
+  }
+
+  void clearFilters() {
+    setState(() {
+      filter = DiscoveryFilter.all;
+      query = '';
+      controller.clear();
+    });
   }
 
   List<String> _quickSearches() {
@@ -768,88 +851,185 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final TalaModel model = widget.model;
     final String normalized = _fold(query.trim());
-    final List<Restaurant> restaurants = normalized.isEmpty
-        ? <Restaurant>[]
-        : model.restaurants.where((Restaurant restaurant) => _fold(restaurant.name).contains(normalized) || _fold(restaurant.category).contains(normalized)).toList();
+    final List<Restaurant> restaurants = filterDiscoveryRestaurants(
+      restaurants: model.restaurants,
+      favorites: model.favorites,
+      term: query,
+      filter: filter,
+    );
+    // Los productos solo están en memoria después de consultar su menú.
+    // No inventar una búsqueda global de platillos sin endpoint de catálogo.
     final List<FoodItem> items = normalized.isEmpty
         ? <FoodItem>[]
-        : model.menu.where((FoodItem item) => _fold(item.name).contains(normalized) || _fold(item.category).contains(normalized)).toList();
+        : model.menu.where((FoodItem item) {
+            final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
+            return restaurant != null &&
+                discoveryMatchesFilter(restaurant, filter, model.favorites) &&
+                (_fold(item.name).contains(normalized) ||
+                    _fold(item.category).contains(normalized));
+          }).toList();
     final List<String> quick = _quickSearches();
+    final bool noResults = restaurants.isEmpty && items.isEmpty;
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
-        children: <Widget>[
-          const Text('Buscar', style: TalaText.display),
-          const SizedBox(height: 16),
-          TextField(
-            controller: controller,
-            autofocus: false,
-            textInputAction: TextInputAction.search,
-            onChanged: (String value) => setState(() => query = value),
-            decoration: InputDecoration(
-              hintText: 'Restaurante, comercio o platillo…',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: query.isEmpty ? null : IconButton(tooltip: 'Borrar búsqueda', onPressed: clear, icon: const Icon(Icons.close_rounded)),
+      child: RefreshIndicator(
+        color: kBrand,
+        onRefresh: model.refreshAll,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
+          children: <Widget>[
+            const Text('Buscar', style: TalaText.display),
+            const SizedBox(height: 5),
+            const Text('Encuentra algo rico en Tala.', style: TalaText.muted),
+            const SizedBox(height: 18),
+            TextField(
+              key: const ValueKey<String>('discovery-search-field'),
+              controller: controller,
+              focusNode: searchFocus,
+              autofocus: false,
+              textInputAction: TextInputAction.search,
+              onChanged: (String value) => setState(() => query = value),
+              decoration: InputDecoration(
+                hintText: 'Restaurante, comercio o platillo…',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Borrar búsqueda',
+                        onPressed: clear,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+              ),
             ),
-          ),
-          const SizedBox(height: 22),
-          AnimatedSwitcher(
-            duration: TalaMotion.of(context, const Duration(milliseconds: 220)),
-            switchInCurve: TalaMotion.ease,
-            transitionBuilder: (Widget child, Animation<double> animation) => FadeTransition(opacity: animation, child: child),
-            child: normalized.isEmpty
-                ? KeyedSubtree(
-                    key: const ValueKey<String>('idle'),
-                    child: quick.isEmpty
-                        ? const SizedBox(width: double.infinity)
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              const Text('Búsquedas rápidas', style: TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: <Widget>[
-                                  for (final String label in quick)
-                                    TalaChoicePill(label: label, icon: DishThumb.iconFor(label), selected: false, onTap: () => setQuickQuery(label)),
-                                ],
-                              ),
-                            ],
-                          ),
-                  )
-                : KeyedSubtree(
-                    key: const ValueKey<String>('results'),
-                    child: (restaurants.isEmpty && items.isEmpty)
+            const SizedBox(height: 18),
+            // Horizontal scroll avoids RenderFlex overflow on 320dp screens.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  TalaChoicePill(
+                    label: 'Todos',
+                    selected: filter == DiscoveryFilter.all,
+                    onTap: () => setState(() => filter = DiscoveryFilter.all),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Abiertos',
+                    icon: Icons.schedule_rounded,
+                    selected: filter == DiscoveryFilter.open,
+                    onTap: () => setState(() => filter = DiscoveryFilter.open),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Entrega',
+                    icon: Icons.delivery_dining_rounded,
+                    selected: filter == DiscoveryFilter.delivery,
+                    onTap: () => setState(() => filter = DiscoveryFilter.delivery),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Recoger',
+                    icon: Icons.storefront_outlined,
+                    selected: filter == DiscoveryFilter.pickup,
+                    onTap: () => setState(() => filter = DiscoveryFilter.pickup),
+                  ),
+                  if (model.favorites.isNotEmpty) ...<Widget>[
+                    const SizedBox(width: 8),
+                    TalaChoicePill(
+                      label: 'Favoritos',
+                      icon: Icons.favorite_border_rounded,
+                      selected: filter == DiscoveryFilter.favorites,
+                      onTap: () => setState(() => filter = DiscoveryFilter.favorites),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (normalized.isEmpty && quick.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 24),
+              const Text(
+                '¿Qué se te antoja?',
+                style: TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  for (final String label in quick)
+                    TalaChoicePill(
+                      label: label,
+                      icon: DishThumb.iconFor(label),
+                      selected: false,
+                      onTap: () => setQuickQuery(label),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 24),
+            if (normalized.isEmpty || restaurants.isNotEmpty) ...<Widget>[
+              TalaSectionHeader(
+                title: normalized.isEmpty ? 'Explorar comercios' : 'Restaurantes',
+                trailing: TalaCountChip(label: '${restaurants.length}'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (noResults)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: model.loading && model.restaurants.isEmpty
+                    ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : model.restaurants.isEmpty && model.lastError.isNotEmpty
                         ? StatusView(
-                            icon: Icons.search_off_rounded,
-                            title: 'Sin resultados',
-                            body: 'No encontramos “${query.trim()}”. Prueba con otro nombre, comida o categoría.',
+                            icon: Icons.wifi_off_rounded,
+                            title: 'Sin conexión al catálogo',
+                            body: 'No pudimos cargar los comercios. Revisa tu conexión.',
+                            actionLabel: 'Reintentar',
+                            onAction: model.refreshAll,
+                            tone: StatusTone.danger,
                             compact: true,
                           )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              if (restaurants.isNotEmpty) ...<Widget>[
-                                TalaSectionHeader(title: 'Restaurantes', trailing: TalaCountChip(label: '${restaurants.length}')),
-                                const SizedBox(height: 12),
-                                for (int i = 0; i < restaurants.length; i++)
-                                  Reveal(index: i, child: SearchRestaurantTile(model: model, restaurant: restaurants[i])),
-                                const SizedBox(height: 16),
-                              ],
-                              if (items.isNotEmpty) ...<Widget>[
-                                TalaSectionHeader(title: 'Platillos', trailing: TalaCountChip(label: '${items.length}')),
-                                const SizedBox(height: 12),
-                                for (int i = 0; i < items.length; i++) Reveal(index: i, child: SearchDishTile(model: model, item: items[i])),
-                              ],
-                            ],
+                        : StatusView(
+                            icon: normalized.isEmpty
+                                ? Icons.storefront_outlined
+                                : Icons.search_off_rounded,
+                            title: normalized.isEmpty && filter == DiscoveryFilter.all
+                                ? 'Aún no hay comercios disponibles'
+                                : 'Sin resultados para esta búsqueda',
+                            body: normalized.isEmpty
+                                ? 'Puedes quitar los filtros o actualizar el catálogo.'
+                                : 'Prueba otro nombre o quita el filtro seleccionado.',
+                            actionLabel: 'Limpiar búsqueda y filtros',
+                            onAction: clearFilters,
+                            compact: true,
                           ),
-                  ),
-          ),
-        ],
+              )
+            else ...<Widget>[
+              for (int i = 0; i < restaurants.length; i++)
+                SearchRestaurantTile(model: model, restaurant: restaurants[i]),
+              if (items.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                TalaSectionHeader(
+                  title: 'Platillos',
+                  trailing: TalaCountChip(label: '${items.length}'),
+                ),
+                const SizedBox(height: 12),
+                for (final FoodItem item in items)
+                  SearchDishTile(model: model, item: item),
+              ],
+              if (normalized.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                const QuietNote(
+                  icon: Icons.menu_book_outlined,
+                  text: 'Los platillos aparecen en la búsqueda después de consultar los menús de los comercios.',
+                ),
+              ],
+            ],
+          ],
+        ),
       ),
     );
   }
