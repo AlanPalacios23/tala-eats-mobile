@@ -758,7 +758,7 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final InputDecorationTheme input = theme.inputDecorationTheme;
+    final InputDecorationThemeData input = theme.inputDecorationTheme;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
