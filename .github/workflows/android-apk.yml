@@ -1,16 +1,20 @@
-name: Tala Eats | Verificar y compilar APK
+name: Tala Eats | APK Android (solo manual)
 
+# Ahorro de minutos: NUNCA compilar por push o PR.
+# Lanzar solo al agrupar cambios y seleccionar la app deseada.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip'
-      - 'tala-eats-usuarios/**'
-      - 'tala-eats-restaurante/**'
-      - 'tala-eats-repartidor/**'
-      - 'ci/security_android_gate.py'
-      - '.github/workflows/android-apk.yml'
   workflow_dispatch:
+    inputs:
+      app:
+        description: 'Aplicacion a compilar'
+        required: true
+        default: usuarios
+        type: choice
+        options:
+          - usuarios
+          - restaurante
+          - repartidor
+          - todas
 
 permissions:
   contents: read
@@ -20,84 +24,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  importar-fuentes:
-    name: Importar kit Flutter (solo la primera vez)
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - name: Descargar repositorio privado
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          persist-credentials: true
-      - name: Verificar e importar las tres aplicaciones
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f tala-eats-usuarios/app/lib/main.dart ] && \
-             [ -f tala-eats-restaurante/app/lib/main.dart ] && \
-             [ -f tala-eats-repartidor/app/lib/main.dart ]; then
-            echo 'Las tres aplicaciones ya están importadas; no se sobrescribe el código.'
-            exit 0
-          fi
-          test -s TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip || {
-            echo 'ERROR: falta el kit ZIP en la raíz del repositorio.'
-            exit 1
-          }
-          python3 - <<'PY'
-          from pathlib import Path, PurePosixPath
-          from zipfile import ZipFile
-          archive=Path('TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip')
-          allowed={
-            'tala-eats-usuarios',
-            'tala-eats-restaurante',
-            'tala-eats-repartidor',
-          }
-          with ZipFile(archive) as z:
-            names=z.namelist()
-            if len(names)>1500 or sum(f.file_size for f in z.infolist())>60_000_000:
-              raise RuntimeError('Archivo demasiado grande o inesperado')
-            for info in z.infolist():
-              p=PurePosixPath(info.filename)
-              if p.is_absolute() or '..' in p.parts or '\\' in info.filename:
-                raise RuntimeError(f'Ruta insegura: {info.filename}')
-              if not p.parts or p.parts[0] not in allowed:
-                continue
-              if info.external_attr >> 16 & 0o170000 == 0o120000:
-                raise RuntimeError(f'Enlace simbólico no admitido: {info.filename}')
-              z.extract(info)
-          for role in ('usuarios','restaurante','repartidor'):
-            root=Path(f'tala-eats-{role}')
-            for required in ('app/lib/main.dart','app/pubspec.yaml','ci/bootstrap_android.py'):
-              if not (root/required).is_file():
-                raise RuntimeError(f'{root}/{required} no se encontró')
-          print('Tres proyectos Flutter importados correctamente desde ZIP')
-          PY
-          git add tala-eats-usuarios tala-eats-restaurante tala-eats-repartidor
-          git rm -f TalaEats-GitHub-Actions-3-Apps-CI-KIT.zip
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore: importar fuentes Flutter de las tres aplicaciones'
-            git push origin HEAD:main
-          fi
-
   android-apk:
     name: ${{ matrix.rol }} | Analizar, probar y compilar
-    needs: importar-fuentes
-    if: ${{ needs.importar-fuentes.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     strategy:
       fail-fast: false
       matrix:
-        rol: [usuarios, restaurante, repartidor]
+        rol: ${{ fromJSON(inputs.app == 'todas' && '["usuarios","restaurante","repartidor"]' || format('["{0}"]', inputs.app)) }}
     steps:
-      - name: Obtener versión más reciente del código
+      - name: Obtener rama elegida manualmente
         uses: actions/checkout@v4
-        with:
-          ref: main
       - name: Java 21
         uses: actions/setup-java@v4
         with:
