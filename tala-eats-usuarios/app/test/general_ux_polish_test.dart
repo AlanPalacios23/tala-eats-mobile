@@ -40,6 +40,13 @@ class _MethodsStub extends TalaApi {
   }
 }
 
+class _UncertainOrderStub extends _MethodsStub {
+  @override
+  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> payload) async {
+    throw ApiException(0, 'Se perdió la conexión después de enviar el pedido.');
+  }
+}
+
 OrderEntry _order(int id, {required String status, required String rawStatus,
   String method = 'cash', String paymentStatus = 'pending'}) =>
     OrderEntry(
@@ -128,6 +135,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Confirmar pedido'), findsOneWidget);
     expect(find.text('Actualizar ubicación de entrega'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    model.dispose();
+  });
+
+  testWidgets('Fallo de conexión no invita a duplicar un pedido', (WidgetTester tester) async {
+    final TalaModel model = TalaModel(apiClient: _UncertainOrderStub());
+    model.restaurants.add(_restaurant);
+    model.addToCart(_food, 1);
+    model.addresses.add(const AddressEntry(
+      id: 3,
+      label: 'Casa',
+      address: 'Centro de Tala, Jalisco',
+      lat: 20.65,
+      lng: -103.70,
+    ));
+    await tester.pumpWidget(MaterialApp(home: CheckoutScreen(model: model)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmar pedido'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Revisa Mis pedidos'), findsOneWidget);
+    expect(find.text('Revisar Mis pedidos'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     model.dispose();
   });
