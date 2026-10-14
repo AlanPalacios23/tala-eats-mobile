@@ -1,0 +1,3 @@
+Importar imágenes originales facilitadas por el propietario para la app TALA EATS Usuarios.
+No compilar APK, no desplegar backend, no tocar Kali/Stripe.
+Un solo uso; validar SHA-256 y guardar en repositorio privado.
