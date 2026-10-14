@@ -665,18 +665,43 @@ class _TrackingScreenState extends State<TrackingScreen> {
               const SizedBox(height: 12),
               TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order)),
               const SizedBox(height: 12),
-              DriverPremiumCard(order: order),
-              if (order.pin.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 12),
-                _PinBlock(pin: order.pin),
+              if (order.deliveryMode == 'delivery') ...<Widget>[
+                DriverPremiumCard(order: order),
+                if (order.pin.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _PinBlock(pin: order.pin),
+                ],
+                const SizedBox(height: 14),
+                if (order.canContactDriver) ...<Widget>[
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).push(premiumRoute(ChatScreen(model: model, order: order))),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    label: const Text('Ver chat con mi repartidor'),
+                  ),
+                  const SizedBox(height: 8),
+                  const QuietNote(
+                    icon: Icons.lock_outline_rounded,
+                    text: 'Vista previa del chat privado. El envío se habilitará cuando el backend esté preparado.',
+                  ),
+                ] else if (!terminal) ...<Widget>[
+                  TalaCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: <Widget>[
+                        const Icon(Icons.mark_chat_unread_outlined, color: kBrandDeep),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Podrás contactar a tu repartidor cuando esté asignado.',
+                            style: TalaText.body,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(context).push(premiumRoute(ChatScreen(model: model, order: order))),
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                label: const Text('Abrir chat del pedido'),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: refreshing ? null : () => _refresh(),
                 icon: const Icon(Icons.refresh_rounded),
@@ -842,7 +867,7 @@ class DriverPremiumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool assigned = order.driverName.isNotEmpty;
+    final bool assigned = order.driverId > 0;
     final String detail = assigned
         ? <String>[
             order.driverVehicle.isEmpty ? 'Repartidor' : order.driverVehicle,
@@ -863,7 +888,10 @@ class DriverPremiumCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(assigned ? order.driverName : 'Asignando repartidor', style: TalaText.title.copyWith(fontSize: 15)),
+                Text(
+                  assigned ? (order.driverName.trim().isEmpty ? 'Tu repartidor' : order.driverName) : 'Buscando repartidor',
+                  style: TalaText.title.copyWith(fontSize: 15),
+                ),
                 const SizedBox(height: 2),
                 Text(detail, style: TalaText.caption),
               ],
@@ -875,188 +903,177 @@ class DriverPremiumCard extends StatelessWidget {
   }
 }
 
-class ChatScreen extends StatefulWidget {
+/// Vista previa de chat EXCLUSIVO con repartidor.
+/// No se llama al endpoint heredado /platform/orders/{id}/chat: actualmente
+/// permite acceso al comercio y no garantiza privacidad cliente-repartidor.
+/// El compositor se habilitará en una versión posterior cuando exista el
+/// contrato privado con controles de rol en el backend y la app de Repartidor.
+class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key, required this.model, required this.order});
 
   final TalaModel model;
   final OrderEntry order;
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController controller = TextEditingController();
-  final List<Map<String, dynamic>> messages = <Map<String, dynamic>>[];
-  Timer? _timer;
-  bool loading = true;
-  bool sending = false;
-  String error = '';
-
-  @override
-  void initState() {
-    super.initState();
-    load();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => load(silent: true));
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> load({bool silent = false}) async {
-    if (!silent && mounted) setState(() => loading = true);
-    try {
-      final dynamic data = await widget.model.api.get('/platform/orders/${widget.order.id}/chat');
-      messages
-        ..clear()
-        ..addAll(List<dynamic>.from(data as List).map((dynamic x) => Map<String, dynamic>.from(x as Map)));
-      error = '';
-    } on ApiException catch (e) {
-      error = e.message;
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
-  }
-
-  Future<void> send() async {
-    final String text = controller.text.trim();
-    if (text.isEmpty || sending) return;
-    setState(() => sending = true);
-    try {
-      final dynamic raw = await widget.model.api.post('/platform/orders/${widget.order.id}/chat', <String, dynamic>{'message': text, 'message_type': 'text', 'media_url': ''});
-      messages.add(Map<String, dynamic>.from(raw as Map));
-      controller.clear();
-      error = '';
-      HapticFeedback.lightImpact();
-    } on ApiException catch (e) {
-      error = e.message;
-    } finally {
-      if (mounted) setState(() => sending = false);
-    }
-  }
-
-  String _time(dynamic raw) {
-    final DateTime? dt = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
-    if (dt == null) return '';
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> ordered = messages.reversed.toList();
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('Chat del pedido'),
-            Text('#${widget.order.id} · ${widget.order.restaurant.name}', style: TalaText.caption),
-          ],
-        ),
-        actions: <Widget>[IconButton(tooltip: 'Actualizar', onPressed: load, icon: const Icon(Icons.refresh_rounded))],
-      ),
-      body: Column(
-        children: <Widget>[
-          if (error.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 8), child: AuthNotice(icon: Icons.error_outline_rounded, text: error, danger: true)),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
-                : messages.isEmpty
-                    ? const StatusView(icon: Icons.chat_bubble_outline_rounded, title: 'Aún no hay mensajes', body: 'Escribe aquí para hablar con el equipo de tu pedido.')
-                    : ListView.builder(
-                        reverse: true,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                        itemCount: ordered.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          final Map<String, dynamic> m = ordered[index];
-                          final bool mine = int.tryParse(m['sender_id']?.toString() ?? '') == widget.model.userId;
-                          final String time = _time(m['created_at']);
-                          return Align(
-                            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-                                decoration: BoxDecoration(
-                                  color: mine ? kBrand : Colors.white,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(18),
-                                    topRight: const Radius.circular(18),
-                                    bottomLeft: Radius.circular(mine ? 18 : 6),
-                                    bottomRight: Radius.circular(mine ? 6 : 18),
-                                  ),
-                                  border: mine ? null : Border.all(color: kLine),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text((m['message'] ?? '').toString(), style: TextStyle(color: mine ? Colors.white : kInk, fontSize: 15, height: 1.35)),
-                                    if (time.isNotEmpty) ...<Widget>[
-                                      const SizedBox(height: 3),
-                                      Text(time, style: TextStyle(color: mine ? Colors.white70 : kSubtle, fontSize: 10, fontWeight: FontWeight.w600)),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+    return AnimatedBuilder(
+      animation: model,
+      builder: (BuildContext context, Widget? child) {
+        final bool assigned = order.canContactDriver;
+        final String name = order.driverName.trim().isEmpty ? 'Tu repartidor' : order.driverName;
+        return Scaffold(
+          backgroundColor: kBackground,
+          appBar: AppBar(
+            title: const Text('Chat con tu repartidor'),
           ),
-          DecoratedBox(
-            decoration: const BoxDecoration(color: kSurface, border: Border(top: BorderSide(color: kLine))),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => send(),
-                      decoration: InputDecoration(
-                        hintText: 'Escribe un mensaje',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kLine)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kLine)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kBrand, width: 1.5)),
-                      ),
+          body: SafeArea(
+            child: Column(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: TalaCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: <Widget>[
+                        CircleAvatar(
+                          radius: 25,
+                          backgroundColor: assigned ? kSoftOrange : kSunken,
+                          child: Icon(assigned ? Icons.delivery_dining_rounded : Icons.lock_outline_rounded,
+                              color: assigned ? kBrandDeep : kMuted, size: 27),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(assigned ? name : 'Conversación no disponible',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title),
+                              const SizedBox(height: 4),
+                              Text('Pedido #${order.id} · ${order.restaurant.name}',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.caption),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const StatusPill(
+                          label: 'Vista previa',
+                          color: kBrandDeep,
+                          background: kSoftOrange,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: kBrand,
-                    shape: const CircleBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: sending ? null : send,
-                      child: SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Center(
-                          child: sending
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                ),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Container(
+                              height: 88,
+                              width: 88,
+                              decoration: BoxDecoration(
+                                color: kSoftOrange,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: kLine),
+                              ),
+                              child: const Icon(Icons.chat_bubble_outline_rounded, color: kBrandDeep, size: 38),
+                            ),
+                            const SizedBox(height: 22),
+                            Text(
+                              assigned ? 'Comunícate con quien lleva tu pedido' : 'Esperando un repartidor',
+                              textAlign: TextAlign.center,
+                              style: TalaText.h2,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              assigned
+                                  ? 'Aquí podrás escribir a ${name} cuando activemos el canal privado entre cliente y repartidor.'
+                                  : 'El chat estará disponible después de que el servidor confirme una asignación.',
+                              textAlign: TextAlign.center,
+                              style: TalaText.body,
+                            ),
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: kLine),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Icon(Icons.shield_outlined, color: kBrandDeep, size: 18),
+                                  SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      'Sin mensajes de demostración ni envíos al restaurante.',
+                                      style: TalaText.caption,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: kSurface,
+                    border: Border(top: BorderSide(color: kLine)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: TextField(
+                                enabled: false,
+                                maxLines: 1,
+                                decoration: InputDecoration(
+                                  hintText: 'Mensajes disponibles próximamente',
+                                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 19),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const IconButton.filled(
+                              onPressed: null,
+                              tooltip: 'Envío pendiente de activar',
+                              icon: Icon(Icons.send_rounded),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Chat privado pendiente de activación en el backend.',
+                          textAlign: TextAlign.center,
+                          style: TalaText.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
