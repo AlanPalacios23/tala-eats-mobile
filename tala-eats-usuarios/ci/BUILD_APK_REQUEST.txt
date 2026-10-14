@@ -1,0 +1,4 @@
+Solicitud explícita del propietario: compilar APK de Usuarios v1.0.20 para pruebas Android.
+Fecha: 2026-10-14.
+Validaciones: Flutter 3.47.6, analyze, test, build APK debug.
+Solo esta rama y app Usuarios. Sin tocar backend/Kali/Stripe LIVE.
