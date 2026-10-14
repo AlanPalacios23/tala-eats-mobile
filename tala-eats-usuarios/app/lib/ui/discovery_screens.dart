@@ -1327,7 +1327,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
             onRefresh: () => model.refreshRestaurantMenu(restaurant.id),
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: <Widget>[
+              slivers: <Widget>[
               SliverAppBar(
                 pinned: true,
                 stretch: true,
@@ -1365,7 +1365,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
                   sliver: SliverToBoxAdapter(
                     child: Text(
-                      '${visible.length} ${visible.length == 1 ? 'platillo' : 'platillos'} disponibles',
+                      '${visible.length} ${visible.length == 1 ? 'platillo' : 'platillos'} en el menú',
                       style: TalaText.caption,
                     ),
                   ),
