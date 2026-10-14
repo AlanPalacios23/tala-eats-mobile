@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'production_api.dart';
 import 'checkout_pricing.dart';
 
@@ -12,6 +14,7 @@ part 'ui/auth_screens.dart';
 part 'ui/discovery_screens.dart';
 part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
+part 'ui/tracking_map.dart';
 part 'ui/account_screens.dart';
 part 'ui/legal_screens.dart';
 
@@ -145,6 +148,10 @@ class OrderEntry {
     this.driverName = '',
     this.driverVehicle = '',
     this.driverRating = 0,
+    this.driverLat,
+    this.driverLng,
+    this.deliveryLat,
+    this.deliveryLng,
   });
 
   final int id;
@@ -162,6 +169,26 @@ class OrderEntry {
   String driverName;
   String driverVehicle;
   double driverRating;
+  double? driverLat;
+  double? driverLng;
+  double? deliveryLat;
+  double? deliveryLng;
+
+  /// El mapa se abre solo después de confirmación, durante una entrega activa.
+  /// Nunca se dibujan pines usando datos inventados o posiciones por defecto.
+  bool get canShowTrackingMap =>
+      deliveryMode == 'delivery' &&
+      !isAwaitingOnlinePayment &&
+      <String>{'confirmed', 'preparing', 'ready', 'assigned', 'picked_up', 'on_the_way'}
+          .contains(rawStatus);
+
+  bool get hasDriverCoordinates =>
+      canShowTrackingMap &&
+      driverId > 0 &&
+      validTrackingCoordinates(driverLat, driverLng);
+
+  bool get hasDeliveryCoordinates =>
+      canShowTrackingMap && validTrackingCoordinates(deliveryLat, deliveryLng);
 
   /// Chat privado: la asignación real viene de OrderPublic del servidor.
   /// El envío sigue desactivado hasta tener un endpoint exclusivo por rol.
@@ -822,6 +849,10 @@ class TalaModel extends ChangeNotifier {
     order.driverName = fresh.driverName;
     order.driverVehicle = fresh.driverVehicle;
     order.driverRating = fresh.driverRating;
+    order.driverLat = fresh.driverLat;
+    order.driverLng = fresh.driverLng;
+    order.deliveryLat = fresh.deliveryLat;
+    order.deliveryLng = fresh.deliveryLng;
     notifyListeners();
   }
 
@@ -1026,7 +1057,7 @@ class TalaModel extends ChangeNotifier {
     }
     final int eta=_asInt(raw['estimated_minutes']);
     final Map<String,dynamic> driver=raw['driver_info'] is Map ? Map<String,dynamic>.from(raw['driver_info'] as Map) : <String,dynamic>{};
-    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverId:_asInt(raw['driver_id'] ?? driver['id']),driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']));
+    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverId:_asInt(raw['driver_id'] ?? driver['id']),driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']),driverLat:_asNullableDouble(driver['current_lat']),driverLng:_asNullableDouble(driver['current_lng']),deliveryLat:_asNullableDouble(raw['delivery_lat']),deliveryLng:_asNullableDouble(raw['delivery_lng']));
   }
 
   Restaurant? _restaurantById(int id) { for (final Restaurant r in restaurants) { if (r.id==id) return r; } return null; }
