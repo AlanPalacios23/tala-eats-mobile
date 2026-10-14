@@ -1016,15 +1016,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     selected: filter == DiscoveryFilter.pickup,
                     onTap: () => setState(() => filter = DiscoveryFilter.pickup),
                   ),
-                  if (model.favorites.isNotEmpty) ...<Widget>[
-                    const SizedBox(width: 8),
-                    TalaChoicePill(
-                      label: 'Favoritos',
-                      icon: Icons.favorite_border_rounded,
-                      selected: filter == DiscoveryFilter.favorites,
-                      onTap: () => setState(() => filter = DiscoveryFilter.favorites),
-                    ),
-                  ],
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Favoritos',
+                    icon: Icons.favorite_border_rounded,
+                    selected: filter == DiscoveryFilter.favorites,
+                    onTap: () => setState(() => filter = DiscoveryFilter.favorites),
+                  ),
                 ],
               ),
             ),
