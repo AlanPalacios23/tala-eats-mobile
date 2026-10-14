@@ -1839,6 +1839,7 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
   int quantity = 1;
   bool adding = false;
   final TextEditingController instructions = TextEditingController();
+  ModalRoute<dynamic>? activeSheetRoute;
 
   unawaited(showModalBottomSheet<void>(
     context: context,
@@ -1848,6 +1849,7 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
     backgroundColor: Colors.transparent,
     barrierColor: kScrim,
     builder: (BuildContext sheetContext) {
+      activeSheetRoute = ModalRoute.of(sheetContext);
       return StatefulBuilder(
         builder: (BuildContext context, StateSetter setModalState) {
           final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
@@ -2046,5 +2048,10 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
         },
       );
     },
-  ).whenComplete(instructions.dispose));
+  ).whenComplete(() async {
+    // showModalBottomSheet Future resolves on pop, BEFORE the exit animation
+    // unmounts TextField. Wait for overlay removal before disposing controller.
+    await activeSheetRoute?.completed;
+    instructions.dispose();
+  }));
 }
