@@ -129,6 +129,68 @@ void main() {
     model.dispose();
   });
 
+  testWidgets('Ficha retirada mientras estaba abierta no agrega producto', (WidgetTester tester) async {
+    final TalaModel model = TalaModel();
+    model.restaurants.add(_openRestaurant);
+    model.menu.add(_dish);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(builder: (BuildContext context) => TextButton(
+          onPressed: () => showProductSheet(context, model, _dish),
+          child: const Text('Abrir detalle'),
+        )),
+      ),
+    ));
+    await tester.tap(find.text('Abrir detalle'));
+    await tester.pumpAndSettle();
+    model.menu.clear();
+
+    final Finder action = find.textContaining('Agregar ·');
+    await tester.ensureVisible(action);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(model.cart, isEmpty);
+    expect(find.textContaining('Actualiza el menú'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    model.dispose();
+  });
+
+  testWidgets('Precio actualizado impide sumar importes desactualizados', (WidgetTester tester) async {
+    final TalaModel model = TalaModel();
+    model.restaurants.add(_openRestaurant);
+    model.menu.add(_dish);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(builder: (BuildContext context) => TextButton(
+          onPressed: () => showProductSheet(context, model, _dish),
+          child: const Text('Abrir detalle'),
+        )),
+      ),
+    ));
+    await tester.tap(find.text('Abrir detalle'));
+    await tester.pumpAndSettle();
+    model.menu
+      ..clear()
+      ..add(const FoodItem(
+        id: 8101,
+        restaurantId: 81,
+        name: 'Tacos dorados',
+        description: 'Orden de tacos dorados',
+        price: 110,
+        image: '',
+        category: 'Tacos',
+      ));
+
+    final Finder action = find.textContaining('Agregar ·');
+    await tester.ensureVisible(action);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(model.cart, isEmpty);
+    expect(find.textContaining('Actualiza el menú'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    model.dispose();
+  });
+
   testWidgets('Detalle compacto 320dp y texto largo no causa overflow', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(320, 720);
     tester.view.devicePixelRatio = 1;
