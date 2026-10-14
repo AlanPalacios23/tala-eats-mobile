@@ -155,7 +155,7 @@ class AccountScreen extends StatelessWidget {
             label: const Text('Cerrar sesión'),
           ),
           const SizedBox(height: 16),
-          const Text('Tala Eats · v1.0.20 (en desarrollo)', textAlign: TextAlign.center, style: TalaText.caption),
+          const Text('Tala Eats · v1.0.20', textAlign: TextAlign.center, style: TalaText.caption),
         ],
       ),
     );
