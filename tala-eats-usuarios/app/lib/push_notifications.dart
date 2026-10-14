@@ -81,7 +81,7 @@ class CustomerPushService extends ChangeNotifier {
       _foreground = FirebaseMessaging.onMessage.listen(_onMessage);
       _opened = FirebaseMessaging.onMessageOpenedApp.listen(_onOpened);
       _rotations = FirebaseMessaging.instance.onTokenRefresh.listen((String token) {
-        if (model.signedIn) unawaited(_register(token));
+        if (model.signedIn) unawaited(_registerIfPermissionGranted());
       });
       final RemoteMessage? launch = await FirebaseMessaging.instance.getInitialMessage();
       if (launch != null) _onOpened(launch);
