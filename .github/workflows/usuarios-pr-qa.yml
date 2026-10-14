@@ -1,26 +1,24 @@
-name: Tala Eats | Usuarios PR - QA y APK
+name: Tala Eats | Usuarios QA y APK (solo manual)
 
+# No usar pull_request ni push: se ejecuta solamente cuando decidamos cerrar
+# un paquete de cambios. Seleccionar la rama correspondiente en Run workflow.
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'tala-eats-usuarios/**'
-      - '.github/workflows/usuarios-pr-qa.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: talaeats-users-pr-${{ github.event.pull_request.number }}
+  group: talaeats-users-manual-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   usuarios-qa:
-    name: Usuarios | Analizar, probar y compilar rama del PR
+    name: Usuarios | Analizar, probar y compilar cuando se solicite
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
-      - name: Checkout del PR (no main)
+      - name: Checkout de la rama seleccionada
         uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -69,7 +67,7 @@ jobs:
       - name: Adjuntar APK solo si QA PASS
         uses: actions/upload-artifact@v4
         with:
-          name: TalaEats-Usuarios-PR-${{ github.event.pull_request.number }}-debug
+          name: TalaEats-Usuarios-PR-${{ github.run_number }}-debug
           path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -77,7 +75,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: TalaEats-Usuarios-PR-${{ github.event.pull_request.number }}-diagnostico
+          name: TalaEats-Usuarios-PR-${{ github.run_number }}-diagnostico
           path: tala-eats-usuarios/app/ci-logs/
           if-no-files-found: ignore
           retention-days: 7
