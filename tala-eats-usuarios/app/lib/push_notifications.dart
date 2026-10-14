@@ -37,6 +37,7 @@ class CustomerPushService extends ChangeNotifier {
   bool _hadSession = false;
   String _deviceId = '';
   int? _pendingOrderOpen;
+  bool _pendingTap = false;
   String message = 'Comprueba la disponibilidad de notificaciones del dispositivo.';
 
   bool get configured => _firebaseReady && _backendReady;
@@ -102,11 +103,11 @@ class CustomerPushService extends ChangeNotifier {
     }
     if (_hadSession) return;
     _hadSession = true;
-    if (_pendingOrderOpen != null) {
-      model.pendingOrderId = _pendingOrderOpen!;
+    if (_pendingTap) {
+      final int? pendingId = _pendingOrderOpen;
       _pendingOrderOpen = null;
-      model.setTab(2);
-      unawaited(model.refreshOrders());
+      _pendingTap = false;
+      _openWhenReady(pendingId);
     }
     await _registerIfPermissionGranted();
   }
@@ -238,17 +239,50 @@ class CustomerPushService extends ChangeNotifier {
   void _onOpened(RemoteMessage message) {
     final int? orderId = safePushOrderId(message.data);
     if (!model.signedIn) {
-      // No abrir datos de la cuenta anterior hasta iniciar sesión otra vez.
+      // El usuario debe autenticarse para consultar los detalles de un pedido.
       _pendingOrderOpen = orderId;
+      _pendingTap = true;
       return;
     }
+    _openWhenReady(orderId);
+  }
+
+  void _openWhenReady(int? orderId) {
+    if (!model.signedIn || _disposed) return;
     if (orderId != null) model.pendingOrderId = orderId;
     model.setTab(orderId == null ? 3 : 2);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_disposed && model.signedIn) unawaited(_navigateToPush(orderId));
+    });
+  }
+
+  Future<void> _navigateToPush(int? orderId) async {
+    if (_disposed || !model.signedIn) return;
     if (orderId == null) {
-      unawaited(model.refreshNotifications());
-    } else {
-      unawaited(model.refreshOrders());
+      await model.refreshNotifications();
+      if (_disposed || !model.signedIn) return;
+      final NavigatorState? nav = talaNavigatorKey.currentState;
+      if (nav != null && nav.mounted) {
+        nav.push(premiumRoute(NotificationsScreen(model: model)));
+      }
+      return;
     }
+    await model.refreshOrders();
+    if (_disposed || !model.signedIn) return;
+    OrderEntry? order;
+    for (final OrderEntry candidate in model.orders) {
+      if (candidate.id == orderId) {
+        order = candidate;
+        break;
+      }
+    }
+    if (order == null) return;
+    final NavigatorState? nav = talaNavigatorKey.currentState;
+    if (nav == null || !nav.mounted) return;
+    final Widget page = order.canShowTrackingMap
+        ? TrackingScreen(model: model, order: order)
+        : OrderDetailScreen(model: model, order: order);
+    nav.push(premiumRoute(page));
   }
 
   @override
