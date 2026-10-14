@@ -36,6 +36,7 @@ class CustomerPushService extends ChangeNotifier {
   bool _disposed = false;
   bool _hadSession = false;
   String _deviceId = '';
+  int? _pendingOrderOpen;
   String message = 'Comprueba la disponibilidad de notificaciones del dispositivo.';
 
   bool get configured => _firebaseReady && _backendReady;
@@ -71,6 +72,8 @@ class CustomerPushService extends ChangeNotifier {
       );
       _firebaseReady = true;
       _deviceId = await NativeBridge.pushDeviceId() ?? '';
+      model.setOrderPush(await NativeBridge.pushEnabled());
+      model.setPromoPush(await NativeBridge.pushMarketing());
       if (_deviceId.length < 8) {
         _update('No pudimos identificar el dispositivo de forma segura.');
         return;
@@ -99,6 +102,12 @@ class CustomerPushService extends ChangeNotifier {
     }
     if (_hadSession) return;
     _hadSession = true;
+    if (_pendingOrderOpen != null) {
+      model.pendingOrderId = _pendingOrderOpen!;
+      _pendingOrderOpen = null;
+      model.setTab(2);
+      unawaited(model.refreshOrders());
+    }
     await _registerIfPermissionGranted();
   }
 
@@ -143,6 +152,7 @@ class CustomerPushService extends ChangeNotifier {
         return;
       }
       model.setOrderPush(true);
+      await NativeBridge.setPushEnabled(true);
       await _registerIfPermissionGranted();
     } catch (_) {
       _update('No fue posible habilitar avisos en el dispositivo.');
@@ -176,6 +186,7 @@ class CustomerPushService extends ChangeNotifier {
 
   Future<void> setMarketing(bool enabled) async {
     model.setPromoPush(enabled);
+    await NativeBridge.setPushMarketing(enabled);
     if (!configured || !_registered || !model.signedIn) return;
     try {
       await model.api.put('/mobile-push/devices/$_deviceId/preferences',
@@ -194,6 +205,7 @@ class CustomerPushService extends ChangeNotifier {
         await model.api.delete('/mobile-push/devices/$_deviceId');
       }
       model.setOrderPush(false);
+      await NativeBridge.setPushEnabled(false);
       _registered = false;
       await FirebaseMessaging.instance.deleteToken();
       _update('Notificaciones push desactivadas en este dispositivo.');
@@ -224,8 +236,12 @@ class CustomerPushService extends ChangeNotifier {
   }
 
   void _onOpened(RemoteMessage message) {
-    if (!model.signedIn) return;
     final int? orderId = safePushOrderId(message.data);
+    if (!model.signedIn) {
+      // No abrir datos de la cuenta anterior hasta iniciar sesión otra vez.
+      _pendingOrderOpen = orderId;
+      return;
+    }
     if (orderId != null) model.pendingOrderId = orderId;
     model.setTab(orderId == null ? 3 : 2);
     if (orderId == null) {
