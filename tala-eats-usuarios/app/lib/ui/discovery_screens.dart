@@ -1268,7 +1268,9 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   bool _settled = false;
 
   TalaModel get model => widget.model;
-  Restaurant get restaurant => widget.restaurant;
+  // La lista de comercios se actualiza tras recargar; nunca mantener un
+  // horario/estado obsoleto del objeto capturado al abrir la pantalla.
+  Restaurant get restaurant => restaurantFor(model, widget.restaurant.id) ?? widget.restaurant;
 
   @override
   void initState() {
@@ -1541,6 +1543,11 @@ class _RestaurantInfo extends StatelessWidget {
             const SizedBox(height: 24),
             const Text('Menú', style: TalaText.h2),
             const SizedBox(height: 4),
+            const Text(
+              'Precios y disponibilidad sujetos a confirmación del restaurante.',
+              style: TalaText.caption,
+            ),
+            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -1620,7 +1627,12 @@ class _CategoryBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _CategoryBarDelegate oldDelegate) {
-    return oldDelegate.selected != selected || oldDelegate.categories.length != categories.length;
+    if (oldDelegate.selected != selected ||
+        oldDelegate.categories.length != categories.length) return true;
+    for (int index = 0; index < categories.length; index++) {
+      if (oldDelegate.categories[index] != categories[index]) return true;
+    }
+    return false;
   }
 }
 
@@ -1790,11 +1802,14 @@ class RestaurantCartBar extends StatelessWidget {
 // Producto
 // ---------------------------------------------------------------------------
 
+/// Detalle de un platillo real. No se ofrecen modificadores ni extras
+/// predefinidos hasta que el restaurante publique opciones en el backend.
 void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
   int quantity = 1;
-  String preference = '';
-  const List<String> options = <String>['Sin cambios', 'Sin cebolla', 'Extra salsa', 'Bien cocido'];
-  showModalBottomSheet<void>(
+  bool adding = false;
+  final TextEditingController instructions = TextEditingController();
+
+  unawaited(showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -1805,106 +1820,200 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
       return StatefulBuilder(
         builder: (BuildContext context, StateSetter setModalState) {
           final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
+          final bool closed = restaurant != null && !restaurant.isOpen;
           final bool hasPhoto = item.imageUrl.startsWith('https://');
-          return Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-            decoration: const BoxDecoration(color: kSurface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: kLineStrong, borderRadius: BorderRadius.circular(99)))),
-                ),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                    children: <Widget>[
-                      if (hasPhoto)
+          return AnimatedPadding(
+            duration: TalaMotion.of(context, const Duration(milliseconds: 180)),
+            curve: TalaMotion.ease,
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
+              decoration: const BoxDecoration(
+                color: kSurface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: kLineStrong,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                      children: <Widget>[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(22),
                           child: AspectRatio(
                             aspectRatio: 16 / 10,
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 1.05, end: 1),
-                              duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
-                              curve: TalaMotion.ease,
-                              builder: (BuildContext context, double scale, Widget? child) => Transform.scale(scale: scale, child: child),
-                              child: RestaurantMedia(assetPath: item.image, imageUrl: item.imageUrl),
-                            ),
+                            child: hasPhoto
+                                ? TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(begin: 1.05, end: 1),
+                                    duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
+                                    curve: TalaMotion.ease,
+                                    builder: (BuildContext context, double scale, Widget? child) =>
+                                        Transform.scale(scale: scale, child: child),
+                                    child: RestaurantMedia(
+                                      assetPath: item.image,
+                                      imageUrl: item.imageUrl,
+                                    ),
+                                  )
+                                : DecoratedBox(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: <Color>[Color(0xFFFFF1E8), Color(0xFFFFE2D4)],
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: <Widget>[
+                                        Icon(
+                                          DishThumb.iconFor('${item.category} ${item.name}'),
+                                          color: kBrandDeep,
+                                          size: 58,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'Fotografía no disponible',
+                                          style: TalaText.caption,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
-                        )
-                      else
-                        Align(alignment: Alignment.centerLeft, child: DishThumb(item: item, size: 72, radius: 20)),
-                      const SizedBox(height: 16),
-                      Text(item.name, style: TalaText.h1.copyWith(fontSize: 24)),
-                      if (restaurant != null) ...<Widget>[
-                        const SizedBox(height: 4),
-                        Text(restaurant.name, style: TalaText.caption),
-                      ],
-                      if (item.description.trim().isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 10),
-                        Text(item.description, style: TalaText.body),
-                      ],
-                      const SizedBox(height: 12),
-                      Text(money(item.price), style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep)),
-                      const SizedBox(height: 22),
-                      const Row(
-                        children: <Widget>[
-                          Text('Preferencias', style: TalaText.title),
-                          SizedBox(width: 8),
-                          Text('Opcional', style: TalaText.caption),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(item.name, style: TalaText.h1.copyWith(fontSize: 24)),
+                        if (restaurant != null) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Text(restaurant.name, style: TalaText.caption),
                         ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: options.map((String label) {
-                          final bool selected = (label == 'Sin cambios' && preference.isEmpty) || preference == label;
-                          return TalaChoicePill(
-                            label: label,
-                            selected: selected,
-                            onTap: () => setModalState(() => preference = label == 'Sin cambios' ? '' : label),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: kLine))),
-                  child: SafeArea(
-                    top: false,
-                    minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                    child: Row(
-                      children: <Widget>[
-                        QuantityStepper(
-                          quantity: quantity,
-                          onDecrement: quantity > 1 ? () => setModalState(() => quantity -= 1) : null,
-                          onIncrement: () => setModalState(() => quantity += 1),
+                        if (item.description.trim().isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 10),
+                          Text(item.description, style: TalaText.body),
+                        ],
+                        const SizedBox(height: 14),
+                        Text(
+                          money(item.price),
+                          style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () async {
-                              final bool added = await addItemWithGuard(sheetContext, model, item, quantity, note: preference);
-                              if (added && sheetContext.mounted) Navigator.of(sheetContext).pop();
-                            },
-                            child: Text('Agregar · ${money(item.price * quantity)}'),
+                        const SizedBox(height: 22),
+                        const Text('Indicaciones para la cocina', style: TalaText.title),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Opcional · El restaurante confirmará si puede atenderlas.',
+                          style: TalaText.caption,
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          key: const ValueKey<String>('product-instructions'),
+                          controller: instructions,
+                          textCapitalization: TextCapitalization.sentences,
+                          keyboardType: TextInputType.multiline,
+                          textInputAction: TextInputAction.newline,
+                          minLines: 2,
+                          maxLines: 3,
+                          maxLength: 160,
+                          decoration: const InputDecoration(
+                            hintText: 'Ej. Sin cebolla, por favor',
+                            prefixIcon: Icon(Icons.edit_note_rounded),
                           ),
                         ),
+                        if (closed) ...<Widget>[
+                          const SizedBox(height: 10),
+                          const AuthNotice(
+                            icon: Icons.schedule_rounded,
+                            text: 'Este restaurante está cerrado. No puedes agregar platillos por ahora.',
+                            danger: true,
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ),
-              ],
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: kSurface,
+                      border: Border(top: BorderSide(color: kLine)),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      child: Row(
+                        children: <Widget>[
+                          QuantityStepper(
+                            quantity: quantity,
+                            onDecrement: adding || quantity <= 1
+                                ? null
+                                : () => setModalState(() => quantity -= 1),
+                            onIncrement: adding || quantity >= 99
+                                ? null
+                                : () => setModalState(() => quantity += 1),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: adding || closed
+                                  ? null
+                                  : () async {
+                                      if (adding) return;
+                                      setModalState(() => adding = true);
+                                      try {
+                                        final bool added = await addItemWithGuard(
+                                          sheetContext,
+                                          model,
+                                          item,
+                                          quantity,
+                                          note: instructions.text.trim(),
+                                        );
+                                        if (added && sheetContext.mounted) {
+                                          Navigator.of(sheetContext).pop();
+                                        }
+                                      } finally {
+                                        if (context.mounted) {
+                                          setModalState(() => adding = false);
+                                        }
+                                      }
+                                    },
+                              child: adding
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text('Agregar · ${money(item.price * quantity)}'),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
       );
     },
-  );
+  ).whenComplete(instructions.dispose));
 }
