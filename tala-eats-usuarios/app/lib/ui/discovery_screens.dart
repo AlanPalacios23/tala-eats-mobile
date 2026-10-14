@@ -1404,7 +1404,8 @@ class _RestaurantInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery ? 'Recoger' : (restaurant.deliveryFee <= 0 ? 'Gratis' : money(restaurant.deliveryFee));
+    // La tarifa final depende de la ubicación; no prometer envío gratis ni un precio estático.
+    final String fee = restaurant.delivery ? 'Según zona' : 'Recoger';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
       child: Reveal(
