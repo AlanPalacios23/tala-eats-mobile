@@ -1130,6 +1130,9 @@ class TalaModel extends ChangeNotifier {
   }
 }
 
+/// Navegador principal usado al abrir una notificación desde Android.
+final GlobalKey<NavigatorState> talaNavigatorKey = GlobalKey<NavigatorState>();
+
 class TalaEatsApp extends StatefulWidget {
   const TalaEatsApp({super.key, this.testMode = false});
 
@@ -1185,6 +1188,7 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: talaNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Tala Eats',
       theme: buildTalaTheme(),
