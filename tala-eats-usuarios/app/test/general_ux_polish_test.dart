@@ -87,6 +87,9 @@ void main() {
       rawStatus: 'received', method: 'stripe');
     await tester.pumpWidget(MaterialApp(home: OrderDetailScreen(model: model, order: pending)));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Revisar estado del pago'), 180,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
     expect(find.text('Revisar estado del pago'), findsOneWidget);
     expect(find.text('Seguir pedido'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -155,6 +158,9 @@ void main() {
     await tester.tap(find.text('Confirmar pedido'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(find.text('Revisar Mis pedidos'), 170,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
     expect(find.textContaining('Revisa Mis pedidos'), findsOneWidget);
     expect(find.text('Revisar Mis pedidos'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
