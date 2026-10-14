@@ -221,7 +221,7 @@ class CustomerPushService extends ChangeNotifier {
   /// Ejecutar ANTES de borrar el bearer; cerrar sesión no debe conservar
   /// notificaciones privadas en un teléfono compartido.
   void signOut() {
-    if (!_firebaseReady) return;
+    if (!_firebaseReady || (!model.signedIn && !_registered && !_hadSession)) return;
     if (_deviceId.isNotEmpty && model.api.token != null) {
       unawaited(model.api.delete('/mobile-push/devices/$_deviceId').catchError((Object _) => null));
     }
