@@ -324,6 +324,7 @@ class HomeScreen extends StatelessWidget {
         ? 'Agregar dirección'
         : model.addresses[model.selectedAddress.clamp(0, model.addresses.length - 1).toInt()].label;
     final String name = firstName(model.userName);
+    final OrderEntry? activeOrder = model.activeOrder;
     return RefreshIndicator(
       color: kBrand,
       backgroundColor: Colors.white,
@@ -431,6 +432,19 @@ class HomeScreen extends StatelessWidget {
                       },
                     ),
                   ),
+                  if (activeOrder != null) ...<Widget>[
+                    const SizedBox(height: 18),
+                    HomeActiveOrderCard(
+                      order: activeOrder,
+                      onTap: () => Navigator.of(context).push(
+                        premiumRoute(
+                          activeOrder.deliveryMode == 'delivery'
+                              ? TrackingScreen(model: model, order: activeOrder)
+                              : OrderDetailScreen(model: model, order: activeOrder),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 28),
                   TalaSectionHeader(
                     title: 'Restaurantes y comercios',
@@ -491,6 +505,72 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Solo se muestra con un pedido operativo confirmado por el backend.
+class HomeActiveOrderCard extends StatelessWidget {
+  const HomeActiveOrderCard({super.key, required this.order, required this.onTap});
+
+  final OrderEntry order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final String restaurantName = order.restaurant.name.trim().isEmpty
+        ? 'Tu restaurante'
+        : order.restaurant.name;
+    return TalaCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: kSoftOrange,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.receipt_long_rounded, color: kBrandDeep, size: 23),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'TU PEDIDO EN CURSO',
+                  style: TextStyle(
+                    color: kBrandDeep,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  restaurantName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TalaText.title,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  order.status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TalaText.caption,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.arrow_forward_ios_rounded, color: kBrandDeep, size: 17),
         ],
       ),
     );
