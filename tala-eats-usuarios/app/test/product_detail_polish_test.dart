@@ -112,6 +112,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_dish.name), findsOneWidget);
     expect(find.text('Fotografía no disponible'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Indicaciones para la cocina'), 130,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
     expect(find.text('Indicaciones para la cocina'), findsOneWidget);
     expect(find.text('Extra salsa'), findsNothing);
     final Finder field = find.byKey(const ValueKey<String>('product-instructions'));
