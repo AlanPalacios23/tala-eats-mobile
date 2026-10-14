@@ -79,8 +79,8 @@ def setup(role):
 '''
         content=replace_once(content,'</activity>',deep_links+'        </activity>','user deep links')
         content=replace_once(content,'</application>',
-            '        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="orders" />\\n'
-            '        <meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true" />\\n'
+            '        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="orders" />\n'
+            '        <meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true" />\n'
             '    </application>','wallet and push metadata')
         source=APP/'tools/native/MainActivity.java'
         if not source.is_file(): raise RuntimeError('Missing project-native Stripe/secure MainActivity.java')
