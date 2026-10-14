@@ -90,7 +90,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: LoginScreen(model: model)));
     await tester.tap(find.text('Privacidad'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Aviso de privacidad'), findsWidgets);
+    expect(find.text('Aviso de Privacidad'), findsWidgets);
     await tester.pumpWidget(const SizedBox.shrink());
     model.dispose();
   });
