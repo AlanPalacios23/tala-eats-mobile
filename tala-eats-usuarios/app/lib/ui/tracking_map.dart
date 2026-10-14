@@ -23,6 +23,8 @@ class DriverTrackingMap extends StatefulWidget {
 class _DriverTrackingMapState extends State<DriverTrackingMap> {
   final MapController _controller = MapController();
   bool _mapReady = false;
+  bool _followDriver = true;
+  LatLng? _previousDriverPosition;
 
   // Se puede cambiar al proveedor de teselas contratado al cerrar la fase
   // piloto, sin reconstruir el widget ni modificar el backend.
@@ -40,6 +42,7 @@ class _DriverTrackingMapState extends State<DriverTrackingMap> {
 
   void _fitVisiblePoints() {
     if (!_mapReady) return;
+    _followDriver = true;
     final OrderEntry order = widget.order;
     final List<LatLng> positions = <LatLng>[
       if (order.hasDeliveryCoordinates)
@@ -72,6 +75,24 @@ class _DriverTrackingMapState extends State<DriverTrackingMap> {
     final LatLng? destination = destinationLocated
         ? LatLng(order.deliveryLat!, order.deliveryLng!)
         : null;
+
+    // Los marcadores se actualizan cada vez que cambia OrderEntry por polling.
+    // Seguir el GPS es opcional: al mover el mapa manualmente deja de recentrar
+    // automáticamente hasta que se toque el botón de centrado.
+    if (driver != _previousDriverPosition) {
+      final bool firstPosition = _previousDriverPosition == null;
+      _previousDriverPosition = driver;
+      if (driver != null && _mapReady && _followDriver) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_mapReady || !_followDriver) return;
+          if (firstPosition) {
+            _fitVisiblePoints();
+          } else {
+            _controller.move(driver, _controller.camera.zoom);
+          }
+        });
+      }
+    }
 
     final bool assigned = order.driverId > 0;
     final String subtitle = !assigned
@@ -149,6 +170,9 @@ class _DriverTrackingMapState extends State<DriverTrackingMap> {
                             : null,
                         minZoom: 3,
                         maxZoom: 18,
+                        onPositionChanged: (MapCamera camera, bool hasGesture) {
+                          if (hasGesture) _followDriver = false;
+                        },
                         onMapReady: () {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             if (mounted) setState(() => _mapReady = true);
@@ -202,7 +226,7 @@ class _DriverTrackingMapState extends State<DriverTrackingMap> {
                         borderRadius: BorderRadius.circular(14),
                         child: IconButton(
                           icon: const Icon(Icons.center_focus_strong_rounded, color: kInk),
-                          tooltip: 'Centrar puntos en el mapa',
+                          tooltip: 'Centrar mapa y seguir GPS',
                           onPressed: _mapReady ? _fitVisiblePoints : null,
                           constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
                         ),
