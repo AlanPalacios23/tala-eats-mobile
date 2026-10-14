@@ -552,21 +552,49 @@ class TalaModel extends ChangeNotifier {
     });
   }
 
+  /// Cada combinación de producto + indicaciones conserva su propia línea.
+  /// No mezclar notas distintas: evita enviar instrucciones incorrectas al
+  /// restaurante al crear el pedido.
   void addToCart(FoodItem item, int quantity, {String note = ''}) {
-    if (cartRestaurantId != null && cartRestaurantId != item.restaurantId) cart.clear();
-    cartRestaurantId = item.restaurantId;
+    if (quantity <= 0) return;
     final Restaurant? restaurant = _restaurantById(item.restaurantId);
     if (restaurant != null && !restaurant.isOpen) return;
-    if (restaurant != null && !restaurant.delivery && restaurant.pickup) deliveryMode = 'pickup';
+
+    final String instructions = note.trim();
+    if (cartRestaurantId != null && cartRestaurantId != item.restaurantId) {
+      cart.clear();
+    }
+    cartRestaurantId = item.restaurantId;
+    if (restaurant != null && !restaurant.delivery && restaurant.pickup) {
+      deliveryMode = 'pickup';
+    }
+
     CartLine? existing;
-    for (final CartLine line in cart) { if (line.item.id == item.id) { existing = line; break; } }
-    if (existing == null) cart.add(CartLine(item: item, quantity: quantity, note: note));
-    else { existing.quantity += quantity; if (note.trim().isNotEmpty) existing.note = note.trim(); }
+    for (final CartLine line in cart) {
+      if (line.item.id == item.id &&
+          line.item.restaurantId == item.restaurantId &&
+          line.note.trim() == instructions) {
+        existing = line;
+        break;
+      }
+    }
+    const int maxQuantityPerLine = 99;
+    if (existing == null) {
+      cart.add(CartLine(
+        item: item,
+        quantity: math.min(quantity, maxQuantityPerLine),
+        note: instructions,
+      ));
+    } else {
+      if (existing.quantity >= maxQuantityPerLine) return;
+      existing.quantity = math.min(existing.quantity + quantity, maxQuantityPerLine);
+    }
     notifyListeners();
   }
 
   void changeQuantity(CartLine line, int delta) {
-    line.quantity += delta;
+    if (!cart.contains(line) || delta == 0) return;
+    line.quantity = (line.quantity + delta).clamp(0, 99);
     if (line.quantity <= 0) cart.remove(line);
     if (cart.isEmpty) cartRestaurantId = null;
     notifyListeners();
