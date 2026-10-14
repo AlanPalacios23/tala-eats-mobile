@@ -381,6 +381,11 @@ void main() {
       image: '',
       category: 'QA',
     ), 1);
+    // Checkout exige una ubicación real para iniciar una entrega.
+    model.addresses.add(const AddressEntry(
+      id: 101, label: 'Casa QA', address: 'Calle de prueba, Tala, Jalisco',
+      lat: 20.65, lng: -103.70,
+    ));
 
     await tester.pumpWidget(MaterialApp(home: CheckoutScreen(model: model)));
     await tester.pumpAndSettle();
@@ -422,6 +427,10 @@ void main() {
       image: '',
       category: 'QA',
     ), 1);
+    model.addresses.add(const AddressEntry(
+      id: 102, label: 'Casa QA', address: 'Calle de prueba, Tala, Jalisco',
+      lat: 20.65, lng: -103.70,
+    ));
 
     await tester.pumpWidget(MaterialApp(home: CheckoutScreen(model: model)));
     await tester.pumpAndSettle();
