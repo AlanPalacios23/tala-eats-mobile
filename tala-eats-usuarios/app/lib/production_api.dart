@@ -54,6 +54,22 @@ class NativeBridge {
     try { return await _channel.invokeMethod<String>('pushDeviceId'); } catch (_) { return null; }
   }
 
+  static Future<bool> pushEnabled() async {
+    try { return await _channel.invokeMethod<bool>('getPushEnabled') ?? true; } catch (_) { return true; }
+  }
+
+  static Future<void> setPushEnabled(bool enabled) async {
+    try { await _channel.invokeMethod<void>('setPushEnabled', <String, dynamic>{'enabled': enabled}); } catch (_) {}
+  }
+
+  static Future<bool> pushMarketing() async {
+    try { return await _channel.invokeMethod<bool>('getPushMarketing') ?? false; } catch (_) { return false; }
+  }
+
+  static Future<void> setPushMarketing(bool enabled) async {
+    try { await _channel.invokeMethod<void>('setPushMarketing', <String, dynamic>{'enabled': enabled}); } catch (_) {}
+  }
+
 
   static Future<Map<String, double>?> currentLocation() async {
     try {
