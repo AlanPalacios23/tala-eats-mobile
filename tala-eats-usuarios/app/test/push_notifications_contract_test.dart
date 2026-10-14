@@ -14,8 +14,8 @@ void main() {
     });
 
     test('Sin Firebase no se finge que push está habilitado', () {
-      // En el test normal no hay --dart-define con Firebase.
-      expect(customerFirebaseConfigured, false);
+      // El test no presupone si el futuro build inyecta opciones FCM.
+      // Sin iniciar el servicio, nunca se declara un dispositivo registrado.
       final TalaModel model = TalaModel();
       final CustomerPushService service = CustomerPushService(model);
       expect(service.configured, false);
