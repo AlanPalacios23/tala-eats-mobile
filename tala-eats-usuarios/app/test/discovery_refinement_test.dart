@@ -66,7 +66,7 @@ void main() {
     final TalaModel model = TalaModel();
     model.restaurants.addAll(<Restaurant>[_pizza, _tacos, _burger]);
 
-    await tester.pumpWidget(MaterialApp(home: SearchScreen(model: model)));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(model: model))));
     await tester.pump();
 
     expect(find.text('Explorar comercios'), findsOneWidget);
@@ -82,7 +82,7 @@ void main() {
     final TalaModel model = TalaModel();
     model.restaurants.addAll(<Restaurant>[_pizza, _tacos, _burger]);
 
-    await tester.pumpWidget(MaterialApp(home: SearchScreen(model: model)));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(model: model))));
     await tester.pump();
     await tester.tap(find.text('Abiertos'));
     await tester.pumpAndSettle();
@@ -98,7 +98,7 @@ void main() {
     final TalaModel model = TalaModel();
     model.restaurants.addAll(<Restaurant>[_pizza, _tacos, _burger]);
 
-    await tester.pumpWidget(MaterialApp(home: SearchScreen(model: model)));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(model: model))));
     await tester.enterText(find.byKey(const ValueKey<String>('discovery-search-field')), 'tacos');
     await tester.pumpAndSettle();
     expect(find.text(_tacos.name), findsOneWidget);
@@ -167,7 +167,7 @@ void main() {
     model.restaurants.addAll(<Restaurant>[_pizza, _tacos, _burger]);
     model.favorites.add(11);
 
-    await tester.pumpWidget(MaterialApp(home: SearchScreen(model: model)));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(model: model))));
     await tester.pump();
     expect(find.byType(SingleChildScrollView), findsWidgets);
     expect(tester.takeException(), isNull);
