@@ -546,15 +546,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       )
                     : FilledButton(
                         onPressed: placing ? null : submit,
-                    child: BusyLabel(
-                      busy: placing,
-                      label: model.paymentMethod == 'cash'
-                          ? 'Confirmar pedido'
-                          : model.paymentMethod == 'stripe'
-                              ? 'Continuar a pago con Stripe'
-                              : 'Continuar a Mercado Pago',
-                    ),
-                  )
+                        child: BusyLabel(
+                          busy: placing,
+                          label: model.paymentMethod == 'cash'
+                              ? 'Confirmar pedido'
+                              : model.paymentMethod == 'stripe'
+                                  ? 'Continuar a pago con Stripe'
+                                  : 'Continuar a Mercado Pago',
+                        ),
+                      )
                 : OutlinedButton.icon(
                     onPressed: refreshingPayment ? null : refreshPaymentAvailability,
                     icon: refreshingPayment
