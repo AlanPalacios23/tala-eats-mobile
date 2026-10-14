@@ -594,7 +594,7 @@ class TalaModel extends ChangeNotifier {
 
   void changeQuantity(CartLine line, int delta) {
     if (!cart.contains(line) || delta == 0) return;
-    line.quantity = (line.quantity + delta).clamp(0, 99);
+    line.quantity = math.max(0, math.min(99, line.quantity + delta));
     if (line.quantity <= 0) cart.remove(line);
     if (cart.isEmpty) cartRestaurantId = null;
     notifyListeners();
