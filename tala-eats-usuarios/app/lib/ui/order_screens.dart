@@ -595,13 +595,6 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
   OrderEntry get order => widget.order;
   TalaModel get model => widget.model;
 
-  double get progress {
-    final List<(String, Set<String>)> steps = _timelineSteps(order);
-    final int index = _timelineIndex(order, steps);
-    if (steps.length < 2) return 0;
-    return (index / (steps.length - 1)).clamp(0.0, 1.0).toDouble();
-  }
-
   bool get terminal => <String>{'Entregado', 'Recogido', 'Cancelado'}.contains(order.status);
 
   @override
@@ -674,8 +667,22 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
               const SizedBox(height: 18),
               if (order.canShowTrackingMap)
                 DriverTrackingMap(order: order)
-              else
-                RouteProgress(progress: progress, from: order.restaurant.name, to: 'Tu dirección'),
+              else if (!terminal)
+                TalaCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: <Widget>[
+                      const Icon(Icons.hourglass_top_rounded, color: kBrandDeep),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Esperando confirmación del restaurante. El mapa se mostrará cuando el pedido avance.',
+                          style: TalaText.body,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 12),
               TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order)),
               const SizedBox(height: 12),
