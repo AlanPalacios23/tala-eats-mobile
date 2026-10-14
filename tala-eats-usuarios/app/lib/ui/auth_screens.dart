@@ -806,9 +806,9 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(22, 12, 22, 26),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: math.max(0, bounds.maxHeight - 38)),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                             SizedBox(
                               height: 48,
@@ -827,7 +827,6 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
                                     : const SizedBox.shrink(),
                               ),
                             ),
-                            const Spacer(),
                             Center(
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(maxWidth: 430),
@@ -876,7 +875,6 @@ class FoodPhotoAuthScaffold extends StatelessWidget {
                               ),
                             ),
                           ],
-                        ),
                       ),
                     ),
                   );
