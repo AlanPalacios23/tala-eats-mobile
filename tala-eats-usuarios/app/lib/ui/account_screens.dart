@@ -84,6 +84,17 @@ class AccountScreen extends StatelessWidget {
               title: 'Tu cuenta',
               children: <Widget>[
                 AccountLink(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Mis pedidos',
+                  subtitle: model.activeOrder != null
+                      ? 'Tienes un pedido en curso'
+                      : 'Consulta tus compras y entregas',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    model.setTab(2);
+                  },
+                ),
+                AccountLink(
                   icon: Icons.favorite_border_rounded,
                   title: 'Favoritos',
                   subtitle: model.favorites.isEmpty ? null : '${model.favorites.length} guardados',
@@ -144,7 +155,7 @@ class AccountScreen extends StatelessWidget {
             label: const Text('Cerrar sesión'),
           ),
           const SizedBox(height: 16),
-          const Text('Tala Eats · v1.0.12', textAlign: TextAlign.center, style: TalaText.caption),
+          const Text('Tala Eats · v1.0.20 (en desarrollo)', textAlign: TextAlign.center, style: TalaText.caption),
         ],
       ),
     );
