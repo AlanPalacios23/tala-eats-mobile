@@ -127,8 +127,9 @@ def setup(role):
             if 'name="LaunchTheme"' not in current:
                 raise RuntimeError('No LaunchTheme in Android 12 themes')
             current=re.sub(r'(<style name="LaunchTheme"[^>]*>)',
-                r'\\1\\n        <item name="android:windowSplashScreenBackground">@android:color/white</item>\n'
-                r'        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_launch_blank</item>',
+                lambda match: match.group(1) +
+                    '\n        <item name="android:windowSplashScreenBackground">@android:color/white</item>' +
+                    '\n        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_launch_blank</item>',
                 current,count=1)
             write(modern,current)
         else:
