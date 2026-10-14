@@ -51,29 +51,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumAuthScaffold(
-      title: 'Bienvenido de vuelta',
-      subtitle: 'Pide lo que se te antoje y sigue tu pedido en tiempo real.',
+    return FoodPhotoAuthScaffold(
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             TextField(
+              key: const ValueKey<String>('login-email'),
               controller: email,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.email],
               autocorrect: false,
-              decoration: const InputDecoration(labelText: 'Correo electrónico', prefixIcon: Icon(Icons.alternate_email_rounded)),
+              style: const TextStyle(color: kInk),
+              decoration: const InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
+              key: const ValueKey<String>('login-password'),
               controller: password,
               obscureText: hidePassword,
+              style: const TextStyle(color: kInk),
               textInputAction: TextInputAction.done,
-              onSubmitted: (_) {
-                if (!loading) submit();
-              },
+              onSubmitted: (_) { if (!loading) submit(); },
               autofillHints: const <String>[AutofillHints.password],
               decoration: InputDecoration(
                 labelText: 'Contraseña',
@@ -88,45 +91,64 @@ class _LoginScreenState extends State<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () => Navigator.of(context).push(premiumRoute(ForgotPasswordScreen(model: widget.model))),
+                style: FoodPhotoAuthScaffold.whiteLink,
+                onPressed: () => Navigator.of(context).push(
+                  premiumRoute(ForgotPasswordScreen(model: widget.model)),
+                ),
                 child: const Text('¿Olvidaste tu contraseña?'),
               ),
             ),
-            AnimatedSize(
-              duration: TalaMotion.of(context, TalaMotion.select),
-              curve: TalaMotion.ease,
-              child: error.isEmpty
-                  ? const SizedBox(width: double.infinity)
-                  : Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: AuthNotice(key: ValueKey<String>(error), icon: Icons.error_outline_rounded, text: error, danger: true),
-                    ),
-            ),
+            if (error.isNotEmpty) ...<Widget>[
+              AuthNotice(
+                icon: Icons.error_outline_rounded,
+                text: error,
+                danger: true,
+              ),
+              const SizedBox(height: 12),
+            ],
             FilledButton(
+              key: const ValueKey<String>('login-submit'),
               onPressed: loading ? null : submit,
               child: BusyLabel(busy: loading, label: 'Iniciar sesión'),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Wrap(
               alignment: WrapAlignment.center,
               crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 2,
+              spacing: 8,
               runSpacing: 0,
               children: <Widget>[
-                const Text('¿Aún no tienes cuenta?', style: TalaText.muted),
                 TextButton(
-                  onPressed: () => Navigator.of(context).push(premiumRoute(SignUpScreen(model: widget.model))),
+                  style: FoodPhotoAuthScaffold.whiteLink,
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(SignUpScreen(model: widget.model)),
+                  ),
                   child: const Text('Crear cuenta'),
+                ),
+                TextButton(
+                  style: FoodPhotoAuthScaffold.whiteLink,
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(const TermsAndConditionsScreen()),
+                  ),
+                  child: const Text('Términos'),
+                ),
+                TextButton(
+                  style: FoodPhotoAuthScaffold.whiteLink,
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(PrivacyNoticeScreen(
+                      supportEmail: widget.model.supportEmail,
+                    )),
+                  ),
+                  child: const Text('Privacidad'),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            LegalLoginNotice(model: widget.model),
           ],
         ),
       ),
     );
   }
+
 }
 
 class SignUpScreen extends StatefulWidget {
@@ -197,110 +219,140 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumAuthScaffold(
+    return FoodPhotoAuthScaffold(
+      title: 'Crear cuenta',
       showBack: true,
-      title: 'Crea tu cuenta',
-      subtitle: 'Un minuto y quedas listo para pedir en Tala Eats.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          TextField(
-            controller: name,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.next,
-            autofillHints: const <String>[AutofillHints.name],
-            decoration: const InputDecoration(labelText: 'Nombre', prefixIcon: Icon(Icons.person_outline_rounded)),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: email,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-            autocorrect: false,
-            autofillHints: const <String>[AutofillHints.email],
-            decoration: const InputDecoration(labelText: 'Correo electrónico', prefixIcon: Icon(Icons.alternate_email_rounded)),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: password,
-            obscureText: hidePassword,
-            onChanged: (_) => setState(() {}),
-            textInputAction: TextInputAction.next,
-            autofillHints: const <String>[AutofillHints.newPassword],
-            decoration: InputDecoration(
-              labelText: 'Crea una contraseña',
-              prefixIcon: const Icon(Icons.lock_outline_rounded),
-              suffixIcon: IconButton(
-                tooltip: hidePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                onPressed: () => setState(() => hidePassword = !hidePassword),
-                icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+      child: AutofillGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            TextField(
+              key: const ValueKey<String>('signup-name'),
+              controller: name,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              autofillHints: const <String>[AutofillHints.name],
+              style: const TextStyle(color: kInk),
+              decoration: const InputDecoration(
+                labelText: 'Nombre',
+                prefixIcon: Icon(Icons.person_outline_rounded),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          PasswordRequirements(hasLength: hasLength, hasUpper: hasUpper, hasLower: hasLower, hasNumber: hasNumber),
-          const SizedBox(height: 12),
-          TextField(
-            controller: confirm,
-            obscureText: hideConfirm,
-            textInputAction: TextInputAction.done,
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => submit(),
-            decoration: InputDecoration(
-              labelText: 'Confirma tu contraseña',
-              prefixIcon: const Icon(Icons.verified_user_outlined),
-              suffixIcon: IconButton(
-                tooltip: hideConfirm ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                onPressed: () => setState(() => hideConfirm = !hideConfirm),
-                icon: Icon(hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey<String>('signup-email'),
+              controller: email,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              autofillHints: const <String>[AutofillHints.email],
+              style: const TextStyle(color: kInk),
+              decoration: const InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Material(
-            type: MaterialType.transparency,
-            child: CheckboxListTile(
-              value: accepted,
-              onChanged: (bool? value) {
-                HapticFeedback.selectionClick();
-                setState(() => accepted = value ?? false);
-              },
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              visualDensity: VisualDensity.compact,
-              title: const Text('Acepto los Términos y el Aviso de privacidad.', style: TextStyle(fontSize: 13, height: 1.35, color: kInkSoft)),
-            ),
-          ),
-          Wrap(
-            spacing: 4,
-            children: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).push(premiumRoute(const TermsAndConditionsScreen())),
-                child: const Text('Leer términos'),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey<String>('signup-password'),
+              controller: password,
+              obscureText: hidePassword,
+              onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.next,
+              autofillHints: const <String>[AutofillHints.newPassword],
+              style: const TextStyle(color: kInk),
+              decoration: InputDecoration(
+                labelText: 'Contraseña',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  tooltip: hidePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                  onPressed: () => setState(() => hidePassword = !hidePassword),
+                  icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                ),
               ),
-              TextButton(
-                onPressed: () => Navigator.of(context).push(premiumRoute(PrivacyNoticeScreen(supportEmail: widget.model.supportEmail))),
-                child: const Text('Leer aviso de privacidad'),
+            ),
+            if (password.text.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                passwordStrong
+                    ? 'Contraseña segura'
+                    : '8 caracteres, mayúscula, minúscula y número',
+                style: TextStyle(
+                  color: passwordStrong ? const Color(0xFFD3FFE3) : Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  shadows: const <Shadow>[Shadow(color: Colors.black54, blurRadius: 8)],
+                ),
               ),
             ],
-          ),
-          AnimatedSize(
-            duration: TalaMotion.of(context, TalaMotion.select),
-            curve: TalaMotion.ease,
-            child: error.isEmpty
-                ? const SizedBox(width: double.infinity, height: 8)
-                : Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 14),
-                    child: AuthNotice(key: ValueKey<String>(error), icon: Icons.info_outline_rounded, text: error, danger: true),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey<String>('signup-confirm-password'),
+              controller: confirm,
+              obscureText: hideConfirm,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => submit(),
+              style: const TextStyle(color: kInk),
+              decoration: InputDecoration(
+                labelText: 'Confirmar contraseña',
+                prefixIcon: const Icon(Icons.verified_user_outlined),
+                suffixIcon: IconButton(
+                  tooltip: hideConfirm ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                  onPressed: () => setState(() => hideConfirm = !hideConfirm),
+                  icon: Icon(hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            CheckboxListTile(
+              key: const ValueKey<String>('signup-legal-accept'),
+              value: accepted,
+              onChanged: (bool? value) => setState(() => accepted = value ?? false),
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text(
+                'Acepto los Términos y el Aviso de privacidad',
+                style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (error.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 4),
+              AuthNotice(icon: Icons.error_outline_rounded, text: error, danger: true),
+            ],
+            const SizedBox(height: 8),
+            FilledButton(
+              key: const ValueKey<String>('signup-submit'),
+              onPressed: submit,
+              child: const Text('Crear cuenta'),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: <Widget>[
+                TextButton(
+                  style: FoodPhotoAuthScaffold.whiteLink,
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(const TermsAndConditionsScreen()),
                   ),
-          ),
-          FilledButton(onPressed: submit, child: const Text('Continuar')),
-          const SizedBox(height: 14),
-          const QuietNote(icon: Icons.shield_outlined, text: 'Nunca compartas tu contraseña. Tala Eats no te la pedirá por mensaje.'),
-        ],
+                  child: const Text('Términos'),
+                ),
+                TextButton(
+                  style: FoodPhotoAuthScaffold.whiteLink,
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(PrivacyNoticeScreen(supportEmail: widget.model.supportEmail)),
+                  ),
+                  child: const Text('Privacidad'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+
 }
 
 class VerifyAccountScreen extends StatefulWidget {
@@ -423,51 +475,65 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumAuthScaffold(
+    return FoodPhotoAuthScaffold(
       showBack: true,
-      title: sent ? 'Revisa tu correo' : 'Recupera tu contraseña',
-      subtitle: sent
-          ? 'Si la cuenta existe, recibirás un enlace seguro. Ábrelo en este teléfono para crear tu nueva contraseña.'
-          : 'Te enviaremos un enlace seguro para crear una nueva contraseña.',
+      title: sent ? 'Revisa tu correo' : 'Recuperar contraseña',
       child: AnimatedSwitcher(
         duration: TalaMotion.of(context, TalaMotion.reveal),
         child: sent
             ? Column(
-                key: const ValueKey<String>('sent'),
+                key: const ValueKey<String>('auth-mail-sent'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const Center(child: SuccessOrb(icon: Icons.mark_email_read_rounded)),
-                  const SizedBox(height: 22),
-                  const QuietNote(icon: Icons.info_outline_rounded, text: 'Si no lo ves en unos minutos, revisa las carpetas de spam o promociones.'),
-                  const SizedBox(height: 18),
-                  OutlinedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Volver al inicio de sesión')),
+                  const Text(
+                    'Si la cuenta existe, recibirás un enlace para restablecer tu contraseña.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Volver a iniciar sesión'),
+                  ),
                 ],
               )
             : Column(
-                key: const ValueKey<String>('form'),
+                key: const ValueKey<String>('auth-recover-form'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   TextField(
+                    key: const ValueKey<String>('recover-email'),
                     controller: email,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     autocorrect: false,
-                    onSubmitted: (_) {
-                      if (!loading) submit();
-                    },
-                    decoration: const InputDecoration(labelText: 'Correo electrónico', prefixIcon: Icon(Icons.alternate_email_rounded)),
+                    autofillHints: const <String>[AutofillHints.email],
+                    style: const TextStyle(color: kInk),
+                    onSubmitted: (_) { if (!loading) submit(); },
+                    decoration: const InputDecoration(
+                      labelText: 'Correo electrónico',
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
+                    ),
                   ),
                   if (error.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 12),
                     AuthNotice(icon: Icons.error_outline_rounded, text: error, danger: true),
                   ],
-                  const SizedBox(height: 18),
-                  FilledButton(onPressed: loading ? null : submit, child: BusyLabel(busy: loading, label: 'Enviar enlace')),
+                  const SizedBox(height: 14),
+                  FilledButton(
+                    key: const ValueKey<String>('recover-submit'),
+                    onPressed: loading ? null : submit,
+                    child: BusyLabel(busy: loading, label: 'Enviar enlace'),
+                  ),
                 ],
               ),
       ),
     );
   }
+
 }
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -668,6 +734,162 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 }
 
 /// Shared auth layout: brand lockup, strong title, calm form area.
+/// Acceso minimalista: fotografía suministrada por el propietario y controles
+/// encima, sin banners/textos promocionales. Se usa solamente en login,
+/// registro y recuperación para no cambiar otros flujos de seguridad.
+class FoodPhotoAuthScaffold extends StatelessWidget {
+  const FoodPhotoAuthScaffold({
+    super.key,
+    required this.child,
+    this.title,
+    this.showBack = false,
+  });
+
+  final Widget child;
+  final String? title;
+  final bool showBack;
+
+  static final ButtonStyle whiteLink = TextButton.styleFrom(
+    foregroundColor: Colors.white,
+    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final InputDecorationTheme input = theme.inputDecorationTheme;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF19191C),
+        resizeToAvoidBottomInset: true,
+        body: Stack(
+          children: <Widget>[
+            const Positioned.fill(
+              child: Image(
+                key: ValueKey<String>('auth-food-photo'),
+                image: AssetImage('assets/images/auth_food_cover.webp'),
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        Color(0x480B0810),
+                        Color(0x0C100D15),
+                        Color(0x66120A0E),
+                        Color(0xE807070A),
+                      ],
+                      stops: <double>[0, 0.28, 0.54, 1],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints bounds) {
+                  return SingleChildScrollView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 26),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: math.max(0, bounds.maxHeight - 38)),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            SizedBox(
+                              height: 48,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: showBack
+                                    ? Material(
+                                        color: Colors.black.withValues(alpha: 0.3),
+                                        shape: const CircleBorder(),
+                                        child: IconButton(
+                                          tooltip: 'Regresar',
+                                          onPressed: () => Navigator.of(context).maybePop(),
+                                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ),
+                            const Spacer(),
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 430),
+                                child: Theme(
+                                  data: theme.copyWith(
+                                    inputDecorationTheme: input.copyWith(
+                                      fillColor: const Color(0xF5FFFFFF),
+                                      hintStyle: const TextStyle(color: kMuted),
+                                      labelStyle: const TextStyle(color: kInkSoft),
+                                      floatingLabelStyle: const TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700),
+                                      prefixIconColor: kInkSoft,
+                                      suffixIconColor: kInkSoft,
+                                    ),
+                                    checkboxTheme: CheckboxThemeData(
+                                      fillColor: WidgetStateProperty.resolveWith(
+                                        (Set<WidgetState> states) => states.contains(WidgetState.selected)
+                                            ? kBrand
+                                            : Colors.white,
+                                      ),
+                                      checkColor: const WidgetStatePropertyAll<Color>(Colors.white),
+                                      side: const BorderSide(color: Colors.white, width: 1.5),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: <Widget>[
+                                      if (title != null) ...<Widget>[
+                                        Text(
+                                          title!,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w800,
+                                            height: 1.15,
+                                            shadows: <Shadow>[
+                                              Shadow(color: Colors.black54, blurRadius: 14),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                      ],
+                                      child,
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class PremiumAuthScaffold extends StatelessWidget {
   const PremiumAuthScaffold({
     super.key,
