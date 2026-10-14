@@ -587,9 +587,10 @@ class TrackingScreen extends StatefulWidget {
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen> {
+class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObserver {
   Timer? _timer;
   bool refreshing = false;
+  bool _foreground = true;
 
   OrderEntry get order => widget.order;
   TalaModel get model => widget.model;
@@ -606,20 +607,30 @@ class _TrackingScreenState extends State<TrackingScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(silent: true));
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!terminal) _refresh(silent: true);
+      if (_foreground && !terminal) _refresh(silent: true);
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final bool active = state == AppLifecycleState.resumed;
+    final bool wasActive = _foreground;
+    _foreground = active;
+    if (active && !wasActive && !terminal) _refresh(silent: true);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
   Future<void> _refresh({bool silent = false}) async {
-    if (refreshing || terminal) return;
+    if (refreshing || terminal || !_foreground || !mounted) return;
     if (mounted) setState(() => refreshing = true);
     try {
       await model.refreshOrder(order);
@@ -661,7 +672,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
               const SizedBox(height: 2),
               Text(order.restaurant.name, style: TalaText.muted),
               const SizedBox(height: 18),
-              RouteProgress(progress: progress, from: order.restaurant.name, to: 'Tu dirección'),
+              if (order.canShowTrackingMap)
+                DriverTrackingMap(order: order)
+              else
+                RouteProgress(progress: progress, from: order.restaurant.name, to: 'Tu dirección'),
               const SizedBox(height: 12),
               TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order)),
               const SizedBox(height: 12),
