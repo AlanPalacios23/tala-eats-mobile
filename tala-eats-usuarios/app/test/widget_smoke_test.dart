@@ -191,7 +191,7 @@ void main() {
     await tester.pumpWidget(const TalaEatsApp(testMode: true));
     await tester.pump();
 
-    final Finder privacyLink = find.text('Aviso de Privacidad');
+    final Finder privacyLink = find.text('Privacidad');
     expect(privacyLink, findsOneWidget);
     await tester.ensureVisible(privacyLink);
     await tester.pumpAndSettle();
