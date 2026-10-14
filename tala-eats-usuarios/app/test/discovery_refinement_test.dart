@@ -116,6 +116,48 @@ void main() {
     model.dispose();
   });
 
+  testWidgets('Inicio ofrece seguimiento de pedido activo sin banner permanente', (WidgetTester tester) async {
+    final TalaModel model = TalaModel();
+    model.restaurants.add(_pizza);
+    model.orders.add(OrderEntry(
+      id: 700,
+      restaurant: _pizza,
+      total: 249,
+      status: 'Preparando',
+      deliveryMode: 'delivery',
+      lines: <CartLine>[],
+      rawStatus: 'preparing',
+      paymentMethod: 'cash',
+    ));
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(model: model)));
+    await tester.pump();
+    expect(find.text('TU PEDIDO EN CURSO'), findsOneWidget);
+    expect(find.text('Preparando'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    model.dispose();
+  });
+
+  testWidgets('Inicio NO confunde pago Stripe pendiente con reparto activo', (WidgetTester tester) async {
+    final TalaModel model = TalaModel();
+    model.restaurants.add(_pizza);
+    model.orders.add(OrderEntry(
+      id: 701,
+      restaurant: _pizza,
+      total: 249,
+      status: 'Pago pendiente',
+      deliveryMode: 'delivery',
+      lines: <CartLine>[],
+      rawStatus: 'received',
+      paymentMethod: 'stripe',
+      paymentStatus: 'pending',
+    ));
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(model: model)));
+    await tester.pump();
+    expect(find.text('TU PEDIDO EN CURSO'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    model.dispose();
+  });
+
   testWidgets('Pantalla 320dp mantiene filtros desplazables sin overflow', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(320, 700);
     tester.view.devicePixelRatio = 1;
