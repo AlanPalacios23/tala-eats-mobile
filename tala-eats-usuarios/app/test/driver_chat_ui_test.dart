@@ -116,6 +116,12 @@ void main() {
     final TalaModel model = TalaModel(apiClient: api);
     await tester.pumpWidget(MaterialApp(home: TrackingScreen(model: model, order: _order())));
     await tester.pump();
+    // El contenido de TrackingScreen está por debajo del viewport inicial.
+    await tester.scrollUntilVisible(
+      find.text('Buscando repartidor'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Ver chat con mi repartidor'), findsNothing);
     expect(find.text('Buscando repartidor'), findsOneWidget);
     expect(api.sharedChatRequests, 0);
@@ -134,8 +140,12 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: TrackingScreen(model: model, order: order)));
     await tester.pump();
     final Finder action = find.text('Ver chat con mi repartidor');
+    await tester.scrollUntilVisible(
+      action,
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(action, findsOneWidget);
-    await tester.ensureVisible(action);
     await tester.tap(action);
     await tester.pumpAndSettle();
 
