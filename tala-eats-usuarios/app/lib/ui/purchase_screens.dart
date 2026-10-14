@@ -191,11 +191,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> submit() async {
+    if (placing) return;
     final TalaModel model = widget.model;
-    if (model.deliveryMode == 'delivery' && model.addresses.isEmpty) {
-      HapticFeedback.mediumImpact();
-      setState(() => error = 'Agrega una dirección de entrega para continuar.');
-      return;
+    if (model.deliveryMode == 'delivery') {
+      final AddressEntry? address = model.addresses.isEmpty
+          ? null
+          : model.addresses[model.selectedAddress.clamp(0, model.addresses.length - 1).toInt()];
+      if (address == null || !validTrackingCoordinates(address.lat, address.lng)) {
+        HapticFeedback.mediumImpact();
+        setState(() => error = address == null
+            ? 'Agrega una dirección de entrega para continuar.'
+            : 'Esta dirección necesita una ubicación GPS válida. Regístrala de nuevo para continuar.');
+        return;
+      }
     }
     if (!model.hasAvailablePaymentMethod || !model.isPaymentMethodEnabled(model.paymentMethod)) {
       setState(() => error = 'No hay un método de pago disponible para confirmar el pedido.');
@@ -222,6 +230,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           error = e.message;
         });
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          placing = false;
+          error = 'No pudimos confirmar el pedido. Revisa tu conexión y vuelve a intentarlo.';
+        });
+      }
     }
   }
 
@@ -230,7 +245,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     widget.model.setCoupon(coupon.text);
     if (coupon.text.trim().isEmpty) return;
     HapticFeedback.selectionClick();
-    showMessage(context, 'Cupón listo. Se validará al confirmar el pago.');
+    showMessage(context, 'Cupón guardado. El servidor lo validará al confirmar el pedido.');
   }
 
   void removeCoupon() {
@@ -254,6 +269,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       builder: (BuildContext context, Widget? child) {
         final bool delivery = model.deliveryMode == 'delivery';
         final AddressEntry? address = model.addresses.isEmpty ? null : model.addresses[model.selectedAddress.clamp(0, model.addresses.length - 1).toInt()];
+        final bool addressReady = !delivery || (address != null && validTrackingCoordinates(address.lat, address.lng));
         return Scaffold(
           appBar: AppBar(title: const Text('Finalizar pedido')),
           body: ListView(
@@ -359,6 +375,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ),
                               ),
                       ),
+                      if (delivery && address != null && !addressReady) ...<Widget>[
+                        const SizedBox(height: 12),
+                        const AuthNotice(
+                          icon: Icons.location_off_outlined,
+                          text: 'Tu dirección no tiene un punto GPS válido. Regístrala de nuevo para confirmar el envío.',
+                          danger: true,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -480,8 +504,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           bottomNavigationBar: BottomActionBar(
             child: model.hasAvailablePaymentMethod
-                ? FilledButton(
-                    onPressed: placing ? null : submit,
+                ? !addressReady
+                    ? OutlinedButton.icon(
+                        onPressed: placing
+                            ? null
+                            : () => Navigator.of(context).push(
+                                premiumRoute(AddressesScreen(model: model)),
+                              ),
+                        icon: const Icon(Icons.add_location_alt_outlined),
+                        label: Text(address == null
+                            ? 'Agregar dirección de entrega'
+                            : 'Actualizar ubicación de entrega'),
+                      )
+                    : FilledButton(
+                        onPressed: placing ? null : submit,
                     child: BusyLabel(
                       busy: placing,
                       label: model.paymentMethod == 'cash'
