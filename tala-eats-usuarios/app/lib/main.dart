@@ -4,6 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'production_api.dart';
 import 'checkout_pricing.dart';
 
@@ -12,6 +16,8 @@ part 'ui/auth_screens.dart';
 part 'ui/discovery_screens.dart';
 part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
+part 'ui/tracking_map.dart';
+part 'push_notifications.dart';
 part 'ui/account_screens.dart';
 part 'ui/legal_screens.dart';
 
@@ -141,9 +147,14 @@ class OrderEntry {
     this.paymentStatus = 'pending',
     this.paymentMethod = 'cash',
     this.rawStatus = 'received',
+    this.driverId = 0,
     this.driverName = '',
     this.driverVehicle = '',
     this.driverRating = 0,
+    this.driverLat,
+    this.driverLng,
+    this.deliveryLat,
+    this.deliveryLng,
   });
 
   final int id;
@@ -157,9 +168,38 @@ class OrderEntry {
   String paymentStatus;
   final String paymentMethod;
   String rawStatus;
-  final String driverName;
-  final String driverVehicle;
-  final double driverRating;
+  int driverId;
+  String driverName;
+  String driverVehicle;
+  double driverRating;
+  double? driverLat;
+  double? driverLng;
+  double? deliveryLat;
+  double? deliveryLng;
+
+  /// El mapa se abre solo después de confirmación, durante una entrega activa.
+  /// Nunca se dibujan pines usando datos inventados o posiciones por defecto.
+  bool get canShowTrackingMap =>
+      deliveryMode == 'delivery' &&
+      !isAwaitingOnlinePayment &&
+      <String>{'confirmed', 'preparing', 'ready', 'assigned', 'picked_up', 'on_the_way'}
+          .contains(rawStatus);
+
+  bool get hasDriverCoordinates =>
+      canShowTrackingMap &&
+      driverId > 0 &&
+      validTrackingCoordinates(driverLat, driverLng);
+
+  bool get hasDeliveryCoordinates =>
+      canShowTrackingMap && validTrackingCoordinates(deliveryLat, deliveryLng);
+
+  /// Chat privado: la asignación real viene de OrderPublic del servidor.
+  /// El envío sigue desactivado hasta tener un endpoint exclusivo por rol.
+  bool get canContactDriver =>
+      deliveryMode == 'delivery' &&
+      driverId > 0 &&
+      !<String>{'delivered', 'cancelled'}.contains(rawStatus) &&
+      !isAwaitingOnlinePayment;
 
   bool get isOnlinePayment => paymentMethod == 'stripe' || paymentMethod == 'mercadopago';
   bool get isAwaitingOnlinePayment => isOnlinePayment && paymentStatus != 'paid' && rawStatus != 'cancelled';
@@ -169,6 +209,7 @@ class TalaModel extends ChangeNotifier {
   TalaModel({TalaApi? apiClient}) : api = apiClient ?? TalaApi();
 
   final TalaApi api;
+  CustomerPushService? pushService;
   bool signedIn = false;
   bool loading = false;
   bool online = true;
@@ -408,6 +449,7 @@ class TalaModel extends ChangeNotifier {
   }
 
   void logout() {
+    pushService?.signOut();
     api.post('/auth/logout').catchError((Object _) => null);
     NativeBridge.clearToken();
     api.token = null;
@@ -542,21 +584,49 @@ class TalaModel extends ChangeNotifier {
     });
   }
 
+  /// Cada combinación de producto + indicaciones conserva su propia línea.
+  /// No mezclar notas distintas: evita enviar instrucciones incorrectas al
+  /// restaurante al crear el pedido.
   void addToCart(FoodItem item, int quantity, {String note = ''}) {
-    if (cartRestaurantId != null && cartRestaurantId != item.restaurantId) cart.clear();
-    cartRestaurantId = item.restaurantId;
+    if (quantity <= 0) return;
     final Restaurant? restaurant = _restaurantById(item.restaurantId);
     if (restaurant != null && !restaurant.isOpen) return;
-    if (restaurant != null && !restaurant.delivery && restaurant.pickup) deliveryMode = 'pickup';
+
+    final String instructions = note.trim();
+    if (cartRestaurantId != null && cartRestaurantId != item.restaurantId) {
+      cart.clear();
+    }
+    cartRestaurantId = item.restaurantId;
+    if (restaurant != null && !restaurant.delivery && restaurant.pickup) {
+      deliveryMode = 'pickup';
+    }
+
     CartLine? existing;
-    for (final CartLine line in cart) { if (line.item.id == item.id) { existing = line; break; } }
-    if (existing == null) cart.add(CartLine(item: item, quantity: quantity, note: note));
-    else { existing.quantity += quantity; if (note.trim().isNotEmpty) existing.note = note.trim(); }
+    for (final CartLine line in cart) {
+      if (line.item.id == item.id &&
+          line.item.restaurantId == item.restaurantId &&
+          line.note.trim() == instructions) {
+        existing = line;
+        break;
+      }
+    }
+    const int maxQuantityPerLine = 99;
+    if (existing == null) {
+      cart.add(CartLine(
+        item: item,
+        quantity: math.min(quantity, maxQuantityPerLine),
+        note: instructions,
+      ));
+    } else {
+      if (existing.quantity >= maxQuantityPerLine) return;
+      existing.quantity = math.min(existing.quantity + quantity, maxQuantityPerLine);
+    }
     notifyListeners();
   }
 
   void changeQuantity(CartLine line, int delta) {
-    line.quantity += delta;
+    if (!cart.contains(line) || delta == 0) return;
+    line.quantity = math.max(0, math.min(99, line.quantity + delta));
     if (line.quantity <= 0) cart.remove(line);
     if (cart.isEmpty) cartRestaurantId = null;
     notifyListeners();
@@ -776,7 +846,18 @@ class TalaModel extends ChangeNotifier {
     final Map<String, dynamic> live = await api.liveOrder(order.id);
     final Map<String, dynamic> raw = Map<String, dynamic>.from(live['order'] as Map);
     final OrderEntry fresh = _orderFromJson(raw);
-    order.status = fresh.status; order.rawStatus = fresh.rawStatus; order.paymentStatus = fresh.paymentStatus; order.eta = fresh.eta;
+    order.status = fresh.status;
+    order.rawStatus = fresh.rawStatus;
+    order.paymentStatus = fresh.paymentStatus;
+    order.eta = fresh.eta;
+    order.driverId = fresh.driverId;
+    order.driverName = fresh.driverName;
+    order.driverVehicle = fresh.driverVehicle;
+    order.driverRating = fresh.driverRating;
+    order.driverLat = fresh.driverLat;
+    order.driverLng = fresh.driverLng;
+    order.deliveryLat = fresh.deliveryLat;
+    order.deliveryLng = fresh.deliveryLng;
     notifyListeners();
   }
 
@@ -889,6 +970,16 @@ class TalaModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshNotifications() async {
+    if (!signedIn) return;
+    try {
+      _applyNotifications(await api.notifications());
+      notifyListeners();
+    } catch (_) {
+      // Si el móvil está desconectado el buzón no se vacía ni se inventan avisos.
+    }
+  }
+
   Future<void> markNotificationRead(NotificationEntry notification) async {
     if (notification.isRead) return;
     try {
@@ -981,7 +1072,7 @@ class TalaModel extends ChangeNotifier {
     }
     final int eta=_asInt(raw['estimated_minutes']);
     final Map<String,dynamic> driver=raw['driver_info'] is Map ? Map<String,dynamic>.from(raw['driver_info'] as Map) : <String,dynamic>{};
-    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']));
+    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverId:_asInt(raw['driver_id'] ?? driver['id']),driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']),driverLat:_asNullableDouble(driver['current_lat']),driverLng:_asNullableDouble(driver['current_lng']),deliveryLat:_asNullableDouble(raw['delivery_lat']),deliveryLng:_asNullableDouble(raw['delivery_lng']));
   }
 
   Restaurant? _restaurantById(int id) { for (final Restaurant r in restaurants) { if (r.id==id) return r; } return null; }
@@ -1039,6 +1130,9 @@ class TalaModel extends ChangeNotifier {
   }
 }
 
+/// Navegador principal usado al abrir una notificación desde Android.
+final GlobalKey<NavigatorState> talaNavigatorKey = GlobalKey<NavigatorState>();
+
 class TalaEatsApp extends StatefulWidget {
   const TalaEatsApp({super.key, this.testMode = false});
 
@@ -1050,11 +1144,26 @@ class TalaEatsApp extends StatefulWidget {
 
 class _TalaEatsAppState extends State<TalaEatsApp> {
   final TalaModel model = TalaModel();
+  late final CustomerPushService push = CustomerPushService(model);
   bool booted = false;
+  bool _previousAuth = false;
+
+  void _listenToAuth() {
+    if (_previousAuth == model.signedIn) return;
+    _previousAuth = model.signedIn;
+    if (model.signedIn) {
+      unawaited(push.onAuthChanged());
+    } else {
+      // Cierre de sesión forzado/401: invalidar token push también.
+      push.signOut();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    model.pushService = push;
+    model.addListener(_listenToAuth);
     if (widget.testMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => booted = true);
@@ -1068,12 +1177,23 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
       Future<void>.delayed(const Duration(milliseconds: 1100)),
     ]).whenComplete(() {
       if (mounted) setState(() => booted = true);
+      unawaited(push.start());
     });
+  }
+
+  @override
+  void dispose() {
+    model.removeListener(_listenToAuth);
+    model.pushService = null;
+    push.dispose();
+    model.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: talaNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Tala Eats',
       theme: buildTalaTheme(),

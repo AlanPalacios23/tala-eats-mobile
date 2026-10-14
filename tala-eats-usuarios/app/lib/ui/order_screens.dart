@@ -57,7 +57,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final TalaModel model = widget.model;
-    final List<OrderEntry> active = model.orders.where((OrderEntry order) => !isComplete(order)).toList();
+    final List<OrderEntry> pending = model.orders.where((OrderEntry order) => !isComplete(order) && order.isAwaitingOnlinePayment).toList();
+    final List<OrderEntry> active = model.orders.where((OrderEntry order) => !isComplete(order) && !order.isAwaitingOnlinePayment).toList();
     final List<OrderEntry> past = model.orders.where(isComplete).toList();
     return SafeArea(
       bottom: false,
@@ -77,12 +78,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: StatusView(
                   icon: Icons.receipt_long_outlined,
                   title: 'Aún no tienes pedidos',
-                  body: 'Cuando hagas tu primer pedido podrás seguirlo aquí en tiempo real.',
+                  body: 'Cuando hagas tu primer pedido podrás consultar su estado aquí.',
                   actionLabel: 'Explorar restaurantes',
                   onAction: () => model.setTab(0),
                 ),
               )
             else ...<Widget>[
+              if (pending.isNotEmpty) ...<Widget>[
+                TalaSectionHeader(
+                  title: 'Pendientes de pago',
+                  trailing: TalaCountChip(label: '${pending.length}'),
+                ),
+                const SizedBox(height: 12),
+                for (int i = 0; i < pending.length; i++)
+                  PendingPaymentOrderCard(order: pending[i], onTap: () => _open(pending[i])),
+                const SizedBox(height: 18),
+              ],
               if (active.isNotEmpty) ...<Widget>[
                 TalaSectionHeader(title: 'En curso', trailing: TalaCountChip(label: '${active.length}')),
                 const SizedBox(height: 12),
@@ -94,11 +105,83 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 const TalaSectionHeader(title: 'Anteriores'),
                 const SizedBox(height: 12),
                 for (int i = 0; i < past.length; i++)
-                  Reveal(index: active.length + i, child: PastOrderTile(order: past[i], onTap: () => _open(past[i]))),
+                  Reveal(index: pending.length + active.length + i, child: PastOrderTile(order: past[i], onTap: () => _open(past[i]))),
               ],
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+class PendingPaymentOrderCard extends StatelessWidget {
+  const PendingPaymentOrderCard({super.key, required this.order, required this.onTap});
+
+  final OrderEntry order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TalaCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: kSoftOrange,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(Icons.lock_clock_rounded, color: kBrandDeep, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      order.restaurant.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TalaText.title,
+                    ),
+                    const SizedBox(height: 3),
+                    Text('Pedido #${order.id} · ${money(order.total)}', style: TalaText.caption),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const QuietNote(
+            icon: Icons.info_outline_rounded,
+            text: 'El restaurante comenzará a preparar tu pedido cuando se confirme el pago.',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              const Expanded(
+                child: Text(
+                  'Pago sin confirmar',
+                  style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+              const Text(
+                'Revisar pedido',
+                style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: kBrandDeep, size: 19),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -440,10 +523,26 @@ class OrderDetailScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Reveal(index: 1, child: TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order))),
               ],
-              if (delivery && !complete && !cancelled) ...<Widget>[
+              if (order.isAwaitingOnlinePayment && !cancelled) ...<Widget>[
+                const SizedBox(height: 14),
+                const AuthNotice(
+                  icon: Icons.lock_clock_rounded,
+                  text: 'El pago aún no está confirmado. El restaurante no empezará a preparar este pedido hasta que se autorice.',
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(PaymentStatusScreen(model: model, order: order)),
+                  ),
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Revisar estado del pago'),
+                ),
+              ] else if (delivery && !complete && !cancelled) ...<Widget>[
                 const SizedBox(height: 14),
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).push(premiumRoute(TrackingScreen(model: model, order: order))),
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(TrackingScreen(model: model, order: order)),
+                  ),
                   icon: const Icon(Icons.near_me_rounded),
                   label: const Text('Seguir pedido'),
                 ),
@@ -587,39 +686,43 @@ class TrackingScreen extends StatefulWidget {
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen> {
+class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObserver {
   Timer? _timer;
   bool refreshing = false;
+  bool _foreground = true;
 
   OrderEntry get order => widget.order;
   TalaModel get model => widget.model;
-
-  double get progress {
-    final List<(String, Set<String>)> steps = _timelineSteps(order);
-    final int index = _timelineIndex(order, steps);
-    if (steps.length < 2) return 0;
-    return (index / (steps.length - 1)).clamp(0.0, 1.0).toDouble();
-  }
 
   bool get terminal => <String>{'Entregado', 'Recogido', 'Cancelado'}.contains(order.status);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(silent: true));
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!terminal) _refresh(silent: true);
+      if (_foreground && !terminal) _refresh(silent: true);
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final bool active = state == AppLifecycleState.resumed;
+    final bool wasActive = _foreground;
+    _foreground = active;
+    if (active && !wasActive && !terminal) _refresh(silent: true);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
   Future<void> _refresh({bool silent = false}) async {
-    if (refreshing || terminal) return;
+    if (refreshing || terminal || !_foreground || !mounted) return;
     if (mounted) setState(() => refreshing = true);
     try {
       await model.refreshOrder(order);
@@ -643,13 +746,38 @@ class _TrackingScreenState extends State<TrackingScreen> {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  if (!terminal) const LiveBadge() else const StatusPill(label: 'Finalizado', color: kGreen, background: kSoftGreen),
-                  const Spacer(),
-                  AnimatedSwitcher(
-                    duration: TalaMotion.of(context, TalaMotion.select),
-                    child: refreshing
-                        ? const SizedBox(key: ValueKey<String>('r'), width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Estimado ${order.eta}', key: ValueKey<String>(order.eta), style: TalaText.caption),
+                  Flexible(
+                    flex: 3,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: !terminal
+                          ? const LiveBadge()
+                          : const StatusPill(label: 'Finalizado', color: kGreen, background: kSoftGreen),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 2,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: AnimatedSwitcher(
+                        duration: TalaMotion.of(context, TalaMotion.select),
+                        child: refreshing
+                            ? const SizedBox(
+                                key: ValueKey<String>('r'),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                'Estimado ${order.eta}',
+                                key: ValueKey<String>(order.eta),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TalaText.caption,
+                              ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -661,22 +789,64 @@ class _TrackingScreenState extends State<TrackingScreen> {
               const SizedBox(height: 2),
               Text(order.restaurant.name, style: TalaText.muted),
               const SizedBox(height: 18),
-              RouteProgress(progress: progress, from: order.restaurant.name, to: 'Tu dirección'),
+              if (order.canShowTrackingMap)
+                DriverTrackingMap(order: order)
+              else if (!terminal)
+                TalaCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: <Widget>[
+                      const Icon(Icons.hourglass_top_rounded, color: kBrandDeep),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Esperando confirmación del restaurante. El mapa se mostrará cuando el pedido avance.',
+                          style: TalaText.body,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 12),
               TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order)),
               const SizedBox(height: 12),
-              DriverPremiumCard(order: order),
-              if (order.pin.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 12),
-                _PinBlock(pin: order.pin),
+              if (order.deliveryMode == 'delivery') ...<Widget>[
+                DriverPremiumCard(order: order),
+                if (order.pin.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _PinBlock(pin: order.pin),
+                ],
+                const SizedBox(height: 14),
+                if (order.canContactDriver) ...<Widget>[
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).push(premiumRoute(ChatScreen(model: model, order: order))),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    label: const Text('Ver chat con mi repartidor'),
+                  ),
+                  const SizedBox(height: 8),
+                  const QuietNote(
+                    icon: Icons.lock_outline_rounded,
+                    text: 'Vista previa del chat privado. El envío se habilitará cuando el backend esté preparado.',
+                  ),
+                ] else if (!terminal) ...<Widget>[
+                  TalaCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: <Widget>[
+                        const Icon(Icons.mark_chat_unread_outlined, color: kBrandDeep),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Podrás contactar a tu repartidor cuando esté asignado.',
+                            style: TalaText.body,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(context).push(premiumRoute(ChatScreen(model: model, order: order))),
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                label: const Text('Abrir chat del pedido'),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: refreshing ? null : () => _refresh(),
                 icon: const Icon(Icons.refresh_rounded),
@@ -826,9 +996,16 @@ class LiveBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SkeletonPulse(child: Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle))),
+          Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          const Text('En vivo', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          const Flexible(
+            child: Text(
+              'Actualización periódica',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -842,7 +1019,7 @@ class DriverPremiumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool assigned = order.driverName.isNotEmpty;
+    final bool assigned = order.driverId > 0;
     final String detail = assigned
         ? <String>[
             order.driverVehicle.isEmpty ? 'Repartidor' : order.driverVehicle,
@@ -863,7 +1040,10 @@ class DriverPremiumCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(assigned ? order.driverName : 'Asignando repartidor', style: TalaText.title.copyWith(fontSize: 15)),
+                Text(
+                  assigned ? (order.driverName.trim().isEmpty ? 'Tu repartidor' : order.driverName) : 'Buscando repartidor',
+                  style: TalaText.title.copyWith(fontSize: 15),
+                ),
                 const SizedBox(height: 2),
                 Text(detail, style: TalaText.caption),
               ],
@@ -875,188 +1055,177 @@ class DriverPremiumCard extends StatelessWidget {
   }
 }
 
-class ChatScreen extends StatefulWidget {
+/// Vista previa de chat EXCLUSIVO con repartidor.
+/// No se llama al endpoint heredado /platform/orders/{id}/chat: actualmente
+/// permite acceso al comercio y no garantiza privacidad cliente-repartidor.
+/// El compositor se habilitará en una versión posterior cuando exista el
+/// contrato privado con controles de rol en el backend y la app de Repartidor.
+class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key, required this.model, required this.order});
 
   final TalaModel model;
   final OrderEntry order;
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController controller = TextEditingController();
-  final List<Map<String, dynamic>> messages = <Map<String, dynamic>>[];
-  Timer? _timer;
-  bool loading = true;
-  bool sending = false;
-  String error = '';
-
-  @override
-  void initState() {
-    super.initState();
-    load();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => load(silent: true));
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> load({bool silent = false}) async {
-    if (!silent && mounted) setState(() => loading = true);
-    try {
-      final dynamic data = await widget.model.api.get('/platform/orders/${widget.order.id}/chat');
-      messages
-        ..clear()
-        ..addAll(List<dynamic>.from(data as List).map((dynamic x) => Map<String, dynamic>.from(x as Map)));
-      error = '';
-    } on ApiException catch (e) {
-      error = e.message;
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
-  }
-
-  Future<void> send() async {
-    final String text = controller.text.trim();
-    if (text.isEmpty || sending) return;
-    setState(() => sending = true);
-    try {
-      final dynamic raw = await widget.model.api.post('/platform/orders/${widget.order.id}/chat', <String, dynamic>{'message': text, 'message_type': 'text', 'media_url': ''});
-      messages.add(Map<String, dynamic>.from(raw as Map));
-      controller.clear();
-      error = '';
-      HapticFeedback.lightImpact();
-    } on ApiException catch (e) {
-      error = e.message;
-    } finally {
-      if (mounted) setState(() => sending = false);
-    }
-  }
-
-  String _time(dynamic raw) {
-    final DateTime? dt = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
-    if (dt == null) return '';
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> ordered = messages.reversed.toList();
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('Chat del pedido'),
-            Text('#${widget.order.id} · ${widget.order.restaurant.name}', style: TalaText.caption),
-          ],
-        ),
-        actions: <Widget>[IconButton(tooltip: 'Actualizar', onPressed: load, icon: const Icon(Icons.refresh_rounded))],
-      ),
-      body: Column(
-        children: <Widget>[
-          if (error.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 8), child: AuthNotice(icon: Icons.error_outline_rounded, text: error, danger: true)),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
-                : messages.isEmpty
-                    ? const StatusView(icon: Icons.chat_bubble_outline_rounded, title: 'Aún no hay mensajes', body: 'Escribe aquí para hablar con el equipo de tu pedido.')
-                    : ListView.builder(
-                        reverse: true,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                        itemCount: ordered.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          final Map<String, dynamic> m = ordered[index];
-                          final bool mine = int.tryParse(m['sender_id']?.toString() ?? '') == widget.model.userId;
-                          final String time = _time(m['created_at']);
-                          return Align(
-                            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-                                decoration: BoxDecoration(
-                                  color: mine ? kBrand : Colors.white,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(18),
-                                    topRight: const Radius.circular(18),
-                                    bottomLeft: Radius.circular(mine ? 18 : 6),
-                                    bottomRight: Radius.circular(mine ? 6 : 18),
-                                  ),
-                                  border: mine ? null : Border.all(color: kLine),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text((m['message'] ?? '').toString(), style: TextStyle(color: mine ? Colors.white : kInk, fontSize: 15, height: 1.35)),
-                                    if (time.isNotEmpty) ...<Widget>[
-                                      const SizedBox(height: 3),
-                                      Text(time, style: TextStyle(color: mine ? Colors.white70 : kSubtle, fontSize: 10, fontWeight: FontWeight.w600)),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+    return AnimatedBuilder(
+      animation: model,
+      builder: (BuildContext context, Widget? child) {
+        final bool assigned = order.canContactDriver;
+        final String name = order.driverName.trim().isEmpty ? 'Tu repartidor' : order.driverName;
+        return Scaffold(
+          backgroundColor: kBackground,
+          appBar: AppBar(
+            title: const Text('Chat con tu repartidor'),
           ),
-          DecoratedBox(
-            decoration: const BoxDecoration(color: kSurface, border: Border(top: BorderSide(color: kLine))),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => send(),
-                      decoration: InputDecoration(
-                        hintText: 'Escribe un mensaje',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kLine)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kLine)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kBrand, width: 1.5)),
-                      ),
+          body: SafeArea(
+            child: Column(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: TalaCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: <Widget>[
+                        CircleAvatar(
+                          radius: 25,
+                          backgroundColor: assigned ? kSoftOrange : kSunken,
+                          child: Icon(assigned ? Icons.delivery_dining_rounded : Icons.lock_outline_rounded,
+                              color: assigned ? kBrandDeep : kMuted, size: 27),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(assigned ? name : 'Conversación no disponible',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title),
+                              const SizedBox(height: 4),
+                              Text('Pedido #${order.id} · ${order.restaurant.name}',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.caption),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const StatusPill(
+                          label: 'Vista previa',
+                          color: kBrandDeep,
+                          background: kSoftOrange,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: kBrand,
-                    shape: const CircleBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: sending ? null : send,
-                      child: SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Center(
-                          child: sending
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                ),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Container(
+                              height: 88,
+                              width: 88,
+                              decoration: BoxDecoration(
+                                color: kSoftOrange,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: kLine),
+                              ),
+                              child: const Icon(Icons.chat_bubble_outline_rounded, color: kBrandDeep, size: 38),
+                            ),
+                            const SizedBox(height: 22),
+                            Text(
+                              assigned ? 'Comunícate con quien lleva tu pedido' : 'Esperando un repartidor',
+                              textAlign: TextAlign.center,
+                              style: TalaText.h2,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              assigned
+                                  ? 'Aquí podrás escribir a ${name} cuando activemos el canal privado entre cliente y repartidor.'
+                                  : 'El chat estará disponible después de que el servidor confirme una asignación.',
+                              textAlign: TextAlign.center,
+                              style: TalaText.body,
+                            ),
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: kLine),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Icon(Icons.shield_outlined, color: kBrandDeep, size: 18),
+                                  SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      'Sin mensajes de demostración ni envíos al restaurante.',
+                                      style: TalaText.caption,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: kSurface,
+                    border: Border(top: BorderSide(color: kLine)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: TextField(
+                                enabled: false,
+                                maxLines: 1,
+                                decoration: InputDecoration(
+                                  hintText: 'Mensajes disponibles próximamente',
+                                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 19),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const IconButton.filled(
+                              onPressed: null,
+                              tooltip: 'Envío pendiente de activar',
+                              icon: Icon(Icons.send_rounded),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Chat privado pendiente de activación en el backend.',
+                          textAlign: TextAlign.center,
+                          style: TalaText.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

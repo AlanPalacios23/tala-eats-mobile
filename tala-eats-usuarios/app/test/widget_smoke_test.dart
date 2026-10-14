@@ -146,8 +146,8 @@ void main() {
     expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(find.text('Crear cuenta'), findsOneWidget);
     expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
-    expect(find.text('Términos y Condiciones'), findsOneWidget);
-    expect(find.text('Aviso de Privacidad'), findsOneWidget);
+    expect(find.text('Términos'), findsOneWidget);
+    expect(find.text('Privacidad'), findsOneWidget);
   });
 
   testWidgets('Registro production muestra creación segura de contraseña', (WidgetTester tester) async {
@@ -157,9 +157,9 @@ void main() {
     await tester.tap(find.text('Crear cuenta'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Crea tu cuenta'), findsOneWidget);
-    expect(find.text('Crea una contraseña'), findsOneWidget);
-    expect(find.text('Confirma tu contraseña'), findsOneWidget);
+    expect(find.text('Crear cuenta'), findsWidgets);
+    expect(find.text('Contraseña'), findsOneWidget);
+    expect(find.text('Confirmar contraseña'), findsOneWidget);
   });
 
   testWidgets('Recuperación production está disponible sin tocar red', (WidgetTester tester) async {
@@ -169,7 +169,7 @@ void main() {
     await tester.tap(find.text('¿Olvidaste tu contraseña?'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Recupera tu contraseña'), findsOneWidget);
+    expect(find.text('Recuperar contraseña'), findsOneWidget);
     expect(find.text('Enviar enlace'), findsOneWidget);
   });
 
@@ -177,7 +177,7 @@ void main() {
     await tester.pumpWidget(const TalaEatsApp(testMode: true));
     await tester.pump();
 
-    final Finder termsLink = find.text('Términos y Condiciones');
+    final Finder termsLink = find.text('Términos');
     expect(termsLink, findsOneWidget);
     await tester.ensureVisible(termsLink);
     await tester.pumpAndSettle();
@@ -381,6 +381,11 @@ void main() {
       image: '',
       category: 'QA',
     ), 1);
+    // Checkout exige una ubicación real para iniciar una entrega.
+    model.addresses.add(const AddressEntry(
+      id: 101, label: 'Casa QA', address: 'Calle de prueba, Tala, Jalisco',
+      lat: 20.65, lng: -103.70,
+    ));
 
     await tester.pumpWidget(MaterialApp(home: CheckoutScreen(model: model)));
     await tester.pumpAndSettle();
@@ -422,6 +427,10 @@ void main() {
       image: '',
       category: 'QA',
     ), 1);
+    model.addresses.add(const AddressEntry(
+      id: 102, label: 'Casa QA', address: 'Calle de prueba, Tala, Jalisco',
+      lat: 20.65, lng: -103.70,
+    ));
 
     await tester.pumpWidget(MaterialApp(home: CheckoutScreen(model: model)));
     await tester.pumpAndSettle();

@@ -29,8 +29,25 @@ int cartItemCount(TalaModel model) => model.cart.fold<int>(0, (int total, CartLi
 /// model replaces a cart that belongs to another restaurant.
 Future<bool> addItemWithGuard(BuildContext context, TalaModel model, FoodItem item, int quantity, {String note = ''}) async {
   final Restaurant? target = restaurantFor(model, item.restaurantId);
-  if (target != null && !target.isOpen) {
+  if (target == null) {
+    showMessage(context, 'Este comercio ya no está disponible. Actualiza el catálogo.');
+    return false;
+  }
+  if (!target.isOpen) {
     showMessage(context, 'Este restaurante está cerrado por ahora.');
+    return false;
+  }
+  // Una ficha abierta puede quedar obsoleta tras actualizar el catálogo.
+  // El servidor seguirá validando stock/precio al confirmar el pedido.
+  FoodItem? latest;
+  for (final FoodItem current in model.menu) {
+    if (current.restaurantId == item.restaurantId && current.id == item.id) {
+      latest = current;
+      break;
+    }
+  }
+  if (latest == null || latest.price != item.price) {
+    showMessage(context, 'Este platillo cambió o dejó de estar disponible. Actualiza el menú.');
     return false;
   }
   if (model.cart.isNotEmpty && model.cartRestaurantId != null && model.cartRestaurantId != item.restaurantId) {
@@ -240,7 +257,7 @@ class PremiumBottomDock extends StatelessWidget {
                     child: Semantics(
                       selected: selected,
                       button: true,
-                      label: item.$3,
+                      label: i == 2 && activeOrder ? 'Pedidos, tienes un pedido en curso' : item.$3,
                       excludeSemantics: true,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
@@ -324,6 +341,7 @@ class HomeScreen extends StatelessWidget {
         ? 'Agregar dirección'
         : model.addresses[model.selectedAddress.clamp(0, model.addresses.length - 1).toInt()].label;
     final String name = firstName(model.userName);
+    final OrderEntry? activeOrder = model.activeOrder;
     return RefreshIndicator(
       color: kBrand,
       backgroundColor: Colors.white,
@@ -431,6 +449,19 @@ class HomeScreen extends StatelessWidget {
                       },
                     ),
                   ),
+                  if (activeOrder != null) ...<Widget>[
+                    const SizedBox(height: 18),
+                    HomeActiveOrderCard(
+                      order: activeOrder,
+                      onTap: () => Navigator.of(context).push(
+                        premiumRoute(
+                          activeOrder.deliveryMode == 'delivery'
+                              ? TrackingScreen(model: model, order: activeOrder)
+                              : OrderDetailScreen(model: model, order: activeOrder),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 28),
                   TalaSectionHeader(
                     title: 'Restaurantes y comercios',
@@ -491,6 +522,72 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Solo se muestra con un pedido operativo confirmado por el backend.
+class HomeActiveOrderCard extends StatelessWidget {
+  const HomeActiveOrderCard({super.key, required this.order, required this.onTap});
+
+  final OrderEntry order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final String restaurantName = order.restaurant.name.trim().isEmpty
+        ? 'Tu restaurante'
+        : order.restaurant.name;
+    return TalaCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: kSoftOrange,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.receipt_long_rounded, color: kBrandDeep, size: 23),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'TU PEDIDO EN CURSO',
+                  style: TextStyle(
+                    color: kBrandDeep,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  restaurantName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TalaText.title,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  order.status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TalaText.caption,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.arrow_forward_ios_rounded, color: kBrandDeep, size: 17),
         ],
       ),
     );
@@ -600,9 +697,9 @@ class RestaurantCard extends StatelessWidget {
     );
     final String? tag = heroTag;
     if (tag != null) media = Hero(tag: tag, child: media);
-    final String fee = !restaurant.delivery
-        ? 'Solo recoger'
-        : (restaurant.deliveryFee <= 0 ? 'Envío gratis' : 'Envío ${money(restaurant.deliveryFee)}');
+    // El envío final depende de la ubicación del cliente y se confirma
+    // por el backend. No anunciar aquí un precio estático como cotización.
+    final String fee = restaurant.delivery ? 'Entrega disponible' : 'Solo recoger';
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Semantics(
@@ -721,6 +818,45 @@ class RestaurantCardSkeleton extends StatelessWidget {
 // Buscar
 // ---------------------------------------------------------------------------
 
+enum DiscoveryFilter { all, open, delivery, pickup, favorites }
+
+bool discoveryMatchesFilter(
+  Restaurant restaurant,
+  DiscoveryFilter filter,
+  Set<int> favorites,
+) {
+  switch (filter) {
+    case DiscoveryFilter.all:
+      return true;
+    case DiscoveryFilter.open:
+      return restaurant.isOpen;
+    case DiscoveryFilter.delivery:
+      return restaurant.delivery;
+    case DiscoveryFilter.pickup:
+      return restaurant.pickup;
+    case DiscoveryFilter.favorites:
+      return favorites.contains(restaurant.id);
+  }
+}
+
+/// Pure presentation filter: uses only catalog data returned by the server.
+/// Preserves backend ordering (including any sponsored placement).
+List<Restaurant> filterDiscoveryRestaurants({
+  required List<Restaurant> restaurants,
+  required Set<int> favorites,
+  String term = '',
+  DiscoveryFilter filter = DiscoveryFilter.all,
+}) {
+  final String query = _fold(term.trim());
+  return restaurants.where((Restaurant restaurant) {
+    if (!discoveryMatchesFilter(restaurant, filter, favorites)) return false;
+    if (query.isEmpty) return true;
+    return _fold(restaurant.name).contains(query) ||
+        _fold(restaurant.category).contains(query) ||
+        _fold(restaurant.description).contains(query);
+  }).toList();
+}
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, required this.model});
 
@@ -732,11 +868,45 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController controller = TextEditingController();
+  final FocusNode searchFocus = FocusNode();
   String query = '';
+  DiscoveryFilter filter = DiscoveryFilter.all;
+  bool _wasSearchTab = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _wasSearchTab = widget.model.tabIndex == 1;
+    widget.model.addListener(_followTab);
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.model != widget.model) {
+      oldWidget.model.removeListener(_followTab);
+      widget.model.addListener(_followTab);
+      _wasSearchTab = widget.model.tabIndex == 1;
+    }
+  }
+
+  /// Opening Buscar from Inicio or the dock places the cursor in the field.
+  /// When visiting another tab the keyboard is dismissed by the existing dock.
+  void _followTab() {
+    final bool active = widget.model.tabIndex == 1;
+    if (active && !_wasSearchTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.model.tabIndex == 1) searchFocus.requestFocus();
+      });
+    }
+    _wasSearchTab = active;
+  }
 
   @override
   void dispose() {
+    widget.model.removeListener(_followTab);
     controller.dispose();
+    searchFocus.dispose();
     super.dispose();
   }
 
@@ -744,12 +914,22 @@ class _SearchScreenState extends State<SearchScreen> {
     controller.text = value;
     controller.selection = TextSelection.collapsed(offset: value.length);
     setState(() => query = value);
+    searchFocus.requestFocus();
     HapticFeedback.selectionClick();
   }
 
   void clear() {
     controller.clear();
     setState(() => query = '');
+    searchFocus.requestFocus();
+  }
+
+  void clearFilters() {
+    setState(() {
+      filter = DiscoveryFilter.all;
+      query = '';
+      controller.clear();
+    });
   }
 
   List<String> _quickSearches() {
@@ -768,88 +948,183 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final TalaModel model = widget.model;
     final String normalized = _fold(query.trim());
-    final List<Restaurant> restaurants = normalized.isEmpty
-        ? <Restaurant>[]
-        : model.restaurants.where((Restaurant restaurant) => _fold(restaurant.name).contains(normalized) || _fold(restaurant.category).contains(normalized)).toList();
+    final List<Restaurant> restaurants = filterDiscoveryRestaurants(
+      restaurants: model.restaurants,
+      favorites: model.favorites,
+      term: query,
+      filter: filter,
+    );
+    // Los productos solo están en memoria después de consultar su menú.
+    // No inventar una búsqueda global de platillos sin endpoint de catálogo.
     final List<FoodItem> items = normalized.isEmpty
         ? <FoodItem>[]
-        : model.menu.where((FoodItem item) => _fold(item.name).contains(normalized) || _fold(item.category).contains(normalized)).toList();
+        : model.menu.where((FoodItem item) {
+            final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
+            return restaurant != null &&
+                discoveryMatchesFilter(restaurant, filter, model.favorites) &&
+                (_fold(item.name).contains(normalized) ||
+                    _fold(item.category).contains(normalized));
+          }).toList();
     final List<String> quick = _quickSearches();
+    final bool noResults = restaurants.isEmpty && items.isEmpty;
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
-        children: <Widget>[
-          const Text('Buscar', style: TalaText.display),
-          const SizedBox(height: 16),
-          TextField(
-            controller: controller,
-            autofocus: false,
-            textInputAction: TextInputAction.search,
-            onChanged: (String value) => setState(() => query = value),
-            decoration: InputDecoration(
-              hintText: 'Restaurante, comercio o platillo…',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: query.isEmpty ? null : IconButton(tooltip: 'Borrar búsqueda', onPressed: clear, icon: const Icon(Icons.close_rounded)),
+      child: RefreshIndicator(
+        color: kBrand,
+        onRefresh: model.refreshAll,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
+          children: <Widget>[
+            const Text('Buscar', style: TalaText.display),
+            const SizedBox(height: 5),
+            const Text('Encuentra algo rico en Tala.', style: TalaText.muted),
+            const SizedBox(height: 18),
+            TextField(
+              key: const ValueKey<String>('discovery-search-field'),
+              controller: controller,
+              focusNode: searchFocus,
+              autofocus: false,
+              textInputAction: TextInputAction.search,
+              onChanged: (String value) => setState(() => query = value),
+              decoration: InputDecoration(
+                hintText: 'Restaurante, comercio o platillo…',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Borrar búsqueda',
+                        onPressed: clear,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+              ),
             ),
-          ),
-          const SizedBox(height: 22),
-          AnimatedSwitcher(
-            duration: TalaMotion.of(context, const Duration(milliseconds: 220)),
-            switchInCurve: TalaMotion.ease,
-            transitionBuilder: (Widget child, Animation<double> animation) => FadeTransition(opacity: animation, child: child),
-            child: normalized.isEmpty
-                ? KeyedSubtree(
-                    key: const ValueKey<String>('idle'),
-                    child: quick.isEmpty
-                        ? const SizedBox(width: double.infinity)
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              const Text('Búsquedas rápidas', style: TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: <Widget>[
-                                  for (final String label in quick)
-                                    TalaChoicePill(label: label, icon: DishThumb.iconFor(label), selected: false, onTap: () => setQuickQuery(label)),
-                                ],
-                              ),
-                            ],
-                          ),
-                  )
-                : KeyedSubtree(
-                    key: const ValueKey<String>('results'),
-                    child: (restaurants.isEmpty && items.isEmpty)
+            const SizedBox(height: 18),
+            // Horizontal scroll avoids RenderFlex overflow on 320dp screens.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  TalaChoicePill(
+                    label: 'Todos',
+                    selected: filter == DiscoveryFilter.all,
+                    onTap: () => setState(() => filter = DiscoveryFilter.all),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Abiertos',
+                    icon: Icons.schedule_rounded,
+                    selected: filter == DiscoveryFilter.open,
+                    onTap: () => setState(() => filter = DiscoveryFilter.open),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Entrega',
+                    icon: Icons.delivery_dining_rounded,
+                    selected: filter == DiscoveryFilter.delivery,
+                    onTap: () => setState(() => filter = DiscoveryFilter.delivery),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Recoger',
+                    icon: Icons.storefront_outlined,
+                    selected: filter == DiscoveryFilter.pickup,
+                    onTap: () => setState(() => filter = DiscoveryFilter.pickup),
+                  ),
+                  const SizedBox(width: 8),
+                  TalaChoicePill(
+                    label: 'Favoritos',
+                    icon: Icons.favorite_border_rounded,
+                    selected: filter == DiscoveryFilter.favorites,
+                    onTap: () => setState(() => filter = DiscoveryFilter.favorites),
+                  ),
+                ],
+              ),
+            ),
+            if (normalized.isEmpty && quick.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 24),
+              const Text(
+                '¿Qué se te antoja?',
+                style: TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  for (final String label in quick)
+                    TalaChoicePill(
+                      label: label,
+                      icon: DishThumb.iconFor(label),
+                      selected: false,
+                      onTap: () => setQuickQuery(label),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 24),
+            if (normalized.isEmpty || restaurants.isNotEmpty) ...<Widget>[
+              TalaSectionHeader(
+                title: normalized.isEmpty ? 'Explorar comercios' : 'Restaurantes',
+                trailing: TalaCountChip(label: '${restaurants.length}'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (noResults)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: model.loading && model.restaurants.isEmpty
+                    ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : model.restaurants.isEmpty && model.lastError.isNotEmpty
                         ? StatusView(
-                            icon: Icons.search_off_rounded,
-                            title: 'Sin resultados',
-                            body: 'No encontramos “${query.trim()}”. Prueba con otro nombre, comida o categoría.',
+                            icon: Icons.wifi_off_rounded,
+                            title: 'Sin conexión al catálogo',
+                            body: 'No pudimos cargar los comercios. Revisa tu conexión.',
+                            actionLabel: 'Reintentar',
+                            onAction: model.refreshAll,
+                            tone: StatusTone.danger,
                             compact: true,
                           )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              if (restaurants.isNotEmpty) ...<Widget>[
-                                TalaSectionHeader(title: 'Restaurantes', trailing: TalaCountChip(label: '${restaurants.length}')),
-                                const SizedBox(height: 12),
-                                for (int i = 0; i < restaurants.length; i++)
-                                  Reveal(index: i, child: SearchRestaurantTile(model: model, restaurant: restaurants[i])),
-                                const SizedBox(height: 16),
-                              ],
-                              if (items.isNotEmpty) ...<Widget>[
-                                TalaSectionHeader(title: 'Platillos', trailing: TalaCountChip(label: '${items.length}')),
-                                const SizedBox(height: 12),
-                                for (int i = 0; i < items.length; i++) Reveal(index: i, child: SearchDishTile(model: model, item: items[i])),
-                              ],
-                            ],
+                        : StatusView(
+                            icon: normalized.isEmpty
+                                ? Icons.storefront_outlined
+                                : Icons.search_off_rounded,
+                            title: normalized.isEmpty && filter == DiscoveryFilter.all
+                                ? 'Aún no hay comercios disponibles'
+                                : 'Sin resultados para esta búsqueda',
+                            body: normalized.isEmpty
+                                ? 'Puedes quitar los filtros o actualizar el catálogo.'
+                                : 'Prueba otro nombre o quita el filtro seleccionado.',
+                            actionLabel: 'Limpiar búsqueda y filtros',
+                            onAction: clearFilters,
+                            compact: true,
                           ),
-                  ),
-          ),
-        ],
+              )
+            else ...<Widget>[
+              for (int i = 0; i < restaurants.length; i++)
+                SearchRestaurantTile(model: model, restaurant: restaurants[i]),
+              if (items.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                TalaSectionHeader(
+                  title: 'Platillos',
+                  trailing: TalaCountChip(label: '${items.length}'),
+                ),
+                const SizedBox(height: 12),
+                for (final FoodItem item in items)
+                  SearchDishTile(model: model, item: item),
+              ],
+              if (normalized.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                const QuietNote(
+                  icon: Icons.menu_book_outlined,
+                  text: 'Los platillos aparecen en la búsqueda después de consultar los menús de los comercios.',
+                ),
+              ],
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1010,7 +1285,9 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   bool _settled = false;
 
   TalaModel get model => widget.model;
-  Restaurant get restaurant => widget.restaurant;
+  // La lista de comercios se actualiza tras recargar; nunca mantener un
+  // horario/estado obsoleto del objeto capturado al abrir la pantalla.
+  Restaurant get restaurant => restaurantFor(model, widget.restaurant.id) ?? widget.restaurant;
 
   @override
   void initState() {
@@ -1062,9 +1339,12 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
           final List<FoodItem> visible = selected.isEmpty ? items : items.where((FoodItem item) => item.category.trim() == selected).toList();
           final bool loading = items.isEmpty && (!_settled || model._menusLoading.contains(restaurant.id));
           final bool favorite = model.favorites.contains(restaurant.id);
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: <Widget>[
+          return RefreshIndicator(
+            color: kBrand,
+            onRefresh: () => model.refreshRestaurantMenu(restaurant.id),
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: <Widget>[
               SliverAppBar(
                 pinned: true,
                 stretch: true,
@@ -1095,6 +1375,16 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                     categories: categories,
                     selected: selected,
                     onSelect: (String value) => setState(() => _category = value),
+                  ),
+                ),
+              if (items.isNotEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+                  sliver: SliverToBoxAdapter(
+                    child: Text(
+                      '${visible.length} ${visible.length == 1 ? 'platillo' : 'platillos'} en el menú',
+                      style: TalaText.caption,
+                    ),
                   ),
                 ),
               if (loading)
@@ -1132,7 +1422,8 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                     ),
                   ),
                 ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -1224,7 +1515,8 @@ class _RestaurantInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery ? 'Recoger' : (restaurant.deliveryFee <= 0 ? 'Gratis' : money(restaurant.deliveryFee));
+    // La tarifa final depende de la ubicación; no prometer envío gratis ni un precio estático.
+    final String fee = restaurant.delivery ? 'Según zona' : 'Recoger';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
       child: Reveal(
@@ -1281,6 +1573,11 @@ class _RestaurantInfo extends StatelessWidget {
             ],
             const SizedBox(height: 24),
             const Text('Menú', style: TalaText.h2),
+            const SizedBox(height: 4),
+            const Text(
+              'Precios y disponibilidad sujetos a confirmación del restaurante.',
+              style: TalaText.caption,
+            ),
             const SizedBox(height: 4),
           ],
         ),
@@ -1361,7 +1658,12 @@ class _CategoryBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _CategoryBarDelegate oldDelegate) {
-    return oldDelegate.selected != selected || oldDelegate.categories.length != categories.length;
+    if (oldDelegate.selected != selected ||
+        oldDelegate.categories.length != categories.length) return true;
+    for (int index = 0; index < categories.length; index++) {
+      if (oldDelegate.categories[index] != categories[index]) return true;
+    }
+    return false;
   }
 }
 
@@ -1531,11 +1833,14 @@ class RestaurantCartBar extends StatelessWidget {
 // Producto
 // ---------------------------------------------------------------------------
 
+/// Detalle de un platillo real. No se ofrecen modificadores ni extras
+/// predefinidos hasta que el restaurante publique opciones en el backend.
 void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
   int quantity = 1;
-  String preference = '';
-  const List<String> options = <String>['Sin cambios', 'Sin cebolla', 'Extra salsa', 'Bien cocido'];
-  showModalBottomSheet<void>(
+  bool adding = false;
+  final TextEditingController instructions = TextEditingController();
+
+  unawaited(showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -1546,106 +1851,200 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
       return StatefulBuilder(
         builder: (BuildContext context, StateSetter setModalState) {
           final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
+          final bool closed = restaurant != null && !restaurant.isOpen;
           final bool hasPhoto = item.imageUrl.startsWith('https://');
-          return Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-            decoration: const BoxDecoration(color: kSurface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: kLineStrong, borderRadius: BorderRadius.circular(99)))),
-                ),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                    children: <Widget>[
-                      if (hasPhoto)
+          return AnimatedPadding(
+            duration: TalaMotion.of(context, const Duration(milliseconds: 180)),
+            curve: TalaMotion.ease,
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
+              decoration: const BoxDecoration(
+                color: kSurface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: kLineStrong,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                      children: <Widget>[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(22),
                           child: AspectRatio(
                             aspectRatio: 16 / 10,
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 1.05, end: 1),
-                              duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
-                              curve: TalaMotion.ease,
-                              builder: (BuildContext context, double scale, Widget? child) => Transform.scale(scale: scale, child: child),
-                              child: RestaurantMedia(assetPath: item.image, imageUrl: item.imageUrl),
-                            ),
+                            child: hasPhoto
+                                ? TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(begin: 1.05, end: 1),
+                                    duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
+                                    curve: TalaMotion.ease,
+                                    builder: (BuildContext context, double scale, Widget? child) =>
+                                        Transform.scale(scale: scale, child: child),
+                                    child: RestaurantMedia(
+                                      assetPath: item.image,
+                                      imageUrl: item.imageUrl,
+                                    ),
+                                  )
+                                : DecoratedBox(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: <Color>[Color(0xFFFFF1E8), Color(0xFFFFE2D4)],
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: <Widget>[
+                                        Icon(
+                                          DishThumb.iconFor('${item.category} ${item.name}'),
+                                          color: kBrandDeep,
+                                          size: 58,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'Fotografía no disponible',
+                                          style: TalaText.caption,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
-                        )
-                      else
-                        Align(alignment: Alignment.centerLeft, child: DishThumb(item: item, size: 72, radius: 20)),
-                      const SizedBox(height: 16),
-                      Text(item.name, style: TalaText.h1.copyWith(fontSize: 24)),
-                      if (restaurant != null) ...<Widget>[
-                        const SizedBox(height: 4),
-                        Text(restaurant.name, style: TalaText.caption),
-                      ],
-                      if (item.description.trim().isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 10),
-                        Text(item.description, style: TalaText.body),
-                      ],
-                      const SizedBox(height: 12),
-                      Text(money(item.price), style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep)),
-                      const SizedBox(height: 22),
-                      const Row(
-                        children: <Widget>[
-                          Text('Preferencias', style: TalaText.title),
-                          SizedBox(width: 8),
-                          Text('Opcional', style: TalaText.caption),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(item.name, style: TalaText.h1.copyWith(fontSize: 24)),
+                        if (restaurant != null) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Text(restaurant.name, style: TalaText.caption),
                         ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: options.map((String label) {
-                          final bool selected = (label == 'Sin cambios' && preference.isEmpty) || preference == label;
-                          return TalaChoicePill(
-                            label: label,
-                            selected: selected,
-                            onTap: () => setModalState(() => preference = label == 'Sin cambios' ? '' : label),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: kLine))),
-                  child: SafeArea(
-                    top: false,
-                    minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                    child: Row(
-                      children: <Widget>[
-                        QuantityStepper(
-                          quantity: quantity,
-                          onDecrement: quantity > 1 ? () => setModalState(() => quantity -= 1) : null,
-                          onIncrement: () => setModalState(() => quantity += 1),
+                        if (item.description.trim().isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 10),
+                          Text(item.description, style: TalaText.body),
+                        ],
+                        const SizedBox(height: 14),
+                        Text(
+                          money(item.price),
+                          style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () async {
-                              final bool added = await addItemWithGuard(sheetContext, model, item, quantity, note: preference);
-                              if (added && sheetContext.mounted) Navigator.of(sheetContext).pop();
-                            },
-                            child: Text('Agregar · ${money(item.price * quantity)}'),
+                        const SizedBox(height: 22),
+                        const Text('Indicaciones para la cocina', style: TalaText.title),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Opcional · El restaurante confirmará si puede atenderlas.',
+                          style: TalaText.caption,
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          key: const ValueKey<String>('product-instructions'),
+                          controller: instructions,
+                          textCapitalization: TextCapitalization.sentences,
+                          keyboardType: TextInputType.multiline,
+                          textInputAction: TextInputAction.newline,
+                          minLines: 2,
+                          maxLines: 3,
+                          maxLength: 160,
+                          decoration: const InputDecoration(
+                            hintText: 'Ej. Sin cebolla, por favor',
+                            prefixIcon: Icon(Icons.edit_note_rounded),
                           ),
                         ),
+                        if (closed) ...<Widget>[
+                          const SizedBox(height: 10),
+                          const AuthNotice(
+                            icon: Icons.schedule_rounded,
+                            text: 'Este restaurante está cerrado. No puedes agregar platillos por ahora.',
+                            danger: true,
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ),
-              ],
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: kSurface,
+                      border: Border(top: BorderSide(color: kLine)),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      child: Row(
+                        children: <Widget>[
+                          QuantityStepper(
+                            quantity: quantity,
+                            onDecrement: adding || quantity <= 1
+                                ? null
+                                : () => setModalState(() => quantity -= 1),
+                            onIncrement: adding || quantity >= 99
+                                ? null
+                                : () => setModalState(() => quantity += 1),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: adding || closed
+                                  ? null
+                                  : () async {
+                                      if (adding) return;
+                                      setModalState(() => adding = true);
+                                      try {
+                                        final bool added = await addItemWithGuard(
+                                          sheetContext,
+                                          model,
+                                          item,
+                                          quantity,
+                                          note: instructions.text.trim(),
+                                        );
+                                        if (added && sheetContext.mounted) {
+                                          Navigator.of(sheetContext).pop();
+                                        }
+                                      } finally {
+                                        if (context.mounted) {
+                                          setModalState(() => adding = false);
+                                        }
+                                      }
+                                    },
+                              child: adding
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text('Agregar · ${money(item.price * quantity)}'),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
       );
     },
-  );
+  ).whenComplete(instructions.dispose));
 }
