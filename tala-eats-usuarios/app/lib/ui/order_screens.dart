@@ -57,7 +57,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final TalaModel model = widget.model;
-    final List<OrderEntry> active = model.orders.where((OrderEntry order) => !isComplete(order)).toList();
+    final List<OrderEntry> pending = model.orders.where((OrderEntry order) => !isComplete(order) && order.isAwaitingOnlinePayment).toList();
+    final List<OrderEntry> active = model.orders.where((OrderEntry order) => !isComplete(order) && !order.isAwaitingOnlinePayment).toList();
     final List<OrderEntry> past = model.orders.where(isComplete).toList();
     return SafeArea(
       bottom: false,
@@ -77,12 +78,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: StatusView(
                   icon: Icons.receipt_long_outlined,
                   title: 'Aún no tienes pedidos',
-                  body: 'Cuando hagas tu primer pedido podrás seguirlo aquí en tiempo real.',
+                  body: 'Cuando hagas tu primer pedido podrás consultar su estado aquí.',
                   actionLabel: 'Explorar restaurantes',
                   onAction: () => model.setTab(0),
                 ),
               )
             else ...<Widget>[
+              if (pending.isNotEmpty) ...<Widget>[
+                TalaSectionHeader(
+                  title: 'Pendientes de pago',
+                  trailing: TalaCountChip(label: '${pending.length}'),
+                ),
+                const SizedBox(height: 12),
+                for (int i = 0; i < pending.length; i++)
+                  PendingPaymentOrderCard(order: pending[i], onTap: () => _open(pending[i])),
+                const SizedBox(height: 18),
+              ],
               if (active.isNotEmpty) ...<Widget>[
                 TalaSectionHeader(title: 'En curso', trailing: TalaCountChip(label: '${active.length}')),
                 const SizedBox(height: 12),
@@ -94,11 +105,83 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 const TalaSectionHeader(title: 'Anteriores'),
                 const SizedBox(height: 12),
                 for (int i = 0; i < past.length; i++)
-                  Reveal(index: active.length + i, child: PastOrderTile(order: past[i], onTap: () => _open(past[i]))),
+                  Reveal(index: pending.length + active.length + i, child: PastOrderTile(order: past[i], onTap: () => _open(past[i]))),
               ],
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+class PendingPaymentOrderCard extends StatelessWidget {
+  const PendingPaymentOrderCard({super.key, required this.order, required this.onTap});
+
+  final OrderEntry order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TalaCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: kSoftOrange,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(Icons.lock_clock_rounded, color: kBrandDeep, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      order.restaurant.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TalaText.title,
+                    ),
+                    const SizedBox(height: 3),
+                    Text('Pedido #${order.id} · ${money(order.total)}', style: TalaText.caption),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const QuietNote(
+            icon: Icons.info_outline_rounded,
+            text: 'El restaurante comenzará a preparar tu pedido cuando se confirme el pago.',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              const Expanded(
+                child: Text(
+                  'Pago sin confirmar',
+                  style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+              const Text(
+                'Revisar pedido',
+                style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: kBrandDeep, size: 19),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -440,10 +523,26 @@ class OrderDetailScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Reveal(index: 1, child: TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order))),
               ],
-              if (delivery && !complete && !cancelled) ...<Widget>[
+              if (order.isAwaitingOnlinePayment && !cancelled) ...<Widget>[
+                const SizedBox(height: 14),
+                const AuthNotice(
+                  icon: Icons.lock_clock_rounded,
+                  text: 'El pago aún no está confirmado. El restaurante no empezará a preparar este pedido hasta que se autorice.',
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(PaymentStatusScreen(model: model, order: order)),
+                  ),
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Revisar estado del pago'),
+                ),
+              ] else if (delivery && !complete && !cancelled) ...<Widget>[
                 const SizedBox(height: 14),
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).push(premiumRoute(TrackingScreen(model: model, order: order))),
+                  onPressed: () => Navigator.of(context).push(
+                    premiumRoute(TrackingScreen(model: model, order: order)),
+                  ),
                   icon: const Icon(Icons.near_me_rounded),
                   label: const Text('Seguir pedido'),
                 ),
@@ -872,9 +971,9 @@ class LiveBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SkeletonPulse(child: Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle))),
+          Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          const Text('En vivo', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          const Text('Actualización periódica', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
         ],
       ),
     );
