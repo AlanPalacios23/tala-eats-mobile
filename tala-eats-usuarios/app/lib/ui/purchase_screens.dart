@@ -133,7 +133,7 @@ class CartLineCard extends StatelessWidget {
             deleteAtOne: true,
             quantity: line.quantity,
             onDecrement: () => model.changeQuantity(line, -1),
-            onIncrement: () => model.changeQuantity(line, 1),
+            onIncrement: line.quantity >= 99 ? null : () => model.changeQuantity(line, 1),
           ),
         ],
       ),
