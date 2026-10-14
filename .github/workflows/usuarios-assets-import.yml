@@ -42,6 +42,8 @@ jobs:
           test -s "$dest/auth_login.jpg"
           test -s "$dest/auth_register.jpg"
           echo 'ORIGINAL_IMAGES_INTACT'
+      - name: Validar sintaxis del generador Android sin compilar
+        run: python3 -m py_compile tala-eats-usuarios/ci/bootstrap_android.py
       - name: Guardar recursos en el repositorio privado
         shell: bash
         run: |
