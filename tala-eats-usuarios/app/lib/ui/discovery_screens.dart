@@ -1322,8 +1322,11 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
           final List<FoodItem> visible = selected.isEmpty ? items : items.where((FoodItem item) => item.category.trim() == selected).toList();
           final bool loading = items.isEmpty && (!_settled || model._menusLoading.contains(restaurant.id));
           final bool favorite = model.favorites.contains(restaurant.id);
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          return RefreshIndicator(
+            color: kBrand,
+            onRefresh: () => model.refreshRestaurantMenu(restaurant.id),
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: <Widget>[
               SliverAppBar(
                 pinned: true,
@@ -1355,6 +1358,16 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                     categories: categories,
                     selected: selected,
                     onSelect: (String value) => setState(() => _category = value),
+                  ),
+                ),
+              if (items.isNotEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+                  sliver: SliverToBoxAdapter(
+                    child: Text(
+                      '${visible.length} ${visible.length == 1 ? 'platillo' : 'platillos'} disponibles',
+                      style: TalaText.caption,
+                    ),
                   ),
                 ),
               if (loading)
@@ -1392,7 +1405,8 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                     ),
                   ),
                 ),
-            ],
+              ],
+            ),
           );
         },
       ),
