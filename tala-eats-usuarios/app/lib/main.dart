@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'production_api.dart';
@@ -15,6 +17,7 @@ part 'ui/discovery_screens.dart';
 part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
 part 'ui/tracking_map.dart';
+part 'push_notifications.dart';
 part 'ui/account_screens.dart';
 part 'ui/legal_screens.dart';
 
@@ -206,6 +209,7 @@ class TalaModel extends ChangeNotifier {
   TalaModel({TalaApi? apiClient}) : api = apiClient ?? TalaApi();
 
   final TalaApi api;
+  CustomerPushService? pushService;
   bool signedIn = false;
   bool loading = false;
   bool online = true;
@@ -445,6 +449,7 @@ class TalaModel extends ChangeNotifier {
   }
 
   void logout() {
+    pushService?.signOut();
     api.post('/auth/logout').catchError((Object _) => null);
     NativeBridge.clearToken();
     api.token = null;
@@ -965,6 +970,16 @@ class TalaModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshNotifications() async {
+    if (!signedIn) return;
+    try {
+      _applyNotifications(await api.notifications());
+      notifyListeners();
+    } catch (_) {
+      // Si el móvil está desconectado el buzón no se vacía ni se inventan avisos.
+    }
+  }
+
   Future<void> markNotificationRead(NotificationEntry notification) async {
     if (notification.isRead) return;
     try {
@@ -1126,11 +1141,21 @@ class TalaEatsApp extends StatefulWidget {
 
 class _TalaEatsAppState extends State<TalaEatsApp> {
   final TalaModel model = TalaModel();
+  late final CustomerPushService push = CustomerPushService(model);
   bool booted = false;
+  bool _previousAuth = false;
+
+  void _listenToAuth() {
+    if (_previousAuth == model.signedIn) return;
+    _previousAuth = model.signedIn;
+    if (model.signedIn) unawaited(push.onAuthChanged());
+  }
 
   @override
   void initState() {
     super.initState();
+    model.pushService = push;
+    model.addListener(_listenToAuth);
     if (widget.testMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => booted = true);
@@ -1144,7 +1169,17 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
       Future<void>.delayed(const Duration(milliseconds: 1100)),
     ]).whenComplete(() {
       if (mounted) setState(() => booted = true);
+      unawaited(push.start());
     });
+  }
+
+  @override
+  void dispose() {
+    model.removeListener(_listenToAuth);
+    model.pushService = null;
+    push.dispose();
+    model.dispose();
+    super.dispose();
   }
 
   @override
