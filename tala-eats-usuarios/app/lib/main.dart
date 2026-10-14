@@ -1170,11 +1170,11 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
       });
       return;
     }
-    // The brand moment lasts ~1.1 s and runs in parallel with the real
+    // The supplied splash is visible briefly and runs in parallel with the real
     // bootstrap; it never delays a slower bootstrap any further.
     Future.wait<void>(<Future<void>>[
       model.initialize(),
-      Future<void>.delayed(const Duration(milliseconds: 1100)),
+      Future<void>.delayed(const Duration(milliseconds: 850)),
     ]).whenComplete(() {
       if (mounted) setState(() => booted = true);
       unawaited(push.start());
@@ -1251,89 +1251,34 @@ class TalaLogoMark extends StatelessWidget {
   }
 }
 
-/// Splash: centered brand, one elegant entrance, a quiet loader.
-class LaunchScreen extends StatefulWidget {
+/// Splash de marca proporcionado por el propietario, a resolución original.
+/// El bootstrap real corre en paralelo; la imagen no hace llamadas de red.
+class LaunchScreen extends StatelessWidget {
   const LaunchScreen({super.key});
 
   @override
-  State<LaunchScreen> createState() => _LaunchScreenState();
-}
-
-class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
-  late final Animation<double> _mark = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.62, curve: Curves.easeOutCubic));
-  late final Animation<double> _word = CurvedAnimation(parent: _controller, curve: const Interval(0.22, 0.85, curve: Curves.easeOutCubic));
-  late final Animation<double> _loader = CurvedAnimation(parent: _controller, curve: const Interval(0.6, 1, curve: Curves.easeOut));
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (TalaMotion.reduced(context)) {
-      _controller.value = 1;
-    } else if (_controller.value == 0 && !_controller.isAnimating) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF6),
-      body: Stack(
-        children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                FadeTransition(
-                  opacity: _mark,
-                  child: ScaleTransition(
-                    scale: Tween<double>(begin: 0.86, end: 1).animate(_mark),
-                    child: const TalaLogoMark(size: 88),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                FadeTransition(
-                  opacity: _word,
-                  child: SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero).animate(_word),
-                    child: const Column(
-                      children: <Widget>[
-                        Text('Tala Eats', style: TextStyle(color: kInk, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1.1)),
-                        SizedBox(height: 6),
-                        Text('Tu comida favorita, más cerca.', style: TextStyle(color: kMuted, fontSize: 15, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Semantics(
+          label: 'Iniciando Tala Eats',
+          child: const SizedBox.expand(
+            child: Image(
+              key: ValueKey<String>('tala-launch-image'),
+              image: AssetImage('assets/images/launch_cover.jpg'),
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+              excludeFromSemantics: true,
             ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.paddingOf(context).bottom + 56,
-            child: FadeTransition(
-              opacity: _loader,
-              child: Center(
-                child: SizedBox(
-                  width: 64,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: const LinearProgressIndicator(minHeight: 3, backgroundColor: kSoftOrange, color: kBrand),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
