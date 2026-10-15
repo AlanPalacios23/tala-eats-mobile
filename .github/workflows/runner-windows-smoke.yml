@@ -1,0 +1,42 @@
+name: Tala Eats | Windows Runner Smoke (manual)
+# Prueba de conexion: NO hace checkout ni ejecuta codigo del repositorio.
+# No consume secretos, no toca produccion, Docker, Stripe ni otras carpetas.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Windows local | Verificacion segura
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, X64, tala-eats-android]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Verificar runner Windows sin checkout
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Este test solo se permite en main' }
+          if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch') { throw 'Este test solo se permite manualmente' }
+          if ($env:RUNNER_OS -ne 'Windows') { throw 'No es Windows' }
+          Write-Host "RUNNER_ONLINE_PASS"
+          Write-Host "Windows=$env:RUNNER_OS"
+          Write-Host "Runner=$env:RUNNER_NAME"
+
+      - name: Comprobar herramientas locales
+        run: |
+          python --version
+          if ($LASTEXITCODE -ne 0) { throw 'Python no disponible' }
+          git --version
+          if ($LASTEXITCODE -ne 0) { throw 'Git no disponible' }
+          java -version
+          if ($LASTEXITCODE -ne 0) { throw 'Java no disponible' }
+          flutter --version
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter no disponible' }
+          Write-Host "RUNNER_TOOLS_PASS"
+
+      - name: Resultado de prueba
+        run: Write-Host 'TALA_EATS_RUNNER_SMOKE_PASS'
