@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from urllib.parse import urlparse,unquote
+from urllib.request import url2pathname
 
 app=Path(__file__).resolve().parent.parent/'app'
 config=app/'.dart_tool/package_config.json'
@@ -15,7 +16,7 @@ if not pkg:
 uri=pkg['rootUri']
 if uri.startswith('file:'):
     parsed=urlparse(uri)
-    plugin_root=Path(unquote(parsed.path))
+    plugin_root=Path(url2pathname(parsed.path))
 else:
     plugin_root=(config.parent/unquote(uri)).resolve()
 file=plugin_root/'android/build.gradle'

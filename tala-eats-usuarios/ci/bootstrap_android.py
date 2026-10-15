@@ -32,7 +32,10 @@ def setup(role):
         raise RuntimeError('android/ already exists: CI will not replace a checked-in native project.')
     with tempfile.TemporaryDirectory(prefix='talaeats-scaffold-') as temp:
         temp = Path(temp)
-        cmd = ['flutter','create','--no-pub','--platforms=android','--android-language=java','--org','com.talaeats','--project-name',cfg['name'],'.']
+        flutter_executable = shutil.which('flutter')
+        if not flutter_executable:
+            raise RuntimeError('Flutter is not available in runner PATH')
+        cmd = [flutter_executable,'create','--no-pub','--platforms=android','--android-language=java','--org','com.talaeats','--project-name',cfg['name'],'.']
         subprocess.run(cmd,cwd=temp,check=True)
         shutil.copytree(temp/'android', target)
 
