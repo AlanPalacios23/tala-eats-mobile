@@ -1,0 +1,133 @@
+name: Tala Eats | APK Android Windows (manual)
+# Runner personal: ejecutar solo bajo solicitud explicita y exclusivamente main.
+# El workflow Linux android-apk.yml queda disponible para compilar desde el celular.
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Aplicacion a compilar en la PC Windows'
+        required: true
+        default: usuarios
+        type: choice
+        options:
+          - usuarios
+          - restaurante
+          - repartidor
+          - todas
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tala-eats-android-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-windows:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    name: Windows local | ${{ matrix.rol }}
+    runs-on: [self-hosted, Windows, X64, tala-eats-android]
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        rol: ${{ fromJSON(inputs.app == 'todas' && '["usuarios","restaurante","repartidor"]' || format('["{0}"]', inputs.app)) }}
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Obtener codigo aprobado de main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verificar ambiente Windows sin secretos
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Solo main puede usar el runner personal' }
+          if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch') { throw 'Solo ejecucion manual' }
+          $verJson = flutter --version --machine | Out-String
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter no esta disponible' }
+          $ver = $verJson | ConvertFrom-Json
+          if ($ver.frameworkVersion -ne '3.47.6') { throw "Se requiere Flutter 3.47.6; encontrado $($ver.frameworkVersion)" }
+          java -version
+          if ($LASTEXITCODE -ne 0) { throw 'Java no esta disponible' }
+          python --version
+          if ($LASTEXITCODE -ne 0) { throw 'Python no esta disponible' }
+
+      - name: Crear Android nativo temporal
+        run: |
+          python "tala-eats-${{ matrix.rol }}/ci/bootstrap_android.py" --role "${{ matrix.rol }}"
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo bootstrap Android' }
+
+      - name: Comprobar seguridad Android
+        run: |
+          python ci/security_android_gate.py --role "${{ matrix.rol }}"
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo gate Android P0' }
+
+      - name: Preparar fuentes libres para Restaurante
+        if: matrix.rol == 'restaurante'
+        run: |
+          python tala-eats-restaurante/ci/prepare_fonts.py
+          if ($LASTEXITCODE -ne 0) { throw 'No se prepararon fuentes de Restaurante' }
+
+      - name: Instalar dependencias Flutter
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo flutter pub get' }
+
+      - name: Compatibilidad Stripe JVM 17 Usuarios
+        if: matrix.rol == 'usuarios'
+        run: |
+          python tala-eats-usuarios/ci/stripe_jvm.py
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo compatibilidad Stripe JVM' }
+
+      - name: Preparar Android NDK Restaurante
+        if: matrix.rol == 'restaurante'
+        run: |
+          $sdkRoot = $env:ANDROID_SDK_ROOT
+          if (-not $sdkRoot) { $sdkRoot = $env:ANDROID_HOME }
+          if (-not $sdkRoot) { $sdkRoot = Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
+          $ndk = '28.2.13676358'
+          $ndkProps = Join-Path $sdkRoot "ndk\$ndk\source.properties"
+          if (-not (Test-Path $ndkProps)) {
+            $manager = Join-Path $sdkRoot 'cmdline-tools\latest\bin\sdkmanager.bat'
+            if (-not (Test-Path $manager)) { throw "Android SDK manager no disponible: $manager" }
+            & $manager "--sdk_root=$sdkRoot" --install "ndk;$ndk"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ndkProps)) { throw "No se instalo NDK $ndk" }
+          }
+
+      - name: Analizar Flutter
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          flutter analyze --no-fatal-infos
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo flutter analyze' }
+
+      - name: Ejecutar pruebas Flutter
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          flutter test --reporter expanded
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo flutter test' }
+
+      - name: Compilar APK de depuracion
+        working-directory: tala-eats-${{ matrix.rol }}/app
+        run: |
+          $rol = '${{ matrix.rol }}'
+          if ($rol -eq 'usuarios') {
+            flutter build apk --debug --dart-define=TALAEATS_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1
+          } elseif ($rol -eq 'restaurante') {
+            flutter build apk --debug --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1
+          } else {
+            flutter build apk --debug
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo compilacion APK' }
+          if (-not (Test-Path 'build/app/outputs/flutter-apk/app-debug.apk')) { throw 'No se genero APK debug' }
+
+      - name: Publicar APK si todos los gates aprobaron
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Windows-${{ matrix.rol }}-debug-${{ github.run_number }}
+          path: tala-eats-${{ matrix.rol }}/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
