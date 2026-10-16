@@ -26,7 +26,7 @@ concurrency:
   group: users-order-contract-${{ github.ref }}
   cancel-in-progress: true
 
-# No signing, APK, runtime deployment, live PSP, token, Android device,
+# No release signing, distributed APK, runtime deployment, live PSP, token, Android device,
 # Firebase or user data. The GitHub Actions app is Flutter-only QA.
 jobs:
   users-order-contract:
@@ -50,7 +50,9 @@ jobs:
       - name: Analisis estatico (sin APK)
         run: flutter analyze --no-fatal-infos
       - name: QA de doble toque y llave persistente durante reintentos
-        run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart
+        run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart test/backend_customer_contracts_test.dart
+      - name: Todos los tests Flutter Usuarios
+        run: flutter test --reporter=compact
       - name: Preparar scaffold nativo Android desde fuentes oficiales
         run: python3 ../ci/bootstrap_android.py --role usuarios
       - name: Compilar Java nativo y Flutter Android debug (efímero, sin publicar)

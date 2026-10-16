@@ -500,9 +500,10 @@ class AddressesScreen extends StatelessWidget {
                           address: model.addresses[index],
                           selected: model.selectedAddress == index,
                           canDelete: model.addresses.length > 1,
-                          onTap: () {
+                          onTap: () async {
                             HapticFeedback.selectionClick();
-                            model.setAddress(index);
+                            final saved = await model.setDefaultAddressRemote(index);
+                            if (!saved && context.mounted) showMessage(context, model.lastError);
                           },
                           onDelete: () => _confirmDelete(context, index),
                         ),
@@ -1155,6 +1156,12 @@ class SecurityScreen extends StatelessWidget {
                 title: 'Cambiar contraseña',
                 subtitle: 'Te enviaremos un enlace a tu correo',
                 onTap: () => Navigator.of(context).push(premiumRoute(ChangePasswordScreen(model: model))),
+              ),
+              AccountLink(
+                icon: Icons.devices_rounded,
+                title: 'Dispositivos y sesiones',
+                subtitle: 'Consultar y cerrar sesiones de tu cuenta',
+                onTap: () => Navigator.of(context).push(premiumRoute(CustomerDeviceSessionsScreen(model: model))),
               ),
             ],
           ),

@@ -239,4 +239,62 @@ class TalaApi {
   Future<Map<String, dynamic>> createSupport(String message, {String category = 'general', int? orderId}) async => Map<String, dynamic>.from((await post('/platform/support', <String, dynamic>{'order_id': orderId, 'category': category, 'message': message})) as Map);
   Future<Map<String, dynamic>> privacy() async => Map<String, dynamic>.from((await get('/v11/privacy/preferences')) as Map);
   Future<Map<String, dynamic>> updatePrivacy(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await put('/v11/privacy/preferences', payload)) as Map);
+
+  // Customer-owned session management. Never call admin/merchant security APIs.
+  Future<List<Map<String, dynamic>>> customerDevices() async =>
+      List<dynamic>.from((await get('/auth/devices')) as List)
+          .map((dynamic row) => Map<String, dynamic>.from(row as Map)).toList();
+
+  Future<Map<String, dynamic>> revokeCustomerDevice(int deviceId) async {
+    if (deviceId <= 0) throw ArgumentError.value(deviceId, 'deviceId');
+    return Map<String, dynamic>.from(
+      (await post('/auth/devices/$deviceId/revoke')) as Map,
+    );
+  }
+
+  Future<Map<String, dynamic>> revokeOtherCustomerDevices() async =>
+      Map<String, dynamic>.from((await post('/auth/devices/revoke-others')) as Map);
+
+  // Customer decision on merchant-initiated missing-item requests.
+  // These endpoints may be unavailable until the corresponding backend
+  // release is authorized on Kali. A 404 must not be treated as success.
+  Future<List<Map<String, dynamic>>> orderSubstitutions(int orderId) async {
+    if (orderId <= 0) throw ArgumentError.value(orderId, 'orderId');
+    return List<dynamic>.from((await get('/v11/orders/$orderId/substitutions')) as List)
+        .map((dynamic row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> respondOrderSubstitution(
+      int orderId, int substitutionId, String action) async {
+    if (orderId <= 0 || substitutionId <= 0) {
+      throw ArgumentError('Identificadores de pedido y sustitución inválidos');
+    }
+    if (!const <String>{'accept', 'remove_item', 'cancel_order', 'reject'}
+        .contains(action)) {
+      throw ArgumentError.value(action, 'action', 'Acción no autorizada');
+    }
+    return Map<String, dynamic>.from(
+      (await post('/v11/orders/$orderId/substitutions/$substitutionId/respond',
+          <String, dynamic>{'action': action})) as Map,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> orderRefunds(int orderId) async {
+    if (orderId <= 0) throw ArgumentError.value(orderId, 'orderId');
+    return List<dynamic>.from((await get('/v11/orders/$orderId/refunds')) as List)
+        .map((dynamic row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> updateCustomerAddress(
+      int addressId, Map<String, dynamic> changes) async {
+    if (addressId <= 0) throw ArgumentError.value(addressId, 'addressId');
+    const fields = <String>{'label', 'address', 'lat', 'lng', 'is_default'};
+    if (changes.isEmpty || changes.keys.any((String key) => !fields.contains(key))) {
+      throw ArgumentError('Solo se permiten cambios de dirección soportados');
+    }
+    return Map<String, dynamic>.from(
+      (await patch('/platform/addresses/$addressId', changes)) as Map,
+    );
+  }
+
 }

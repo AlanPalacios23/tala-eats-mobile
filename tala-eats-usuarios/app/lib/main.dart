@@ -15,6 +15,7 @@ part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
 part 'ui/account_screens.dart';
 part 'ui/legal_screens.dart';
+part 'ui/backend_features_screens.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -646,11 +647,31 @@ class TalaModel extends ChangeNotifier {
   }
   void setAddress(int index) { if (index >= 0 && index < addresses.length) { selectedAddress = index; notifyListeners(); } }
 
+  Future<bool> setDefaultAddressRemote(int index) async {
+    if (index < 0 || index >= addresses.length) return false;
+    try {
+      final int id = addresses[index].id;
+      await api.updateCustomerAddress(id, <String, dynamic>{'is_default': true});
+      _applyAddresses(await api.addresses());
+      lastError = '';
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      lastError = e.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      lastError = 'No se pudo guardar tu dirección predeterminada.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> addAddressRemote(String label, String address, {double? deviceLat, double? deviceLng}) async {
     if (label.trim().isEmpty || address.trim().length < 5) return false;
     try {
       double? lat; double? lng;
-      final dynamic geo = await api.post('/v11/maps/geocode', <String, dynamic>{'query': '${address.trim()}, Tala, Jalisco, México', 'limit': 1});
+      final dynamic geo = await api.post('/v11/maps/geocode', <String, dynamic>{'query': '${address.trim()}, Jalisco, México', 'limit': 1});
       final List<dynamic> results = List<dynamic>.from(((geo as Map)['results'] ?? const <dynamic>[]) as List);
       if (results.isNotEmpty) {
         final Map<String, dynamic> first = Map<String, dynamic>.from(results.first as Map);
