@@ -131,7 +131,7 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
             right: 0,
             top: 0,
             height: top,
-            child: const IgnorePointer(child: ColoredBox(color: Color(0xF0F8F6F3))),
+            child: const IgnorePointer(child: ColoredBox(color: Color(0xF0FAFAF9))),
           ),
           if (!model.online && model.lastError.isNotEmpty)
             Positioned(
@@ -211,9 +211,9 @@ class PremiumBottomDock extends StatelessWidget {
       height: 68,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: kLine),
-        boxShadow: kShadowLifted,
+        boxShadow: kShadowSoft,
       ),
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
@@ -465,10 +465,12 @@ class HomeScreen extends StatelessWidget {
                         onAction: model.refreshAll,
                         tone: StatusTone.danger,
                       )
-                    : const StatusView(
+                    : StatusView(
                         icon: Icons.storefront_outlined,
                         title: 'Aún no hay comercios disponibles',
-                        body: 'Cuando un comercio esté activo en Tala Eats aparecerá aquí.',
+                        body: 'Cuando haya negocios activos en ' +
+                            TalaMarket.labelFor(model.marketCode) +
+                            ' podrás encontrarlos aquí.',
                       ),
               ),
             )
@@ -513,10 +515,10 @@ class HomeSearchPill extends StatelessWidget {
       excludeSemantics: true,
       child: Pressable(
         child: DecoratedBox(
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), boxShadow: kShadowSoft),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18)),
           child: Material(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: kLine)),
+            color: kSunken,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
@@ -586,7 +588,13 @@ class FavoriteButton extends StatelessWidget {
 }
 
 class RestaurantCard extends StatelessWidget {
-  const RestaurantCard({super.key, required this.model, required this.restaurant, required this.onTap, this.heroTag});
+  const RestaurantCard({
+    super.key,
+    required this.model,
+    required this.restaurant,
+    required this.onTap,
+    this.heroTag,
+  });
 
   final TalaModel model;
   final Restaurant restaurant;
@@ -597,84 +605,126 @@ class RestaurantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool favorite = model.favorites.contains(restaurant.id);
     final bool closed = !restaurant.isOpen;
-    Widget media = AspectRatio(
-      aspectRatio: 16 / 10,
-      child: RestaurantMedia(assetPath: restaurant.image, imageUrl: restaurant.imageUrl, desaturate: closed),
-    );
-    final String? tag = heroTag;
-    if (tag != null) media = Hero(tag: tag, child: media);
     final String fee = !restaurant.delivery
-        ? 'Solo recoger'
-        : (restaurant.deliveryFee <= 0 ? 'Envío gratis' : 'Envío ${money(restaurant.deliveryFee)}');
+        ? 'Solo para recoger'
+        : (restaurant.deliveryFee <= 0
+            ? 'Envío gratis'
+            : 'Envío ' + money(restaurant.deliveryFee));
+    Widget media = AspectRatio(
+      aspectRatio: 16 / 9,
+      child: RestaurantMedia(
+        assetPath: restaurant.image,
+        imageUrl: restaurant.imageUrl,
+        desaturate: closed,
+      ),
+    );
+    if (heroTag != null) {
+      media = Hero(tag: heroTag!, child: media);
+    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 26),
       child: Semantics(
         button: true,
-        label: '${restaurant.name}, ${restaurant.category}, ${closed ? 'cerrado' : 'abierto'}',
+        label: restaurant.name + ', ' + restaurant.category +
+            (closed ? ', cerrado' : ', abierto'),
         child: Pressable(
-          scale: 0.985,
-          child: DecoratedBox(
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), boxShadow: kShadowSoft),
-            child: Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: kLine)),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onTap,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Stack(
+          scale: 0.992,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Stack(
                       children: <Widget>[
                         media,
-                        if (closed) const Positioned.fill(child: IgnorePointer(child: ColoredBox(color: Color(0x2EFFFFFF)))),
-                        Positioned(
-                          left: 12,
-                          top: 12,
-                          child: closed
-                              ? const StatusPill(label: 'Cerrado', color: kInkSoft, background: Color(0xF2FFFFFF))
-                              : const StatusPill(label: 'Abierto', color: kGreen, background: Color(0xF2FFFFFF)),
-                        ),
+                        if (closed)
+                          const Positioned.fill(
+                            child: IgnorePointer(
+                              child: ColoredBox(color: Color(0x44FFFFFF)),
+                            ),
+                          ),
+                        if (closed)
+                          const Positioned(
+                            top: 12,
+                            left: 12,
+                            child: StatusPill(
+                              label: 'Cerrado',
+                              color: kInkSoft,
+                              background: Color(0xF2FFFFFF),
+                              dot: false,
+                            ),
+                          ),
                         if (restaurant.promo.isNotEmpty)
                           Positioned(
-                            left: 12,
                             bottom: 12,
-                            child: StatusPill(label: restaurant.promo, color: kInkSoft, background: const Color(0xF2FFFFFF), dot: false),
+                            left: 12,
+                            child: StatusPill(
+                              label: restaurant.promo,
+                              color: kInkSoft,
+                              background: const Color(0xF2FFFFFF),
+                              dot: false,
+                            ),
                           ),
                         Positioned(
                           right: 10,
                           top: 10,
-                          child: FavoriteButton(favorite: favorite, onTap: () => model.toggleFavorite(restaurant.id)),
+                          child: FavoriteButton(
+                            favorite: favorite,
+                            onTap: () => model.toggleFavorite(restaurant.id),
+                          ),
                         ),
                       ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Text(restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.h2.copyWith(fontSize: 18)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 12, 2, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                restaurant.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TalaText.h2.copyWith(
+                                  fontSize: 19,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
-                              if (restaurant.rating > 0) ...<Widget>[const SizedBox(width: 8), RatingChip(rating: restaurant.rating)],
+                            ),
+                            if (restaurant.rating > 0) ...<Widget>[
+                              const SizedBox(width: 8),
+                              RatingChip(rating: restaurant.rating),
                             ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(restaurant.category, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.muted.copyWith(fontSize: 14)),
-                          const SizedBox(height: 10),
-                          MetaLine(
-                            items: <(IconData, String)>[
-                              (Icons.schedule_rounded, restaurant.eta),
-                              (restaurant.delivery ? Icons.two_wheeler_rounded : Icons.storefront_rounded, fee),
-                            ],
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          restaurant.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TalaText.muted.copyWith(fontSize: 13),
+                        ),
+                        const SizedBox(height: 9),
+                        MetaLine(
+                          items: <(IconData, String)>[
+                            (Icons.schedule_rounded, restaurant.eta),
+                            (restaurant.delivery
+                                ? Icons.two_wheeler_rounded
+                                : Icons.storefront_rounded, fee),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -778,6 +828,8 @@ class _SearchScreenState extends State<SearchScreen> {
         ? <FoodItem>[]
         : model.menu.where((FoodItem item) => _fold(item.name).contains(normalized) || _fold(item.category).contains(normalized)).toList();
     final List<String> quick = _quickSearches();
+    final List<Restaurant> nearby = model.restaurants
+        .where((Restaurant r) => r.isOpen).take(4).toList();
 
     return SafeArea(
       bottom: false,
@@ -786,7 +838,10 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
         children: <Widget>[
           const Text('Buscar', style: TalaText.display),
-          const SizedBox(height: 16),
+          const SizedBox(height: 3),
+          Text('Explora comercios de ' + TalaMarket.labelFor(model.marketCode),
+              style: TalaText.muted),
+          const SizedBox(height: 20),
           TextField(
             controller: controller,
             autofocus: false,
@@ -796,6 +851,15 @@ class _SearchScreenState extends State<SearchScreen> {
               hintText: 'Restaurante, comercio o platillo…',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty ? null : IconButton(tooltip: 'Borrar búsqueda', onPressed: clear, icon: const Icon(Icons.close_rounded)),
+              fillColor: kSunken,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(color: kBrand, width: 1.4),
+              ),
             ),
           ),
           const SizedBox(height: 22),
@@ -806,23 +870,50 @@ class _SearchScreenState extends State<SearchScreen> {
             child: normalized.isEmpty
                 ? KeyedSubtree(
                     key: const ValueKey<String>('idle'),
-                    child: quick.isEmpty
-                        ? const SizedBox(width: double.infinity)
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        if (quick.isNotEmpty) ...<Widget>[
+                          const Text('Explora por categoría',
+                              style: TextStyle(color: kInk, fontSize: 16,
+                                  fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: <Widget>[
-                              const Text('Búsquedas rápidas', style: TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: <Widget>[
-                                  for (final String label in quick)
-                                    TalaChoicePill(label: label, icon: DishThumb.iconFor(label), selected: false, onTap: () => setQuickQuery(label)),
-                                ],
-                              ),
+                              for (final String label in quick)
+                                TalaChoicePill(
+                                  label: label,
+                                  icon: DishThumb.iconFor(label),
+                                  selected: false,
+                                  onTap: () => setQuickQuery(label),
+                                ),
                             ],
                           ),
+                        ],
+                        if (nearby.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 30),
+                          TalaSectionHeader(
+                            title: 'Comercios disponibles',
+                            subtitle: 'Disponibles en ' +
+                                TalaMarket.labelFor(model.marketCode),
+                          ),
+                          const SizedBox(height: 14),
+                          for (final Restaurant restaurant in nearby)
+                            SearchRestaurantTile(model: model,
+                                restaurant: restaurant),
+                        ],
+                        if (quick.isEmpty && nearby.isEmpty)
+                          const StatusView(
+                            icon: Icons.storefront_outlined,
+                            title: 'Aún no hay comercios para explorar',
+                            body: 'Cuando haya negocios disponibles en esta '
+                                'localidad los encontrarás aquí.',
+                            compact: true,
+                          ),
+                      ],
+                    ),
                   )
                 : KeyedSubtree(
                     key: const ValueKey<String>('results'),
