@@ -275,6 +275,7 @@ class TalaModel extends ChangeNotifier {
   final List<Map<String, dynamic>> promotions = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> coupons = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
+  int _marketCatalogEpoch = 0;
   final Set<int> _menusLoading = <int>{};
   final Set<int> _menuLoadErrors = <int>{};
 
@@ -364,6 +365,8 @@ class TalaModel extends ChangeNotifier {
   }
 
   Future<void> refreshAll() async {
+    final int catalogEpoch = _marketCatalogEpoch;
+    final String requestedMarket = marketCode;
     loading = true;
     lastError = '';
     notifyListeners();
@@ -378,7 +381,9 @@ class TalaModel extends ChangeNotifier {
         api.notifications(),
       ]);
       _applyBootstrap(Map<String, dynamic>.from(core[0] as Map));
-      _applyRestaurants(List<dynamic>.from(core[1] as List));
+      if (catalogEpoch == _marketCatalogEpoch && requestedMarket == marketCode) {
+        _applyRestaurants(List<dynamic>.from(core[1] as List));
+      }
       _applyAddresses(List<dynamic>.from(core[2] as List));
       _applyOrders(List<dynamic>.from(core[3] as List));
       _applyFavorites(List<dynamic>.from(core[4] as List));
@@ -563,6 +568,7 @@ class TalaModel extends ChangeNotifier {
 
   Future<void> _loadRestaurantMenu(int restaurantId) async {
     if (_menusLoading.contains(restaurantId)) return;
+    final int catalogEpoch = _marketCatalogEpoch;
     _menusLoading.add(restaurantId);
     _menuLoadErrors.remove(restaurantId);
     notifyListeners();
@@ -584,6 +590,9 @@ class TalaModel extends ChangeNotifier {
     }
 
     try {
+      // Never reintroduce items from a previous locality or removed shop.
+      if (catalogEpoch != _marketCatalogEpoch ||
+          !restaurants.any((Restaurant r) => r.id == restaurantId)) return;
       if (detail == null && effective == null) {
         _menuLoadErrors.add(restaurantId);
         return;
@@ -678,10 +687,12 @@ class TalaModel extends ChangeNotifier {
   }
 
   void addToCart(FoodItem item, int quantity, {String note = ''}) {
+    if (quantity <= 0) return;
+    final Restaurant? restaurant = _restaurantById(item.restaurantId);
+    if (restaurant == null || !restaurant.isOpen) return;
+    // Reject before mutating any existing basket, including unknown old-market shops.
     if (cartRestaurantId != null && cartRestaurantId != item.restaurantId) cart.clear();
     cartRestaurantId = item.restaurantId;
-    final Restaurant? restaurant = _restaurantById(item.restaurantId);
-    if (restaurant != null && !restaurant.isOpen) return;
     if (restaurant != null && !restaurant.delivery && restaurant.pickup) deliveryMode = 'pickup';
     CartLine? existing;
     for (final CartLine line in cart) { if (line.item.id == item.id) { existing = line; break; } }
@@ -1134,6 +1145,7 @@ class TalaModel extends ChangeNotifier {
   }
 
   void _applyRestaurants(List<dynamic> rows) {
+    _marketCatalogEpoch++;
     restaurants
       ..clear()
       ..addAll(rows.map((dynamic raw) {
@@ -1141,6 +1153,8 @@ class TalaModel extends ChangeNotifier {
         final int id = _asInt(r['id']); final int eta = _asInt(r['eta_min']);
         return Restaurant(id: id, name: (r['name'] ?? 'Restaurante').toString(), category: (r['cuisine'] ?? 'Comida local').toString(), rating: _asDouble(r['rating']), eta: '$eta-${eta + 10} min', deliveryFee: _asDouble(r['delivery_fee']), image: _imageForRestaurant(id), description: (r['description'] ?? '').toString(), promo: r['sponsored'] == true ? 'Patrocinado' : '', delivery: true, pickup: r['pickup_enabled'] != false, isOpen:r['is_open']!=false, imageUrl:_remoteImageUrl(r));
       }));
+    final Set<int> availableIds = restaurants.map((Restaurant r) => r.id).toSet();
+    menu.removeWhere((FoodItem item) => !availableIds.contains(item.restaurantId));
   }
 
   void _applyAddresses(List<dynamic> rows) {
