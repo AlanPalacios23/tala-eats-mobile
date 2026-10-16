@@ -13,7 +13,10 @@ import 'production_api.dart';
 /// Scope: current authenticated app process. Recovery after app termination
 /// still needs durable local persistence + a server-side lookup contract.
 class OrderSubmissionGuard {
-  OrderSubmissionGuard() : _random = Random.secure();
+  OrderSubmissionGuard({this.beforeSend, this.afterResolution}) : _random = Random.secure();
+
+  final Future<void> Function(String reference)? beforeSend;
+  final Future<void> Function()? afterResolution;
 
   final Random _random;
   String? _requestSignature;
@@ -61,15 +64,22 @@ class OrderSubmissionGuard {
     int generation,
   ) async {
     try {
+      // Commit encrypted reference DURABLY before any network POST.
+      // A failed write prevents sending a non-recoverable checkout.
+      if (beforeSend != null) await beforeSend!(body['client_reference'] as String);
       final Map<String, dynamic> result = await send(body);
       // A response from the previous signed-out session must never
       // clear a newer customer's pending checkout.
-      if (_generation == generation) _clearPending();
+      if (_generation == generation) {
+        if (afterResolution != null) await afterResolution!();
+        _clearPending();
+      }
       return result;
     } on ApiException catch (e) {
       // A timeout/408/409/429/5xx remains ambiguous: preserve one key.
       if (_generation == generation &&
           <int>{400, 401, 403, 404, 422}.contains(e.statusCode)) {
+        if (afterResolution != null) await afterResolution!();
         _clearPending();
       }
       rethrow;
