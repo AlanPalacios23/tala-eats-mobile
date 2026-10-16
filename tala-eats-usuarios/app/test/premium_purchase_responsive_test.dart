@@ -148,7 +148,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
     expect(find.textContaining('Hamburguesa especial'), findsOneWidget);
     expect(find.textContaining('Agregar ·'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final Object? layoutError = tester.takeException();
+    if (layoutError is FlutterError) {
+      // Full render diagnostics needed to fix the underlying 320dp overflow.
+      // Do not silence widget errors or relax this regression check.
+      debugPrint(layoutError.toStringDeep());
+    }
+    expect(layoutError, isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
