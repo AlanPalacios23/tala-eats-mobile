@@ -245,6 +245,19 @@ class _CustomerOrderAdjustmentsScreenState extends State<CustomerOrderAdjustment
     return n == null ? 'Pendiente' : money(n);
   }
 
+  String statusLabel(dynamic value) {
+    switch (value?.toString().toLowerCase()) {
+      case 'pending': return 'Pendiente';
+      case 'resolved': return 'Resuelto';
+      case 'completed': return 'Completado';
+      case 'processing': return 'Procesando';
+      case 'failed': return 'No completado';
+      case 'cancelled': return 'Cancelado';
+      case 'rejected': return 'Rechazado';
+      default: return 'En revisión';
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('Cambios del pedido #' + widget.order.id.toString()),
@@ -274,7 +287,7 @@ class _CustomerOrderAdjustmentsScreenState extends State<CustomerOrderAdjustment
                     Text((row['message'] ?? 'Cambio solicitado').toString(),
                       style: const TextStyle(color: kInk, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 5),
-                    Text('Estado: ' + (row['status'] ?? '').toString(), style: TalaText.muted),
+                    Text('Estado: ' + statusLabel(row['status']), style: TalaText.muted),
                     Text('Importe original ' + amount(row['original_amount']) +
                       ' · Sustituto ' + amount(row['replacement_amount']),
                       style: TalaText.caption),
@@ -301,7 +314,7 @@ class _CustomerOrderAdjustmentsScreenState extends State<CustomerOrderAdjustment
               TalaCard(padding: const EdgeInsets.all(16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(amount(row['amount']) + ' · ' + (row['status'] ?? '').toString(),
+                    Text(amount(row['amount']) + ' · ' + statusLabel(row['status']),
                       style: const TextStyle(color: kInk, fontWeight: FontWeight.w700)),
                     Text((row['reason'] ?? 'Ajuste').toString(), style: TalaText.muted),
                     Text('Proveedor: ' + (row['provider'] ?? 'Por confirmar').toString(),
