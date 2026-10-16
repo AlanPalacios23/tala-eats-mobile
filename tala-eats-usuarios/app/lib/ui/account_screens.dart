@@ -500,9 +500,10 @@ class AddressesScreen extends StatelessWidget {
                           address: model.addresses[index],
                           selected: model.selectedAddress == index,
                           canDelete: model.addresses.length > 1,
-                          onTap: () {
+                          onTap: () async {
                             HapticFeedback.selectionClick();
-                            model.setAddress(index);
+                            final saved = await model.setDefaultAddressRemote(index);
+                            if (!saved && context.mounted) showMessage(context, model.lastError);
                           },
                           onDelete: () => _confirmDelete(context, index),
                         ),
