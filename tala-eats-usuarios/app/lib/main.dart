@@ -7,6 +7,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'production_api.dart';
 import 'order_submission_guard.dart';
 import 'checkout_pricing.dart';
+import 'local_markets.dart';
 
 part 'ui/design_system.dart';
 part 'ui/auth_screens.dart';
@@ -189,6 +190,8 @@ class TalaModel extends ChangeNotifier {
   int userId = 0;
   int tabIndex = 0;
   int selectedAddress = 0;
+  String marketCode = TalaMarket.pilot;
+  bool marketChanging = false;
   String deliveryMode = 'delivery';
   double tip = 20;
   String coupon = '';
@@ -255,6 +258,8 @@ class TalaModel extends ChangeNotifier {
         }
       }
     }
+    final String? market = await NativeBridge.readMarketCode();
+    if (market != null && TalaMarket.valid(market)) marketCode = market;
     final String? stored = await NativeBridge.readToken();
     if (stored == null || stored.isEmpty) return;
     api.token = stored;
@@ -296,7 +301,7 @@ class TalaModel extends ChangeNotifier {
     try {
       final List<dynamic> core = await Future.wait<dynamic>(<Future<dynamic>>[
         api.bootstrap(),
-        api.restaurants(),
+        api.restaurantsForMarket(marketCode),
         api.addresses(),
         api.orders(),
         api.favorites(),
@@ -432,6 +437,45 @@ class TalaModel extends ChangeNotifier {
   }
 
   void setTab(int value) { tabIndex = value; notifyListeners(); }
+
+  /// The market chooses discovery only. Backend checkout validates delivery
+  /// coordinates and merchant delivery radius independently of this filter.
+  Future<bool> chooseMarket(String code, {bool discardCart = false}) async {
+    if (!TalaMarket.valid(code) || marketChanging) return false;
+    if (code == marketCode) return true;
+    if (cart.isNotEmpty && !discardCart) {
+      lastError = 'Confirma el cambio de zona para vaciar el carrito actual.';
+      notifyListeners();
+      return false;
+    }
+    marketChanging = true;
+    lastError = '';
+    notifyListeners();
+    try {
+      final rows = await api.restaurantsForMarket(code);
+      await NativeBridge.writeMarketCode(code);
+      // Do not mutate cart, current zone or menu if network/storage fails.
+      marketCode = code;
+      _applyRestaurants(rows);
+      menu.clear();
+      _menusLoading.clear();
+      _menuLoadErrors.clear();
+      cart.clear();
+      cartRestaurantId = null;
+      coupon = '';
+      lastError = '';
+      return true;
+    } on ApiException catch (e) {
+      lastError = e.message;
+      return false;
+    } catch (_) {
+      lastError = 'No se pudo cambiar la localidad. Revisa tu conexión.';
+      return false;
+    } finally {
+      marketChanging = false;
+      notifyListeners();
+    }
+  }
 
   List<FoodItem> itemsFor(int restaurantId) {
     final List<FoodItem> rows = menu.where((FoodItem item) => item.restaurantId == restaurantId).toList();
