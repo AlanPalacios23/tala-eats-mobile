@@ -1686,10 +1686,12 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                       const SizedBox(height: 12),
                       Text(money(item.price), style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep)),
                       const SizedBox(height: 22),
-                      const Row(
+                      const Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: <Widget>[
                           Text('Preferencias', style: TalaText.title),
-                          SizedBox(width: 8),
                           Text('Opcional', style: TalaText.caption),
                         ],
                       ),
