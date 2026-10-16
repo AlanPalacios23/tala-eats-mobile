@@ -826,6 +826,8 @@ class _SearchScreenState extends State<SearchScreen> {
         ? <FoodItem>[]
         : model.menu.where((FoodItem item) => _fold(item.name).contains(normalized) || _fold(item.category).contains(normalized)).toList();
     final List<String> quick = _quickSearches();
+    final List<Restaurant> nearby = model.restaurants
+        .where((Restaurant r) => r.isOpen).take(4).toList();
 
     return SafeArea(
       bottom: false,
@@ -834,7 +836,10 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
         children: <Widget>[
           const Text('Buscar', style: TalaText.display),
-          const SizedBox(height: 16),
+          const SizedBox(height: 3),
+          Text('Explora comercios de ' + TalaMarket.labelFor(model.marketCode),
+              style: TalaText.muted),
+          const SizedBox(height: 20),
           TextField(
             controller: controller,
             autofocus: false,
@@ -854,23 +859,50 @@ class _SearchScreenState extends State<SearchScreen> {
             child: normalized.isEmpty
                 ? KeyedSubtree(
                     key: const ValueKey<String>('idle'),
-                    child: quick.isEmpty
-                        ? const SizedBox(width: double.infinity)
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        if (quick.isNotEmpty) ...<Widget>[
+                          const Text('Explora por categoría',
+                              style: TextStyle(color: kInk, fontSize: 16,
+                                  fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: <Widget>[
-                              const Text('Búsquedas rápidas', style: TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: <Widget>[
-                                  for (final String label in quick)
-                                    TalaChoicePill(label: label, icon: DishThumb.iconFor(label), selected: false, onTap: () => setQuickQuery(label)),
-                                ],
-                              ),
+                              for (final String label in quick)
+                                TalaChoicePill(
+                                  label: label,
+                                  icon: DishThumb.iconFor(label),
+                                  selected: false,
+                                  onTap: () => setQuickQuery(label),
+                                ),
                             ],
                           ),
+                        ],
+                        if (nearby.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 30),
+                          TalaSectionHeader(
+                            title: 'Comercios para ti',
+                            subtitle: 'Disponibles en ' +
+                                TalaMarket.labelFor(model.marketCode),
+                          ),
+                          const SizedBox(height: 14),
+                          for (final Restaurant restaurant in nearby)
+                            SearchRestaurantTile(model: model,
+                                restaurant: restaurant),
+                        ],
+                        if (quick.isEmpty && nearby.isEmpty)
+                          const StatusView(
+                            icon: Icons.storefront_outlined,
+                            title: 'Aún no hay comercios para explorar',
+                            body: 'Cuando haya negocios disponibles en esta '
+                                'localidad los encontrarás aquí.',
+                            compact: true,
+                          ),
+                      ],
+                    ),
                   )
                 : KeyedSubtree(
                     key: const ValueKey<String>('results'),
