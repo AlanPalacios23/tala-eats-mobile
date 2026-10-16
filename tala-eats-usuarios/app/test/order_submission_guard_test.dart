@@ -53,6 +53,8 @@ void main() {
       fail('Double tap must not make a second HTTP request');
     });
     expect(identical(first, second), isTrue);
+    // Persisted journal reads are asynchronous before network dispatch.
+    await Future<void>.delayed(Duration.zero);
     expect(called, 1);
     response.complete(<String, dynamic>{'id': 101, 'status': 'received'});
     expect((await first)['id'], 101);
