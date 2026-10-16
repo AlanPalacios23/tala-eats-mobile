@@ -451,10 +451,11 @@ class HomeScreen extends StatelessWidget {
               ),
             )
           else if (model.restaurants.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
+            // Keep empty/error state scrollable with large fonts and small
+            // screens; SliverFillRemaining can force a child below min height.
+            SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 110),
+                padding: const EdgeInsets.only(top: 16, bottom: 110),
                 child: model.lastError.isNotEmpty
                     ? StatusView(
                         icon: Icons.wifi_off_rounded,
