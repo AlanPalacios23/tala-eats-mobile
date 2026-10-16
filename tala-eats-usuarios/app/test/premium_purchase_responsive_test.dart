@@ -64,7 +64,11 @@ void main() {
     final model = TalaModel()..restaurants.add(_shop());
     model.addToCart(_food(), 2);
     for (final width in <double>[320, 360, 390, 430]) {
-      await _layout(tester, SummaryCard(model: model), width);
+      // Checkout renders this card inside a scrollable ListView; mirror that
+      // real viewport so expanded fare explanations can scroll vertically.
+      await _layout(tester, ListView(children: <Widget>[
+        SummaryCard(model: model),
+      ]), width);
       expect(find.text('Subtotal'), findsOneWidget);
       expect(find.text('Total de referencia'), findsOneWidget);
       expect(find.textContaining('Por confirmar'), findsWidgets);
