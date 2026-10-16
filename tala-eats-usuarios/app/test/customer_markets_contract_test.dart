@@ -73,7 +73,7 @@ void main() {
     await expectLater(broken.restaurantsForMarket('TALA-JAL'), throwsA(isA<ApiException>()));
     final missing = _MarketApi(<Map<String, dynamic>>[
       <String, dynamic>{'id': 1, 'name': 'Sin localidad'},
-    ]);
+    ], ignoreFilter: true);
     await expectLater(missing.restaurantsForMarket('TALA-JAL'), throwsA(isA<ApiException>()));
   });
 }
