@@ -51,6 +51,19 @@ def setup(role):
     if role == 'usuarios':
         gradle = re.sub(r'(sourceCompatibility\s*=\s*)JavaVersion\.VERSION_[A-Z0-9_]+', r'\1JavaVersion.VERSION_17',gradle)
         gradle = re.sub(r'(targetCompatibility\s*=\s*)JavaVersion\.VERSION_[A-Z0-9_]+', r'\1JavaVersion.VERSION_17',gradle)
+    if role == 'usuarios':
+        # Los estilos nativos protegidos de Stripe utilizan AppCompat y
+        # MaterialComponents. flutter create no incorpora estas dependencias
+        # directamente en el modulo :app; sin ellas AAPT no puede enlazar
+        # LaunchTheme/NormalTheme aunque Dart y Java compilen.
+        if 'dependencies {' in gradle:
+            raise RuntimeError('Android scaffold added its own dependencies block: review before editing.')
+        gradle += """
+dependencies {
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
+}
+"""
     write(build, gradle)
 
     manifest = target/'app/src/main/AndroidManifest.xml'

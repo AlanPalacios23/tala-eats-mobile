@@ -4,6 +4,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:talaeats_users/order_submission_guard.dart';
 import 'package:talaeats_users/production_api.dart';
 
+class FakePendingOrderStore implements PendingOrderStore {
+  final Map<int, String> data = <int, String>{};
+  bool failWrite = false;
+  bool failRead = false;
+  int writes = 0;
+
+  @override
+  Future<String?> read(int accountId) async {
+    if (failRead) throw ApiException(409, 'Encrypted journal unavailable');
+    return data[accountId];
+  }
+
+  @override
+  Future<void> write(int accountId, String payload) async {
+    if (failWrite) throw ApiException(409, 'Cannot commit encrypted journal');
+    writes++;
+    data[accountId] = payload;
+  }
+
+  @override
+  Future<void> clear(int accountId) async {
+    data.remove(accountId);
+  }
+}
+
 Map<String, dynamic> draft({int quantity = 1}) => <String, dynamic>{
   'restaurant_id': 7,
   'address': 'Synthetic only',
@@ -28,6 +53,8 @@ void main() {
       fail('Double tap must not make a second HTTP request');
     });
     expect(identical(first, second), isTrue);
+    // Persisted journal reads are asynchronous before network dispatch.
+    await Future<void>.delayed(Duration.zero);
     expect(called, 1);
     response.complete(<String, dynamic>{'id': 101, 'status': 'received'});
     expect((await first)['id'], 101);
@@ -118,9 +145,11 @@ void main() {
     final oldResponse = Completer<Map<String, dynamic>>();
     final freshResponse = Completer<Map<String, dynamic>>();
     final old = guard.submit(draft(), (_) => oldResponse.future);
+    await Future<void>.delayed(Duration.zero);
     final oldReference = guard.unresolvedClientReference;
     guard.clearAfterConfirmedResolution(); // logout changes attempt generation
     final fresh = guard.submit(draft(quantity: 2), (_) => freshResponse.future);
+    await Future<void>.delayed(Duration.zero);
     final newReference = guard.unresolvedClientReference;
     expect(newReference, isNot(oldReference));
     oldResponse.complete(<String, dynamic>{'id': 1});
@@ -145,4 +174,157 @@ void main() {
     expect(sent[0], sent[1]);
     expect(payload.containsKey('client_reference'), false);
   });
+  test('F2 signed-out request releases guard so later valid login can order', () async {
+    final store = FakePendingOrderStore();
+    var accountId = 0;
+    var sent = 0;
+    final guard = OrderSubmissionGuard(store: store, accountId: () => accountId);
+    await expectLater(guard.submit(draft(), (_) async {
+      sent++;
+      return <String, dynamic>{'id': -1};
+    }), throwsA(isA<ApiException>().having((e) => e.statusCode, 'code', 401)));
+    expect(sent, 0);
+    accountId = 31;
+    final order = await guard.submit(draft(), (body) async {
+      sent++;
+      expect(body['client_reference'], startsWith('android-7-'));
+      return <String, dynamic>{'id': 310};
+    });
+    expect(order['id'], 310);
+    expect(sent, 1);
+    expect(store.data[31], isNull);
+  });
+
+  test('F2 Android restart preserves original idempotency key and frozen body', () async {
+    final store = FakePendingOrderStore();
+    final draftBody = draft();
+    final first = OrderSubmissionGuard(store: store, accountId: () => 91);
+    String? firstKey;
+    await expectLater(first.submit(draftBody, (body) async {
+      firstKey = body['client_reference'] as String;
+      expect(store.data[91], isNotNull); // encrypted journal before HTTP
+      throw ApiException(0, 'Connection reset just after COMMIT');
+    }), throwsA(isA<ApiException>()));
+    expect(store.data[91], isNotNull);
+    // Simulate Flutter process termination and creation of new model.
+    final reopened = OrderSubmissionGuard(store: store, accountId: () => 91);
+    final row = await reopened.submit(draftBody, (body) async {
+      expect(body['client_reference'], firstKey);
+      expect(body['restaurant_id'], 7);
+      expect(body.containsKey('id'), isFalse);
+      return <String, dynamic>{'id': 1842};
+    });
+    expect(row['id'], 1842);
+    expect(store.data[91], isNull);
+    expect(store.writes, 1);
+  });
+
+  test('F2 restart rejects modified cart until previous intent reconciled', () async {
+    final store = FakePendingOrderStore();
+    await expectLater(
+      OrderSubmissionGuard(store: store, accountId: () => 92).submit(
+        draft(), (_) async => throw ApiException(503, 'Synthetic timeout')),
+      throwsA(isA<ApiException>()),
+    );
+    var called = 0;
+    final reopened = OrderSubmissionGuard(store: store, accountId: () => 92);
+    await expectLater(
+      reopened.submit(draft(quantity: 2), (_) async {
+        called++;
+        return <String, dynamic>{'id': 2};
+      }),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)),
+    );
+    expect(called, 0);
+    expect(store.data[92], isNotNull);
+  });
+
+  test('F2 journal is account scoped even with prior owner signed out', () async {
+    final store = FakePendingOrderStore();
+    String? one;
+    await expectLater(
+      OrderSubmissionGuard(store: store, accountId: () => 10).submit(
+        draft(), (body) async {
+          one = body['client_reference'] as String;
+          throw ApiException(502, 'Lost response');
+        }),
+      throwsA(isA<ApiException>()),
+    );
+    final second = OrderSubmissionGuard(store: store, accountId: () => 11);
+    final b = await second.submit(draft(), (body) async {
+      expect(body['client_reference'], isNot(one));
+      return <String, dynamic>{'id': 9};
+    });
+    expect(b['id'], 9);
+    expect(store.data[10], isNotNull);
+    expect(store.data[11], isNull);
+  });
+
+  test('F2 failed secure commit or corrupted journal cannot issue POST', () async {
+    final store = FakePendingOrderStore()..failWrite = true;
+    var calls = 0;
+    await expectLater(
+      OrderSubmissionGuard(store: store, accountId: () => 1).submit(
+        draft(), (_) async {
+          calls++;
+          return <String, dynamic>{'id': 1};
+        }),
+      throwsA(isA<ApiException>()),
+    );
+    expect(calls, 0);
+    store.failWrite = false;
+    store.data[1] = 'not valid encrypted journal JSON';
+    await expectLater(
+      OrderSubmissionGuard(store: store, accountId: () => 1).submit(
+        draft(), (_) async {
+          calls++;
+          return <String, dynamic>{'id': 2};
+        }),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)),
+    );
+    expect(calls, 0);
+  });
+
+  test('F2 recovery GET 404 leaves journal; 200 clears without another POST', () async {
+    final store = FakePendingOrderStore();
+    String? reference;
+    await expectLater(
+      OrderSubmissionGuard(store: store, accountId: () => 7).submit(
+        draft(), (body) async {
+          reference = body['client_reference'] as String;
+          throw ApiException(408, 'Ack uncertain');
+        }),
+      throwsA(isA<ApiException>()),
+    );
+    final restarted = OrderSubmissionGuard(store: store, accountId: () => 7);
+    final missing = await restarted.recover((ref) async {
+      expect(ref, reference);
+      throw ApiException(404, 'Not yet indexed');
+    });
+    expect(missing, isNull);
+    expect(store.data[7], isNotNull);
+    final found = await restarted.recover((ref) async =>
+        <String, dynamic>{'id': 118, 'client_reference': ref, 'user_id': 7});
+    expect(found?['id'], 118);
+    expect(store.data[7], isNull);
+  });
+
+  test('F2 recover wrong user response fails closed with retained journal', () async {
+    final store = FakePendingOrderStore();
+    await expectLater(
+      OrderSubmissionGuard(store: store, accountId: () => 77).submit(
+        draft(), (_) async => throw ApiException(503, 'Lost')),
+      throwsA(isA<ApiException>()),
+    );
+    final restarted = OrderSubmissionGuard(store: store, accountId: () => 77);
+    await expectLater(
+      restarted.recover((reference) async => <String, dynamic>{
+        'id': 118, 'client_reference': reference, 'user_id': 78,
+      }),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)),
+    );
+    expect(store.data[77], isNotNull);
+  });
+
+
 }

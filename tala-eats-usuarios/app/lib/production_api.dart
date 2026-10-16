@@ -36,6 +36,48 @@ class NativeBridge {
     try { await _channel.invokeMethod<void>('clearToken'); } catch (_) {}
   }
 
+  // Crash-safe checkout journal: encryption and durable commit are required.
+  // Any native failure MUST prevent HTTP POST, never silently fall back to
+  // unencrypted local storage or a new client_reference.
+  static Future<String?> readPendingOrder(int userId) async {
+    try {
+      return await _channel.invokeMethod<String>('readPendingOrder',
+          <String, dynamic>{'userId': userId});
+    } on PlatformException {
+      throw ApiException(409, 'No pudimos recuperar la compra pendiente '
+          'de forma segura. Contacta soporte.');
+    } on MissingPluginException {
+      throw ApiException(409, 'Almacenamiento Android seguro no disponible. '
+          'No se enviará el pedido.');
+    }
+  }
+
+  static Future<void> writePendingOrder(int userId, String payload) async {
+    try {
+      await _channel.invokeMethod<void>('writePendingOrder',
+          <String, dynamic>{'userId': userId, 'payload': payload});
+    } on PlatformException {
+      throw ApiException(409, 'No pudimos guardar de forma segura tu pedido. '
+          'No se envió el pedido.');
+    } on MissingPluginException {
+      throw ApiException(409, 'Almacenamiento Android seguro no disponible. '
+          'No se enviará el pedido.');
+    }
+  }
+
+  static Future<void> clearPendingOrder(int userId) async {
+    try {
+      await _channel.invokeMethod<void>('clearPendingOrder',
+          <String, dynamic>{'userId': userId});
+    } on PlatformException {
+      throw ApiException(409, 'No pudimos confirmar la recuperación local '
+          'del pedido. Revisa Mis pedidos antes de continuar.');
+    } on MissingPluginException {
+      throw ApiException(409, 'Almacenamiento Android seguro no disponible. '
+          'No se enviará el pedido.');
+    }
+  }
+
   static Future<void> openExternal(String url) async {
     if (!url.startsWith('https://')) throw ApiException(0, 'Tala Eats bloqueó un enlace externo no seguro.');
     try {
