@@ -515,10 +515,10 @@ class HomeSearchPill extends StatelessWidget {
       excludeSemantics: true,
       child: Pressable(
         child: DecoratedBox(
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), boxShadow: kShadowSoft),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18)),
           child: Material(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: kLine)),
+            color: kSunken,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
@@ -851,6 +851,15 @@ class _SearchScreenState extends State<SearchScreen> {
               hintText: 'Restaurante, comercio o platillo…',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty ? null : IconButton(tooltip: 'Borrar búsqueda', onPressed: clear, icon: const Icon(Icons.close_rounded)),
+              fillColor: kSunken,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(color: kBrand, width: 1.4),
+              ),
             ),
           ),
           const SizedBox(height: 22),
