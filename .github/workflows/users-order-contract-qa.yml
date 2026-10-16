@@ -1,4 +1,4 @@
-name: TALA EATS Usuarios | P0 pedido una sola vez (sin APK)
+name: TALA EATS Usuarios | P0 pedido + compilacion Android (sin publicar)
 
 on:
   pull_request:
@@ -30,7 +30,7 @@ concurrency:
 # Firebase or user data. The GitHub Actions app is Flutter-only QA.
 jobs:
   users-order-contract:
-    name: Flutter analyze + idempotent order tests (CI sintético)
+    name: Flutter analyze + tests + compilacion Android debug efimera
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     defaults:
