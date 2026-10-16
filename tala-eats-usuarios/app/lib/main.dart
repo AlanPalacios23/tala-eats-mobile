@@ -590,9 +590,10 @@ class TalaModel extends ChangeNotifier {
     }
 
     try {
-      // Never reintroduce items from a previous locality or removed shop.
-      if (catalogEpoch != _marketCatalogEpoch ||
-          !restaurants.any((Restaurant r) => r.id == restaurantId)) return;
+      // Ignore stale menu responses after a catalog/market change.
+      // Do not require the parent restaurant list here: detail/effective-menu
+      // are valid standalone routes while the catalogue is still loading.
+      if (catalogEpoch != _marketCatalogEpoch) return;
       if (detail == null && effective == null) {
         _menuLoadErrors.add(restaurantId);
         return;
