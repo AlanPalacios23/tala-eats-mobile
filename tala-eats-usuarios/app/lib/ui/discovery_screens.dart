@@ -586,7 +586,13 @@ class FavoriteButton extends StatelessWidget {
 }
 
 class RestaurantCard extends StatelessWidget {
-  const RestaurantCard({super.key, required this.model, required this.restaurant, required this.onTap, this.heroTag});
+  const RestaurantCard({
+    super.key,
+    required this.model,
+    required this.restaurant,
+    required this.onTap,
+    this.heroTag,
+  });
 
   final TalaModel model;
   final Restaurant restaurant;
@@ -597,84 +603,126 @@ class RestaurantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool favorite = model.favorites.contains(restaurant.id);
     final bool closed = !restaurant.isOpen;
-    Widget media = AspectRatio(
-      aspectRatio: 16 / 10,
-      child: RestaurantMedia(assetPath: restaurant.image, imageUrl: restaurant.imageUrl, desaturate: closed),
-    );
-    final String? tag = heroTag;
-    if (tag != null) media = Hero(tag: tag, child: media);
     final String fee = !restaurant.delivery
-        ? 'Solo recoger'
-        : (restaurant.deliveryFee <= 0 ? 'Envío gratis' : 'Envío ${money(restaurant.deliveryFee)}');
+        ? 'Solo para recoger'
+        : (restaurant.deliveryFee <= 0
+            ? 'Envío gratis'
+            : 'Envío ' + money(restaurant.deliveryFee));
+    Widget media = AspectRatio(
+      aspectRatio: 16 / 9,
+      child: RestaurantMedia(
+        assetPath: restaurant.image,
+        imageUrl: restaurant.imageUrl,
+        desaturate: closed,
+      ),
+    );
+    if (heroTag != null) {
+      media = Hero(tag: heroTag!, child: media);
+    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 26),
       child: Semantics(
         button: true,
-        label: '${restaurant.name}, ${restaurant.category}, ${closed ? 'cerrado' : 'abierto'}',
+        label: restaurant.name + ', ' + restaurant.category +
+            (closed ? ', cerrado' : ', abierto'),
         child: Pressable(
-          scale: 0.985,
-          child: DecoratedBox(
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), boxShadow: kShadowSoft),
-            child: Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: kLine)),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onTap,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Stack(
+          scale: 0.992,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Stack(
                       children: <Widget>[
                         media,
-                        if (closed) const Positioned.fill(child: IgnorePointer(child: ColoredBox(color: Color(0x2EFFFFFF)))),
-                        Positioned(
-                          left: 12,
-                          top: 12,
-                          child: closed
-                              ? const StatusPill(label: 'Cerrado', color: kInkSoft, background: Color(0xF2FFFFFF))
-                              : const StatusPill(label: 'Abierto', color: kGreen, background: Color(0xF2FFFFFF)),
-                        ),
+                        if (closed)
+                          const Positioned.fill(
+                            child: IgnorePointer(
+                              child: ColoredBox(color: Color(0x44FFFFFF)),
+                            ),
+                          ),
+                        if (closed)
+                          const Positioned(
+                            top: 12,
+                            left: 12,
+                            child: StatusPill(
+                              label: 'Cerrado',
+                              color: kInkSoft,
+                              background: Color(0xF2FFFFFF),
+                              dot: false,
+                            ),
+                          ),
                         if (restaurant.promo.isNotEmpty)
                           Positioned(
-                            left: 12,
                             bottom: 12,
-                            child: StatusPill(label: restaurant.promo, color: kInkSoft, background: const Color(0xF2FFFFFF), dot: false),
+                            left: 12,
+                            child: StatusPill(
+                              label: restaurant.promo,
+                              color: kInkSoft,
+                              background: const Color(0xF2FFFFFF),
+                              dot: false,
+                            ),
                           ),
                         Positioned(
                           right: 10,
                           top: 10,
-                          child: FavoriteButton(favorite: favorite, onTap: () => model.toggleFavorite(restaurant.id)),
+                          child: FavoriteButton(
+                            favorite: favorite,
+                            onTap: () => model.toggleFavorite(restaurant.id),
+                          ),
                         ),
                       ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Text(restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.h2.copyWith(fontSize: 18)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 12, 2, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                restaurant.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TalaText.h2.copyWith(
+                                  fontSize: 19,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
-                              if (restaurant.rating > 0) ...<Widget>[const SizedBox(width: 8), RatingChip(rating: restaurant.rating)],
+                            ),
+                            if (restaurant.rating > 0) ...<Widget>[
+                              const SizedBox(width: 8),
+                              RatingChip(rating: restaurant.rating),
                             ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(restaurant.category, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.muted.copyWith(fontSize: 14)),
-                          const SizedBox(height: 10),
-                          MetaLine(
-                            items: <(IconData, String)>[
-                              (Icons.schedule_rounded, restaurant.eta),
-                              (restaurant.delivery ? Icons.two_wheeler_rounded : Icons.storefront_rounded, fee),
-                            ],
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          restaurant.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TalaText.muted.copyWith(fontSize: 13),
+                        ),
+                        const SizedBox(height: 9),
+                        MetaLine(
+                          items: <(IconData, String)>[
+                            (Icons.schedule_rounded, restaurant.eta),
+                            (restaurant.delivery
+                                ? Icons.two_wheeler_rounded
+                                : Icons.storefront_rounded, fee),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
