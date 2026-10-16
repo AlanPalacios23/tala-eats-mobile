@@ -72,8 +72,12 @@ class OrderSubmissionGuard {
     Future<Map<String, dynamic>> Function(Map<String, dynamic> payload) send,
     int generation,
   ) async {
-    final owner = _owner();
+    // Cross the first async boundary before _owner() can reject a signed-out
+    // account. Otherwise a synchronous rejection may predate _inFlight setup.
+    await Future<void>.value();
+    int owner = 0;
     try {
+      owner = _owner();
       if (draft.containsKey('client_reference')) {
         throw ArgumentError('El guard genera client_reference internamente.');
       }
@@ -119,7 +123,7 @@ class OrderSubmissionGuard {
     } on ApiException catch (e) {
       // An explicit rejected request may release the reference, but transport
       // failures/5xx and 408/409/429 are ambiguous and MUST retain it.
-      if (generation == _generation &&
+      if (owner > 0 && generation == _generation &&
           <int>{400, 401, 403, 404, 422}.contains(e.statusCode)) {
         await _clearConfirmed(owner);
       }
