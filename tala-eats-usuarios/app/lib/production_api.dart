@@ -36,6 +36,42 @@ class NativeBridge {
     try { await _channel.invokeMethod<void>('clearToken'); } catch (_) {}
   }
 
+  // Only opaque reference + authenticated account ID are persisted,
+  // encrypted by Android Keystore. POST must never begin until commit succeeds.
+  static Future<void> writePendingOrder(int userId, String reference) async {
+    try {
+      await _channel.invokeMethod<void>('writePendingOrder', <String, dynamic>{
+        'userId': userId, 'reference': reference,
+      });
+    } on PlatformException catch (_) {
+      throw ApiException(0, 'No se pudo guardar el pedido de forma segura. No se envió ningún cobro.');
+    } on MissingPluginException {
+      throw ApiException(0, 'Protección de compras no disponible en esta instalación.');
+    }
+  }
+
+  static Future<String?> readPendingOrder() async {
+    try {
+      return await _channel.invokeMethod<String>('readPendingOrder');
+    } on MissingPluginException {
+      // Flutter widget tests do not install the Android platform component.
+      return null;
+    } on PlatformException catch (_) {
+      throw ApiException(409, 'Hay un pedido pendiente que no pudimos verificar. Cierra sesión y contacta soporte si es necesario.');
+    }
+  }
+
+  static Future<void> clearPendingOrder() async {
+    try {
+      await _channel.invokeMethod<void>('clearPendingOrder');
+    } on MissingPluginException {
+      // Flutter unit tests run without Android native code.
+      return;
+    } on PlatformException catch (_) {
+      throw ApiException(409, 'No se pudo finalizar el registro del pedido en el teléfono.');
+    }
+  }
+
   static Future<void> openExternal(String url) async {
     if (!url.startsWith('https://')) throw ApiException(0, 'Tala Eats bloqueó un enlace externo no seguro.');
     try {
