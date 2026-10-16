@@ -19,6 +19,7 @@ class OrderSubmissionGuard {
   String? _requestSignature;
   String? _clientReference;
   Future<Map<String, dynamic>>? _inFlight;
+  int _generation = 0;
 
   String? get unresolvedClientReference => _clientReference;
 
@@ -47,7 +48,9 @@ class OrderSubmissionGuard {
     final Map<String, dynamic> frozen =
         Map<String, dynamic>.from(jsonDecode(_requestSignature!) as Map);
     frozen['client_reference'] = _clientReference;
-    final Future<Map<String, dynamic>> future = _dispatch(frozen, send);
+    final Future<Map<String, dynamic>> future = _dispatch(
+      frozen, send, _generation,
+    );
     _inFlight = future;
     return future;
   }
@@ -55,21 +58,29 @@ class OrderSubmissionGuard {
   Future<Map<String, dynamic>> _dispatch(
     Map<String, dynamic> body,
     Future<Map<String, dynamic>> Function(Map<String, dynamic>) send,
+    int generation,
   ) async {
     try {
       final Map<String, dynamic> result = await send(body);
-      clearAfterConfirmedResolution();
+      // A response from the previous signed-out session must never
+      // clear a newer customer's pending checkout.
+      if (_generation == generation) _clearPending();
       return result;
     } on ApiException catch (e) {
-      // 400/401/403/404/422 explicitly reject the request. A timeout,
-      // 408/409/429, server failure or ambiguous transport must keep the key.
-      if (<int>{400, 401, 403, 404, 422}.contains(e.statusCode)) {
-        clearAfterConfirmedResolution();
+      // A timeout/408/409/429/5xx remains ambiguous: preserve one key.
+      if (_generation == generation &&
+          <int>{400, 401, 403, 404, 422}.contains(e.statusCode)) {
+        _clearPending();
       }
       rethrow;
     } finally {
-      _inFlight = null;
+      if (_generation == generation) _inFlight = null;
     }
+  }
+
+  void _clearPending() {
+    _requestSignature = null;
+    _clientReference = null;
   }
 
   String _newReference(Object? restaurantId) {
@@ -81,7 +92,8 @@ class OrderSubmissionGuard {
 
   /// Use only after confirmed POST success, confirmed rejection, or logout.
   void clearAfterConfirmedResolution() {
-    _requestSignature = null;
-    _clientReference = null;
+    _generation++;
+    _clearPending();
+    _inFlight = null;
   }
 }
