@@ -102,40 +102,75 @@ class CartLineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Widget stepper = QuantityStepper(
+      compact: true,
+      deleteAtOne: true,
+      quantity: line.quantity,
+      onDecrement: () => model.changeQuantity(line, -1),
+      onIncrement: () => model.changeQuantity(line, 1),
+    );
+    final Widget title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(line.item.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: TalaText.title.copyWith(fontSize: 15)),
+        if (line.note.trim().isNotEmpty) ...<Widget>[
+          const SizedBox(height: 4),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: kSoftPeach,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(line.note, maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: kBrandDeep, fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ],
+    );
     return TalaCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
-      child: Row(
-        children: <Widget>[
-          DishThumb(item: line.item, size: 56, radius: 14),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(line.item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TalaText.title.copyWith(fontSize: 15)),
-                if (line.note.trim().isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: kSoftPeach, borderRadius: BorderRadius.circular(8)),
-                    child: Text(line.note, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kBrandDeep, fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final bool narrow = constraints.maxWidth < 330;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  DishThumb(item: line.item, size: 56, radius: 14),
+                  const SizedBox(width: 12),
+                  Expanded(child: title),
+                  if (!narrow) ...<Widget>[
+                    const SizedBox(width: 8),
+                    stepper,
+                  ],
                 ],
-                const SizedBox(height: 6),
-                Text(money(line.total), style: TalaText.price.copyWith(fontSize: 15)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          QuantityStepper(
-            compact: true,
-            deleteAtOne: true,
-            quantity: line.quantity,
-            onDecrement: () => model.changeQuantity(line, -1),
-            onIncrement: () => model.changeQuantity(line, 1),
-          ),
-        ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  Flexible(
+                    child: Text(money(line.total),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TalaText.price.copyWith(fontSize: 16)),
+                  ),
+                  if (narrow) ...<Widget>[
+                    const SizedBox(width: 12),
+                    stepper,
+                  ],
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
