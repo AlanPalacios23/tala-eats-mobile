@@ -71,6 +71,21 @@ public class MainActivity extends FlutterFragmentActivity {
                         writeToken(call.argument("token")); result.success(null); break;
                     case "readToken":
                         result.success(readToken()); break;
+                    case "readMarketCode":
+                        result.success(getSharedPreferences("talaeats_market", Context.MODE_PRIVATE)
+                            .getString("market_code", "TALA-JAL")); break;
+                    case "writeMarketCode":
+                        String marketCode = call.argument("code");
+                        if (marketCode == null || !java.util.Arrays.asList(
+                                "TALA-JAL", "CUISILLOS-JAL", "AMECA-JAL", "AHUALULCO-JAL",
+                                "TEQUILA-JAL", "AMATITAN-JAL").contains(marketCode)) {
+                            result.error("INVALID_MARKET", "Mercado desconocido", null); break;
+                        }
+                        if (!getSharedPreferences("talaeats_market", Context.MODE_PRIVATE)
+                                .edit().putString("market_code", marketCode).commit()) {
+                            result.error("MARKET_SAVE", "No se pudo guardar el mercado", null); break;
+                        }
+                        result.success(null); break;
                     case "clearToken":
                         clearToken(); result.success(null); break;
                     case "writePendingOrder":
