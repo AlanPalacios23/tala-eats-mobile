@@ -1,7 +1,7 @@
 part of '../main.dart';
 
 // ---------------------------------------------------------------------------
-// Tala Eats design system (v1.0.9)
+// Tala Eats design system (premium discovery polish v1.0.23)
 // Tokens, theme, motion and shared building blocks. UI only: nothing in this
 // file talks to the network or changes TalaModel state.
 // ---------------------------------------------------------------------------
@@ -15,10 +15,10 @@ const Color kDangerSoft = Color(0xFFFFEDEA);
 const Color kScrim = Color(0x591C140F);
 
 const List<BoxShadow> kShadowSoft = <BoxShadow>[
-  BoxShadow(color: Color(0x0F2B1A10), blurRadius: 18, offset: Offset(0, 6)),
+  BoxShadow(color: Color(0x0B25211E), blurRadius: 20, offset: Offset(0, 6)),
 ];
 const List<BoxShadow> kShadowLifted = <BoxShadow>[
-  BoxShadow(color: Color(0x142B1A10), blurRadius: 28, offset: Offset(0, 12)),
+  BoxShadow(color: Color(0x1225211E), blurRadius: 28, offset: Offset(0, 10)),
 ];
 
 /// Spacing scale (dp).
