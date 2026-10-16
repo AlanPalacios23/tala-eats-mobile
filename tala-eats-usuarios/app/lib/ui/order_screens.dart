@@ -490,6 +490,21 @@ class OrderDetailScreen extends StatelessWidget {
               const SizedBox(height: 14),
               TalaCard(
                 padding: const EdgeInsets.all(14),
+                onTap: () => Navigator.of(context).push(premiumRoute(CustomerOrderAdjustmentsScreen(model: model, order: order))),
+                child: const Row(children: <Widget>[
+                  CircleAvatar(backgroundColor: kSoftOrange, child: Icon(Icons.rule_rounded, color: kBrand)),
+                  SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                    Text('Cambios y reembolsos', style: TextStyle(color: kInk, fontWeight: FontWeight.w800)),
+                    SizedBox(height: 2),
+                    Text('Sustituciones y ajustes confirmados por el servidor', style: TalaText.caption),
+                  ])),
+                  Icon(Icons.chevron_right_rounded, color: kSubtle),
+                ]),
+              ),
+              const SizedBox(height: 14),
+              TalaCard(
+                padding: const EdgeInsets.all(14),
                 onTap: () => Navigator.of(context).push(premiumRoute(SupportScreen(model: model, orderId: order.id))),
                 child: const Row(
                   children: <Widget>[
