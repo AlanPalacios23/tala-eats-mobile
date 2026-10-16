@@ -135,7 +135,12 @@ class CustomerNativePush {
   Future<bool> disable(TalaApi api, int userId) async {
     ++_generation;
     await _closeSubscriptions();
-    final deviceId = _deviceId;
+    // An Android process can die after consent/registration. Recover the
+    // stable installation ID even when listeners have not resumed yet.
+    final consented = userId > 0 &&
+        await NativeBridge.readPushConsent(userId);
+    final deviceId = _deviceId ??
+        (consented ? await NativeBridge.pushInstallationId() : null);
     _deviceId = null;
     _ownerId = null;
     active = false;
@@ -150,8 +155,16 @@ class CustomerNativePush {
       }
     }
     // The device should not continue to receive pushes after local logout.
-    if (Firebase.apps.isNotEmpty) {
-      try { await FirebaseMessaging.instance.deleteToken(); } catch (_) {}
+    if (firebaseConfigured) {
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(options: const FirebaseOptions(
+            apiKey: _apiKey, appId: _appId,
+            messagingSenderId: _senderId, projectId: _projectId,
+          ));
+        }
+        await FirebaseMessaging.instance.deleteToken();
+      } catch (_) {}
     }
     if (userId > 0) {
       try { await NativeBridge.writePushConsent(userId, false); } catch (_) {}
