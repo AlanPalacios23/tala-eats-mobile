@@ -106,7 +106,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('No queda el producto solicitado'), findsOneWidget);
-    expect(find.textContaining('pendiente'), findsWidgets);
+    expect(find.textContaining('Pendiente'), findsWidgets);
     expect(find.text('Aceptar reemplazo'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
