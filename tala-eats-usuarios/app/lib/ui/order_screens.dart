@@ -122,22 +122,52 @@ class ActiveOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              RestaurantMedia(assetPath: order.restaurant.image, imageUrl: order.restaurant.imageUrl, width: 48, height: 48, radius: 14),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(order.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title),
-                    const SizedBox(height: 2),
-                    Text(order.deliveryMode == 'delivery' ? 'Estimado ${order.eta}' : 'Para recoger · ${order.eta}', style: TalaText.caption),
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints bounds) {
+              final bool compact = bounds.maxWidth < 310;
+              final Widget merchant = Row(
+                children: <Widget>[
+                  RestaurantMedia(
+                    assetPath: order.restaurant.image,
+                    imageUrl: order.restaurant.imageUrl,
+                    width: 48, height: 48, radius: 14,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(order.restaurant.name, maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TalaText.title),
+                        const SizedBox(height: 2),
+                        Text(order.deliveryMode == 'delivery'
+                            ? 'Estimado ${order.eta}'
+                            : 'Para recoger · ${order.eta}',
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: TalaText.caption),
+                      ],
+                    ),
+                  ),
+                  if (!compact) ...<Widget>[
+                    const SizedBox(width: 8),
+                    StatusPill(label: order.status,
+                        color: kBrandDeep, background: kSoftOrange),
                   ],
-                ),
-              ),
-              StatusPill(label: order.status, color: kBrandDeep, background: kSoftOrange),
-            ],
+                ],
+              );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  merchant,
+                  if (compact) ...<Widget>[
+                    const SizedBox(height: 10),
+                    StatusPill(label: order.status,
+                        color: kBrandDeep, background: kSoftOrange),
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           _SegmentedProgress(total: steps.length, current: current),

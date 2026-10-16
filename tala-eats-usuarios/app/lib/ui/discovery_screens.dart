@@ -1686,10 +1686,12 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                       const SizedBox(height: 12),
                       Text(money(item.price), style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep)),
                       const SizedBox(height: 22),
-                      const Row(
+                      const Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: <Widget>[
                           Text('Preferencias', style: TalaText.title),
-                          SizedBox(width: 8),
                           Text('Opcional', style: TalaText.caption),
                         ],
                       ),
@@ -1714,24 +1716,48 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                   child: SafeArea(
                     top: false,
                     minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                    child: Row(
-                      children: <Widget>[
-                        QuantityStepper(
+                    child: LayoutBuilder(
+                      builder: (BuildContext context, BoxConstraints bounds) {
+                        final Widget quantityControl = QuantityStepper(
                           quantity: quantity,
-                          onDecrement: quantity > 1 ? () => setModalState(() => quantity -= 1) : null,
+                          onDecrement: quantity > 1
+                              ? () => setModalState(() => quantity -= 1)
+                              : null,
                           onIncrement: () => setModalState(() => quantity += 1),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () async {
-                              final bool added = await addItemWithGuard(sheetContext, model, item, quantity, note: preference);
-                              if (added && sheetContext.mounted) Navigator.of(sheetContext).pop();
-                            },
-                            child: Text('Agregar · ${money(item.price * quantity)}'),
-                          ),
-                        ),
-                      ],
+                        );
+                        final Widget addAction = FilledButton(
+                          onPressed: () async {
+                            final bool added = await addItemWithGuard(
+                              sheetContext, model, item, quantity,
+                              note: preference,
+                            );
+                            if (added && sheetContext.mounted) {
+                              Navigator.of(sheetContext).pop();
+                            }
+                          },
+                          child: Text('Agregar · ${money(item.price * quantity)}'),
+                        );
+                        if (bounds.maxWidth < 340) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: quantityControl,
+                              ),
+                              const SizedBox(height: 10),
+                              addAction,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: <Widget>[
+                            quantityControl,
+                            const SizedBox(width: 12),
+                            Expanded(child: addAction),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

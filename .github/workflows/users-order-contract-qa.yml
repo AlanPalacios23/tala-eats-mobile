@@ -57,6 +57,8 @@ jobs:
         run: flutter test --reporter=compact test/premium_discovery_polish_test.dart
       - name: Contraste AA de marca y botones (sin APK)
         run: flutter test --reporter=compact test/premium_brand_contrast_test.dart
+      - name: "UX compra: producto, carrito, checkout y pedidos 320-430 dp"
+        run: flutter test --reporter=compact test/premium_purchase_responsive_test.dart
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Backend externo solo GET (diagnostico, no equivalente a E2E)
@@ -65,7 +67,7 @@ jobs:
       - name: Preparar scaffold nativo Android desde fuentes oficiales
         run: python3 ../ci/bootstrap_android.py --role usuarios
       - name: P0 Manifest, permisos y secretos Android Usuarios
-        run: python3 ../../ci/security_android_gate.py --role usuarios --role usuarios
+        run: python3 ../../ci/security_android_gate.py --role usuarios
       - name: Compilar Java nativo y Flutter Android debug (efímero, sin publicar)
         timeout-minutes: 12
         run: flutter build apk --debug --no-pub
