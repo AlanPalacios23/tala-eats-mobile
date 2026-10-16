@@ -34,6 +34,7 @@ public class MainActivity extends FlutterFragmentActivity {
     private static final String CHANNEL = "com.talaeats.app/native";
     private static final String PREFS = "talaeats_secure";
     private static final String KEY_ALIAS = "talaeats_session_key_v1";
+    private static final String ORDER_KEY_ALIAS = "talaeats_pending_order_key_v1";
     private static final String PREF_TOKEN = "session_token";
     private static final String PREF_IV = "session_iv";
     private String latestUri = "";
@@ -208,6 +209,24 @@ public class MainActivity extends FlutterFragmentActivity {
         return kg.generateKey();
     }
 
+    // Independent AES-256 key for pending checkout; never rotate/reuse the
+    // login token's encryption key when clearing a session.
+    private SecretKey getOrCreateOrderKey() throws Exception {
+        KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
+        ks.load(null);
+        if (ks.containsAlias(ORDER_KEY_ALIAS)) {
+            return ((KeyStore.SecretKeyEntry) ks.getEntry(ORDER_KEY_ALIAS, null)).getSecretKey();
+        }
+        KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        generator.init(new KeyGenParameterSpec.Builder(
+                ORDER_KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setKeySize(256)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build());
+        return generator.generateKey();
+    }
+
     private void writeToken(String token) throws Exception {
         if (token == null || token.isEmpty()) { clearToken(); return; }
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey());
@@ -255,7 +274,7 @@ public class MainActivity extends FlutterFragmentActivity {
             throw new IllegalArgumentException("ORDER_PAYLOAD_INVALID");
         }
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey());
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateOrderKey());
         cipher.updateAAD(pendingAad(owner));
         byte[] encrypted = cipher.doFinal(payload.getBytes(StandardCharsets.UTF_8));
         String key = pendingName(owner);
@@ -277,7 +296,7 @@ public class MainActivity extends FlutterFragmentActivity {
             throw new IllegalStateException("ORDER_JOURNAL_INCOMPLETE");
         }
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(),
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateOrderKey(),
                 new GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)));
         cipher.updateAAD(pendingAad(owner));
         byte[] plain = cipher.doFinal(Base64.decode(ciphertext, Base64.NO_WRAP));
