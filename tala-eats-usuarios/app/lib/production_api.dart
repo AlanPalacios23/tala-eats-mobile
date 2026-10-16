@@ -21,6 +21,28 @@ class ApiException implements Exception {
 class NativeBridge {
   static const MethodChannel _channel = MethodChannel('com.talaeats.app/native');
 
+  // Non-sensitive customer shopping locality persists across Android restarts.
+  // Native storage is device-local; no GPS or customer address is saved here.
+  static Future<String?> readMarketCode() async {
+    try {
+      return await _channel.invokeMethod<String>('readMarketCode');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> writeMarketCode(String code) async {
+    if (!TalaMarket.valid(code)) throw ArgumentError.value(code, 'code');
+    try {
+      await _channel.invokeMethod<void>(
+        'writeMarketCode', <String, dynamic>{'code': code});
+    } on PlatformException {
+      throw ApiException(503, 'No se pudo guardar la zona de compras.');
+    } on MissingPluginException {
+      throw ApiException(503, 'Configuración Android de zonas no disponible.');
+    }
+  }
+
   static Future<String?> readToken() async {
     try { return await _channel.invokeMethod<String>('readToken'); } catch (_) { return null; }
   }
