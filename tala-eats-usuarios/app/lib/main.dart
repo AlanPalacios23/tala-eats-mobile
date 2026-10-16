@@ -15,6 +15,7 @@ part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
 part 'ui/account_screens.dart';
 part 'ui/legal_screens.dart';
+part 'ui/backend_features_screens.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
