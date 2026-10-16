@@ -148,15 +148,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
     expect(find.textContaining('Hamburguesa especial'), findsOneWidget);
     expect(find.textContaining('Agregar ·'), findsOneWidget);
-    final Object? layoutError = tester.takeException();
-    if (layoutError is FlutterError) {
-      // Full render diagnostics needed to fix the underlying 320dp overflow.
-      // Do not silence widget errors or relax this regression check.
-      debugPrint(layoutError.toStringDeep());
-      // Render tree captures the offending Row and constraints at 320dp.
-      debugDumpRenderTree();
-    }
-    expect(layoutError, isNull);
+    expect(tester.takeException(), isNull,
+        reason: 'Texto Preferencias/Opcional debe adaptarse a 320dp x1.3');
     await tester.pumpWidget(const SizedBox.shrink());
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
