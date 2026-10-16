@@ -72,6 +72,16 @@ public class MainActivity extends FlutterFragmentActivity {
                         result.success(readToken()); break;
                     case "clearToken":
                         clearToken(); result.success(null); break;
+                    case "writePendingOrder":
+                        Integer writeUserId = call.argument("userId");
+                        String pendingPayload = call.argument("payload");
+                        writePendingOrder(writeUserId, pendingPayload); result.success(null); break;
+                    case "readPendingOrder":
+                        Integer readUserId = call.argument("userId");
+                        result.success(readPendingOrder(readUserId)); break;
+                    case "clearPendingOrder":
+                        Integer clearUserId = call.argument("userId");
+                        clearPendingOrder(clearUserId); result.success(null); break;
                     case "openUrl":
                         String url = call.argument("url");
                         if (url == null || !url.startsWith("https://")) { result.error("BAD_URL", "URL inválida", null); break; }
@@ -92,7 +102,7 @@ public class MainActivity extends FlutterFragmentActivity {
                         result.notImplemented();
                 }
             } catch (Exception e) {
-                result.error("NATIVE_ERROR", e.getMessage(), null);
+                result.error("NATIVE_ERROR", "Error en operación nativa segura", null);
             }
         });
     }
@@ -218,5 +228,69 @@ public class MainActivity extends FlutterFragmentActivity {
 
     private void clearToken() {
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(PREF_TOKEN).remove(PREF_IV).apply();
+    }
+
+    // Per-owner encrypted pending checkout. Ciphertext and fresh AES-GCM IV are
+    // committed to one SharedPreferences transaction BEFORE any network POST.
+    // Persistent across app process death; never shares an entry across users.
+    private int checkedOrderUserId(Integer userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("ORDER_OWNER_REQUIRED");
+        }
+        return userId;
+    }
+
+    private String pendingName(int userId) {
+        return "pending_order_v1_" + userId;
+    }
+
+    private byte[] pendingAad(int userId) {
+        return ("talaeats-pending-order-v1:" + userId).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private void writePendingOrder(Integer userId, String payload) throws Exception {
+        final int owner = checkedOrderUserId(userId);
+        if (payload == null || payload.isEmpty() ||
+                payload.getBytes(StandardCharsets.UTF_8).length > 16000) {
+            throw new IllegalArgumentException("ORDER_PAYLOAD_INVALID");
+        }
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey());
+        cipher.updateAAD(pendingAad(owner));
+        byte[] encrypted = cipher.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+        String key = pendingName(owner);
+        SharedPreferences.Editor editor = getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
+        editor.putString(key, Base64.encodeToString(encrypted, Base64.NO_WRAP));
+        editor.putString(key + "_iv", Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP));
+        if (!editor.commit()) throw new IllegalStateException("ORDER_JOURNAL_DISK_COMMIT_FAILED");
+    }
+
+    private String readPendingOrder(Integer userId) throws Exception {
+        final int owner = checkedOrderUserId(userId);
+        String key = pendingName(owner);
+        SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String ciphertext = prefs.getString(key, null);
+        String iv = prefs.getString(key + "_iv", null);
+        if (ciphertext == null && iv == null) return null;
+        // Partial journal is unsafe; NEVER ignore it and create a new reference.
+        if (ciphertext == null || iv == null) {
+            throw new IllegalStateException("ORDER_JOURNAL_INCOMPLETE");
+        }
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(),
+                new GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)));
+        cipher.updateAAD(pendingAad(owner));
+        byte[] plain = cipher.doFinal(Base64.decode(ciphertext, Base64.NO_WRAP));
+        if (plain.length > 16000) throw new IllegalStateException("ORDER_JOURNAL_TOO_LARGE");
+        return new String(plain, StandardCharsets.UTF_8);
+    }
+
+    private void clearPendingOrder(Integer userId) {
+        final int owner = checkedOrderUserId(userId);
+        String key = pendingName(owner);
+        if (!getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(key).remove(key + "_iv").commit()) {
+            throw new IllegalStateException("ORDER_JOURNAL_CLEAR_FAILED");
+        }
     }
 }
