@@ -50,7 +50,7 @@ jobs:
       - name: Analisis estatico (sin APK)
         run: flutter analyze --no-fatal-infos
       - name: QA de doble toque y llave persistente durante reintentos
-        run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart test/backend_customer_contracts_test.dart test/customer_markets_contract_test.dart
+        run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart test/backend_customer_contracts_test.dart test/customer_markets_contract_test.dart test/customer_native_push_contract_test.dart
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Preparar scaffold nativo Android desde fuentes oficiales
