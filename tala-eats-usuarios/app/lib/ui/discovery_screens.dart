@@ -1584,7 +1584,7 @@ class RestaurantCartBar extends StatelessWidget {
                   boxShadow: const <BoxShadow>[BoxShadow(color: Color(0x40FF5A1F), blurRadius: 24, offset: Offset(0, 10))],
                 ),
                 child: Material(
-                  color: kBrand,
+                  color: kBrandDeep,
                   borderRadius: BorderRadius.circular(20),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
