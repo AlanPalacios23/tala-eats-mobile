@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / 'app'
 ROLES = {
-    'usuarios': {'name':'app', 'package':'com.talaeats.app', 'label':'Tala Eats', 'permissions':['INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']},
+    'usuarios': {'name':'app', 'package':'com.talaeats.app', 'label':'Tala Eats', 'permissions':['INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION','POST_NOTIFICATIONS']},
     'restaurante': {'name':'restaurant', 'package':'com.talaeats.restaurant', 'label':'Tala Eats Restaurante', 'permissions':['INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']},
     'repartidor': {'name':'driver', 'package':'com.talaeats.driver', 'label':'Tala Eats Repartidor', 'permissions':['INTERNET','CAMERA','ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION']},
 }

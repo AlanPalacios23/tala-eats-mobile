@@ -43,6 +43,33 @@ class NativeBridge {
     }
   }
 
+  // An opaque, random per-install ID; never device serial, advertising ID,
+  // GPS or hardware fingerprint. User consent is scoped to this account.
+  static Future<String?> pushInstallationId() async {
+    try { return await _channel.invokeMethod<String>('pushInstallationId'); }
+    catch (_) { return null; }
+  }
+
+  static Future<bool> readPushConsent(int userId) async {
+    if (userId <= 0) return false;
+    try {
+      return await _channel.invokeMethod<bool>(
+        'readPushConsent', <String, dynamic>{'userId': userId}) == true;
+    } catch (_) { return false; }
+  }
+
+  static Future<void> writePushConsent(int userId, bool enabled) async {
+    if (userId <= 0) throw ArgumentError.value(userId, 'userId');
+    try {
+      await _channel.invokeMethod<void>('writePushConsent',
+        <String, dynamic>{'userId': userId, 'enabled': enabled});
+    } on PlatformException {
+      throw ApiException(503, 'No se pudo guardar tu preferencia push.');
+    } on MissingPluginException {
+      throw ApiException(503, 'El dispositivo no admite notificaciones nativas.');
+    }
+  }
+
   static Future<String?> readToken() async {
     try { return await _channel.invokeMethod<String>('readToken'); } catch (_) { return null; }
   }
@@ -295,6 +322,46 @@ class TalaApi {
   Future<Map<String, dynamic>> createSupport(String message, {String category = 'general', int? orderId}) async => Map<String, dynamic>.from((await post('/platform/support', <String, dynamic>{'order_id': orderId, 'category': category, 'message': message})) as Map);
   Future<Map<String, dynamic>> privacy() async => Map<String, dynamic>.from((await get('/v11/privacy/preferences')) as Map);
   Future<Map<String, dynamic>> updatePrivacy(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await put('/v11/privacy/preferences', payload)) as Map);
+
+  // FCM customer-only. Never send device tokens to analytics or other roles.
+  Future<Map<String, dynamic>> customerPushConfig() async =>
+      Map<String, dynamic>.from((await get('/mobile-push/config')) as Map);
+
+  Future<Map<String, dynamic>> registerCustomerPush({
+    required String token, required String deviceId, bool marketing = false,
+  }) async {
+    if (token.length < 20 || token.length > 4096 ||
+        !RegExp(r'^[A-Za-z0-9_.-]{8,96}$').hasMatch(deviceId)) {
+      throw ArgumentError('Token o identificador push inválido');
+    }
+    return Map<String, dynamic>.from(
+      (await put('/mobile-push/devices', <String, dynamic>{
+        'token': token, 'device_id': deviceId,
+        'application': 'customer', 'platform': 'android',
+        'marketing_opt_in': marketing,
+      })) as Map);
+  }
+
+  Future<Map<String, dynamic>> changeCustomerPushMarketing(
+      String deviceId, bool marketing) async {
+    if (!RegExp(r'^[A-Za-z0-9_.-]{8,96}$').hasMatch(deviceId)) {
+      throw ArgumentError.value(deviceId, 'deviceId');
+    }
+    return Map<String, dynamic>.from(
+      (await put('/mobile-push/devices/$deviceId/preferences',
+        <String, dynamic>{'marketing_opt_in': marketing})) as Map);
+  }
+
+  Future<void> unregisterCustomerPush(String deviceId) async {
+    if (!RegExp(r'^[A-Za-z0-9_.-]{8,96}$').hasMatch(deviceId)) {
+      throw ArgumentError.value(deviceId, 'deviceId');
+    }
+    final dynamic result = await delete('/mobile-push/devices/$deviceId');
+    if (result is! Map || result['registered'] != false) {
+      throw ApiException(502, 'El servidor no confirmó la desactivación push.');
+    }
+  }
+
 
   // Customer-owned session management. Never call admin/merchant security APIs.
   Future<List<Map<String, dynamic>>> customerDevices() async =>

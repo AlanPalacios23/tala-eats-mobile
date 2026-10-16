@@ -74,6 +74,37 @@ public class MainActivity extends FlutterFragmentActivity {
                     case "readMarketCode":
                         result.success(getSharedPreferences("talaeats_market", Context.MODE_PRIVATE)
                             .getString("market_code", "TALA-JAL")); break;
+                    case "pushInstallationId":
+                        SharedPreferences pushPrefs = getSharedPreferences("talaeats_push_consent", Context.MODE_PRIVATE);
+                        String installId = pushPrefs.getString("install_id", null);
+                        if (installId == null) {
+                            installId = java.util.UUID.randomUUID().toString();
+                            if (!pushPrefs.edit().putString("install_id", installId).commit()) {
+                                result.error("PUSH_ID_SAVE", "No se pudo proteger el ID del dispositivo", null);
+                                break;
+                            }
+                        }
+                        result.success(installId); break;
+                    case "readPushConsent":
+                        Integer consentOwner = call.argument("userId");
+                        SharedPreferences storedConsent = getSharedPreferences("talaeats_push_consent", Context.MODE_PRIVATE);
+                        result.success(consentOwner != null && consentOwner > 0 &&
+                            storedConsent.getInt("consent_owner", 0) == consentOwner &&
+                            storedConsent.getBoolean("consented", false)); break;
+                    case "writePushConsent":
+                        Integer newOwner = call.argument("userId");
+                        Boolean enablePush = call.argument("enabled");
+                        if (newOwner == null || newOwner <= 0 || enablePush == null) {
+                            result.error("PUSH_CONSENT", "Datos de consentimiento inválidos", null); break;
+                        }
+                        SharedPreferences.Editor editor = getSharedPreferences(
+                            "talaeats_push_consent", Context.MODE_PRIVATE).edit();
+                        editor.putInt("consent_owner", enablePush ? newOwner : 0);
+                        editor.putBoolean("consented", enablePush);
+                        if (!editor.commit()) {
+                            result.error("PUSH_CONSENT_SAVE", "No se guardó el consentimiento", null); break;
+                        }
+                        result.success(null); break;
                     case "writeMarketCode":
                         String marketCode = call.argument("code");
                         if (marketCode == null || !java.util.Arrays.asList(
