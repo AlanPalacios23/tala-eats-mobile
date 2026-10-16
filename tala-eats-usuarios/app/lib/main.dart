@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'production_api.dart';
+import 'order_submission_guard.dart';
 import 'checkout_pricing.dart';
 
 part 'ui/design_system.dart';
@@ -169,6 +170,9 @@ class TalaModel extends ChangeNotifier {
   TalaModel({TalaApi? apiClient}) : api = apiClient ?? TalaApi();
 
   final TalaApi api;
+  final OrderSubmissionGuard _orderSubmissionGuard = OrderSubmissionGuard();
+  Future<OrderEntry>? _activePlaceOrder;
+  int _orderSessionRevision = 0;
   bool signedIn = false;
   bool loading = false;
   bool online = true;
@@ -408,6 +412,9 @@ class TalaModel extends ChangeNotifier {
   }
 
   void logout() {
+    _orderSessionRevision++;
+    _activePlaceOrder = null;
+    _orderSubmissionGuard.clearAfterConfirmedResolution();
     api.post('/auth/logout').catchError((Object _) => null);
     NativeBridge.clearToken();
     api.token = null;
@@ -666,7 +673,18 @@ class TalaModel extends ChangeNotifier {
     } on ApiException catch (e) { lastError = e.message; notifyListeners(); return false; }
   }
 
-  Future<OrderEntry> placeOrder() async {
+  Future<OrderEntry> placeOrder() {
+    // Prevent two simultaneous button taps from inserting or charging twice.
+    final Future<OrderEntry>? inProgress = _activePlaceOrder;
+    if (inProgress != null) return inProgress;
+    final Future<OrderEntry> next = _placeOrderOnce();
+    _activePlaceOrder = next;
+    return next;
+  }
+
+  Future<OrderEntry> _placeOrderOnce() async {
+    final int sessionRevision = _orderSessionRevision;
+    try {
     final Restaurant restaurant = cartRestaurant!;
     AddressEntry? address;
     if (deliveryMode == 'delivery') {
@@ -674,22 +692,29 @@ class TalaModel extends ChangeNotifier {
       address = addresses[selectedAddress.clamp(0, addresses.length - 1).toInt()];
       if (address.lat == null || address.lng == null) throw ApiException(400, 'Esta dirección todavía no tiene ubicación exacta. Edítala o agrégala de nuevo.');
     }
-    final String reference = 'android-${DateTime.now().millisecondsSinceEpoch}-${restaurant.id}';
     final Map<String, dynamic> payload = <String, dynamic>{
       'restaurant_id': restaurant.id,
       'address': deliveryMode == 'delivery' ? address!.address : 'Recoger en ${restaurant.name}',
       'notes': '', 'payment_method': paymentMethod, 'tip': deliveryMode == 'delivery' ? tip : 0,
       'items': cart.map((CartLine line) => <String, dynamic>{'menu_item_id': line.item.id, 'quantity': line.quantity, 'options': line.note}).toList(),
-      'order_type': deliveryMode, 'coupon_code': coupon, 'client_reference': reference,
+      'order_type': deliveryMode, 'coupon_code': coupon,
       'delivery_lat': deliveryMode == 'delivery' ? address!.lat : null,
       'delivery_lng': deliveryMode == 'delivery' ? address!.lng : null,
     };
-    final Map<String, dynamic> raw = await api.createOrder(payload);
+    final Map<String, dynamic> raw = await _orderSubmissionGuard.submit(
+      payload, (Map<String, dynamic> frozen) => api.createOrder(frozen),
+    );
+    if (_orderSessionRevision != sessionRevision) {
+      throw ApiException(401, 'La sesión cambió mientras se registraba el pedido.');
+    }
     final OrderEntry order = _orderFromJson(raw);
     orders.insert(0, order);
     cart.clear(); cartRestaurantId = null; coupon = ''; tip = 20;
     notifyListeners();
     return order;
+    } finally {
+      if (_orderSessionRevision == sessionRevision) _activePlaceOrder = null;
+    }
   }
 
   Future<String?> startMercadoPago(OrderEntry order) async {
