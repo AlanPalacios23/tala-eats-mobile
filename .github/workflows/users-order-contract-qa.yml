@@ -55,6 +55,8 @@ jobs:
         run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart test/backend_customer_contracts_test.dart test/customer_markets_contract_test.dart test/customer_native_push_contract_test.dart test/customer_model_full_integration_test.dart test/customer_ui_full_integration_widget_test.dart
       - name: "UX premium: Home y Buscar responsive (320-430 dp)"
         run: flutter test --reporter=compact test/premium_discovery_polish_test.dart
+      - name: Contraste AA de marca y botones (sin APK)
+        run: flutter test --reporter=compact test/premium_brand_contrast_test.dart
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Backend externo solo GET (diagnostico, no equivalente a E2E)

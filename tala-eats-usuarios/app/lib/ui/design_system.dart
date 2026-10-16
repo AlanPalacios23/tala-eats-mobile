@@ -42,7 +42,7 @@ class TalaText {
   static const TextStyle body = TextStyle(color: kInkSoft, fontSize: 14, fontWeight: FontWeight.w400, height: 1.45);
   static const TextStyle muted = TextStyle(color: kMuted, fontSize: 13, fontWeight: FontWeight.w500, height: 1.4);
   static const TextStyle caption = TextStyle(color: kMuted, fontSize: 12, fontWeight: FontWeight.w600, height: 1.3);
-  static const TextStyle overline = TextStyle(color: kBrand, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.4);
+  static const TextStyle overline = TextStyle(color: kBrandDeep, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.4);
   static const TextStyle price = TextStyle(color: kInk, fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.2);
 }
 
@@ -112,7 +112,7 @@ ThemeData buildTalaTheme() {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: kBrand,
+        backgroundColor: kBrandDeep,
         foregroundColor: Colors.white,
         disabledBackgroundColor: const Color(0xFFF2D6CB),
         disabledForegroundColor: Colors.white,
@@ -504,7 +504,7 @@ class TalaCircleButton extends StatelessWidget {
                     height: 18,
                     padding: const EdgeInsets.symmetric(horizontal: 5),
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(color: kBrand, borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white, width: 2)),
+                    decoration: BoxDecoration(color: kBrandDeep, borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white, width: 2)),
                     child: Text(badge > 9 ? '9+' : '$badge', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, height: 1)),
                   ),
                 ),

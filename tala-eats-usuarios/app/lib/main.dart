@@ -34,7 +34,8 @@ void main() {
 }
 
 const Color kBrand = Color(0xFFFF5A1F);
-const Color kBrandDeep = Color(0xFFE9470F);
+// Dark functional orange for legible text/CTAs; original kBrand stays unchanged.
+const Color kBrandDeep = Color(0xFFCE3C0A);
 const Color kInk = Color(0xFF171717);
 const Color kMuted = Color(0xFF737373);
 const Color kBackground = Color(0xFFFAFAF9);

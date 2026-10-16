@@ -167,7 +167,7 @@ class TalaClubAccountCard extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
-            boxShadow: const <BoxShadow>[BoxShadow(color: Color(0x33E9470F), blurRadius: 24, offset: Offset(0, 10))],
+            boxShadow: const <BoxShadow>[BoxShadow(color: Color(0x22CE3C0A), blurRadius: 22, offset: Offset(0, 9))],
           ),
           child: Material(
             borderRadius: BorderRadius.circular(22),
@@ -177,7 +177,7 @@ class TalaClubAccountCard extends StatelessWidget {
               onTap: () => Navigator.of(context).push(premiumRoute(WalletScreen(model: model))),
               child: Ink(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: <Color>[Color(0xFFFF7A3D), kBrand, kBrandDeep]),
+                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: <Color>[Color(0xFFCF4512), kBrandDeep, Color(0xFFAA2D09)]),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
@@ -206,7 +206,7 @@ class TalaClubAccountCard extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text('${money(model.wallet)} de saldo · ${model.points} puntos', style: const TextStyle(color: Color(0xFFFFE6DA), fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text('${money(model.wallet)} de saldo · ${model.points} puntos', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
