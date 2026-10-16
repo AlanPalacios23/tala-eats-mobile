@@ -92,9 +92,17 @@ Future<String> readBoundedUtf8Response(Stream<List<int>> source, {int maxBytes =
   return utf8.decode(bytes);
 }
 
+/// Only checkout orders carry an HTTP Idempotency-Key matching the body.
+String? orderIdempotencyKeyFor(String method, String path, Object? body) {
+  if (method != 'POST' || path != '/orders' || body is! Map) return null;
+  final dynamic raw = body['client_reference'];
+  if (raw is! String || raw.isEmpty || raw.length > 180) return null;
+  if (raw.contains(RegExp(r'[^A-Za-z0-9_-]'))) return null;
+  return raw;
+}
+
 class TalaApi {
   TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+$'), '');
-
   final String baseUrl;
   final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
   String? token;
@@ -120,6 +128,8 @@ class TalaApi {
     req.headers.set(HttpHeaders.acceptHeader, 'application/json');
     req.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
     req.headers.set('X-TalaEats-Client', 'mobile');
+    final String? orderKey = orderIdempotencyKeyFor(method, path, body);
+    if (orderKey != null) req.headers.set('Idempotency-Key', orderKey);
     if (requestToken != null && requestToken.isNotEmpty) {
       req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $requestToken');
     }
