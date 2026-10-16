@@ -1,7 +1,7 @@
 name: talaeats_users
 description: Tala Eats Usuarios Android production frontend.
 publish_to: 'none'
-version: 1.0.21+32
+version: 1.0.22+33
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_stripe: 14.1.0
+  firebase_core: 4.15.0
+  firebase_messaging: 16.7.0
 
 dev_dependencies:
   flutter_test:
