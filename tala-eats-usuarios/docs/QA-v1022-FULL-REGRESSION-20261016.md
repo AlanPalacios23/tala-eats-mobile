@@ -33,5 +33,29 @@ Validar el código Android de Usuarios, detectar regresiones funcionales antes d
 - Firma release, prueba en Android físico, GPS real, recuperación tras crash/kill, FCM real y sandbox PSP exigen entorno/dispositivos habilitados.
 - Esta PR solo afecta TALA EATS Usuarios + workflow QA. No modifica backend, otras apps, .env, servidor Kali ni Stripe LIVE.
 
-## Resultados verificados
-Pendiente de la nueva ejecución GitHub Actions y diagnóstico de endpoints. Referencia de versión previa v1.0.22 PASS: https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38949037311
+## Resultados verificados y clasificación GO/NO-GO
+
+**CI de aplicación: PASS.** [GitHub Actions run #38954532680](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38954532680) sobre commit de código **`ef8202498a5957743a34173f6d7f6abe531f4f45`**:
+- `flutter analyze --no-fatal-infos`: PASS.
+- Controles P0: **44/44 PASS**, incluyendo idempotencia/checkout y nuevas pruebas de aislamiento del carrito y mercado.
+- Suite Flutter completa: **79/79 PASS**, con widgets de Home 320/360/390/430 dp a texto x1.3; sesiones, pedidos y reembolsos.
+- Android `security_android_gate.py --role usuarios`: PASS (manifest, permisos y patrones de secretos; no auditoría de seguridad exhaustiva).
+- `flutter build apk --debug --no-pub`: PASS; archivo APK generado **efímeramente en el runner**, NO publicado, no firmado release ni distribuido.
+
+**API real: diagnóstico de solo lectura (no E2E):**
+| HTTP GET | Código | Evaluación |
+| --- | --- | --- |
+| `/ready` | 200 | PASS: DB/Redis/ready true |
+| `/restaurants?market_code=TALA-JAL&limit=25&offset=0` | 200 | Los comercios observados coinciden con Tala; no acredita despliegue del filtro |
+| `/restaurants?market_code=AMECA-JAL&limit=25&offset=0` | 200 | **FAIL_MIXED_MARKET**: devuelve comercio(s) de otro mercado |
+| `/mobile-push/config` | 200 | `enabled=false`, no FCM activo |
+| `/orders/mine`, `/auth/devices`, `/platform/addresses` sin autenticación | 401 | Acceso anónimo denegado en los tres |
+
+### Decisión
+- **GO técnico de regresión y compilación Android debug en CI:** Sí, 79/79 tests.
+- **NO-GO para desplegar catálogo multi-localidad en Kali:** backend real no respeta la separación en Ameca; falta desplegar/certificar PR backend #65. La app usa fallo cerrado ante respuesta mezclada.
+- **NO-GO para declarar FCM realmente entregado:** backend FCM `enabled=false`, sin Firebase TEST ni dispositivo Android validado.
+- **NO-GO para publicación Android o pagos LIVE:** falta firma, QA físico, cuentas TEST, Stripe TEST y Mercado Pago sandbox, recuperación tras kill, GPS y flujo final de entrega.
+
+Este documento es evidencia de CI y API pública exclusivamente. No implica modificación de producción.
+
