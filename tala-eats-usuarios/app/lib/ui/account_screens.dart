@@ -1019,6 +1019,54 @@ class NotificationsScreen extends StatelessWidget {
             title: const Text('Notificaciones'),
             actions: <Widget>[
               if (model.unreadNotifications > 0) TextButton(onPressed: model.markAllNotificationsRead, child: const Text('Marcar todo leído')),
+              if (model.nativePushBusy)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Center(child: SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))),
+                )
+              else
+                IconButton(
+                  tooltip: model.nativePushActive
+                      ? 'Desactivar notificaciones Android'
+                      : 'Activar notificaciones Android',
+                  icon: Icon(model.nativePushActive
+                      ? Icons.notifications_active_rounded
+                      : Icons.notification_add_outlined,
+                    color: model.nativePushActive ? kBrand : kInk),
+                  onPressed: () async {
+                    if (model.nativePushActive) {
+                      final bool confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (BuildContext dialog) => AlertDialog(
+                          title: const Text('Desactivar notificaciones'),
+                          content: const Text('Seguirás recibiendo tus avisos dentro de la app. '
+                              'Este teléfono dejará de recibir alertas push.'),
+                          actions: <Widget>[
+                            TextButton(onPressed: () => Navigator.pop(dialog, false),
+                              child: const Text('Conservar')),
+                            FilledButton(onPressed: () => Navigator.pop(dialog, true),
+                              child: const Text('Desactivar')),
+                          ],
+                        ),
+                      ) ?? false;
+                      if (confirmed) {
+                        await model.disableNativePush();
+                        if (context.mounted) showMessage(context,
+                          model.nativePushError.isEmpty
+                              ? 'Notificaciones Android desactivadas.'
+                              : model.nativePushError);
+                      }
+                    } else {
+                      final enabled = await model.enableNativePush();
+                      if (context.mounted) showMessage(context,
+                        enabled ? 'Notificaciones Android activadas.'
+                            : (model.nativePushError.isNotEmpty
+                                ? model.nativePushError
+                                : 'No se pudieron activar las notificaciones.'));
+                    }
+                  },
+                ),
               const SizedBox(width: 8),
             ],
           ),
