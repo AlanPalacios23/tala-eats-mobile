@@ -687,6 +687,7 @@ class TalaModel extends ChangeNotifier {
       activeReference: _orderSubmissionGuard.unresolvedClientReference,
       read: NativeBridge.readPendingOrder,
       clear: NativeBridge.clearPendingOrder,
+      stillCurrent: () => revision == _orderSessionRevision && signedIn,
       lookup: (String reference) async => Map<String, dynamic>.from(
         await api.get('/orders/by-reference/$reference') as Map,
       ),
