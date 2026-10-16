@@ -28,7 +28,7 @@ class AccountScreen extends StatelessWidget {
           ),
         ) ??
         false;
-    if (confirm) model.logout();
+    if (confirm) await model.logout();
   }
 
   @override
