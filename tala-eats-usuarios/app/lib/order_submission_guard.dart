@@ -67,6 +67,9 @@ class OrderSubmissionGuard {
       // Commit encrypted reference DURABLY before any network POST.
       // A failed write prevents sending a non-recoverable checkout.
       if (beforeSend != null) await beforeSend!(body['client_reference'] as String);
+      if (_generation != generation) {
+        throw ApiException(401, 'La sesión cambió antes de enviar el pedido.');
+      }
       final Map<String, dynamic> result = await send(body);
       // A response from the previous signed-out session must never
       // clear a newer customer's pending checkout.
