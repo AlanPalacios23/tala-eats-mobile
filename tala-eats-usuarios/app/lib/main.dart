@@ -17,6 +17,7 @@ part 'ui/order_screens.dart';
 part 'ui/account_screens.dart';
 part 'ui/legal_screens.dart';
 part 'ui/backend_features_screens.dart';
+part 'ui/market_selector.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
