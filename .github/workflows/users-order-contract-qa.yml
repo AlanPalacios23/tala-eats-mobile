@@ -6,12 +6,16 @@ on:
     paths:
       - 'tala-eats-usuarios/app/lib/**'
       - 'tala-eats-usuarios/app/test/**'
+      - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
+      - 'tala-eats-usuarios/ci/bootstrap_android.py'
       - '.github/workflows/users-order-contract-qa.yml'
   push:
     branches: [main]
     paths:
       - 'tala-eats-usuarios/app/lib/**'
       - 'tala-eats-usuarios/app/test/**'
+      - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
+      - 'tala-eats-usuarios/ci/bootstrap_android.py'
       - '.github/workflows/users-order-contract-qa.yml'
   workflow_dispatch:
 
@@ -47,3 +51,13 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: QA de doble toque y llave persistente durante reintentos
         run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart
+      - name: Preparar scaffold nativo Android desde fuentes oficiales
+        run: python3 ../ci/bootstrap_android.py --role usuarios
+      - name: Compilar Java nativo y Flutter Android debug (efímero, sin publicar)
+        timeout-minutes: 12
+        run: flutter build apk --debug --no-pub
+      - name: No subir ni distribuir APK
+        run: |
+          test -f build/app/outputs/flutter-apk/app-debug.apk
+          echo 'NATIVE_ANDROID_DEBUG_COMPILE_PASS no signing release, no APK artifact, no deploy'
+
