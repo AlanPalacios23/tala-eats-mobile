@@ -465,10 +465,12 @@ class HomeScreen extends StatelessWidget {
                         onAction: model.refreshAll,
                         tone: StatusTone.danger,
                       )
-                    : const StatusView(
+                    : StatusView(
                         icon: Icons.storefront_outlined,
                         title: 'Aún no hay comercios disponibles',
-                        body: 'Cuando un comercio esté activo en Tala Eats aparecerá aquí.',
+                        body: 'Cuando haya negocios activos en ' +
+                            TalaMarket.labelFor(model.marketCode) +
+                            ' podrás encontrarlos aquí.',
                       ),
               ),
             )
@@ -884,7 +886,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         if (nearby.isNotEmpty) ...<Widget>[
                           const SizedBox(height: 30),
                           TalaSectionHeader(
-                            title: 'Comercios para ti',
+                            title: 'Comercios disponibles',
                             subtitle: 'Disponibles en ' +
                                 TalaMarket.labelFor(model.marketCode),
                           ),
