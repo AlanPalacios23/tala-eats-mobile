@@ -131,7 +131,7 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
             right: 0,
             top: 0,
             height: top,
-            child: const IgnorePointer(child: ColoredBox(color: Color(0xF0F8F6F3))),
+            child: const IgnorePointer(child: ColoredBox(color: Color(0xF0FAFAF9))),
           ),
           if (!model.online && model.lastError.isNotEmpty)
             Positioned(
@@ -211,9 +211,9 @@ class PremiumBottomDock extends StatelessWidget {
       height: 68,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: kLine),
-        boxShadow: kShadowLifted,
+        boxShadow: kShadowSoft,
       ),
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
