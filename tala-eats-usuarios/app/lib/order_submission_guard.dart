@@ -123,7 +123,7 @@ class OrderSubmissionGuard {
     } on ApiException catch (e) {
       // An explicit rejected request may release the reference, but transport
       // failures/5xx and 408/409/429 are ambiguous and MUST retain it.
-      if (owner > 0 && generation == _generation &&
+      if ((_store == null || owner > 0) && generation == _generation &&
           <int>{400, 401, 403, 404, 422}.contains(e.statusCode)) {
         await _clearConfirmed(owner);
       }
