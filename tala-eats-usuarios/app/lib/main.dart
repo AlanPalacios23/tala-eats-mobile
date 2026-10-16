@@ -170,7 +170,9 @@ class TalaModel extends ChangeNotifier {
   TalaModel({TalaApi? apiClient}) : api = apiClient ?? TalaApi();
 
   final TalaApi api;
-  final OrderSubmissionGuard _orderSubmissionGuard = OrderSubmissionGuard();
+  late final OrderSubmissionGuard _orderSubmissionGuard = OrderSubmissionGuard(
+    store: AndroidPendingOrderStore(), accountId: () => userId,
+  );
   Future<OrderEntry>? _activePlaceOrder;
   int _orderSessionRevision = 0;
   bool signedIn = false;
@@ -266,6 +268,7 @@ class TalaModel extends ChangeNotifier {
       userLocalAvatarPath = await NativeBridge.profilePhotoPath(userId) ?? '';
       signedIn = true;
       await refreshAll();
+      await _recoverPersistedCheckout();
       if (pendingOrderId > 0) tabIndex = 2;
     } on ApiException catch (e) {
       signedIn = false;
@@ -360,6 +363,7 @@ class TalaModel extends ChangeNotifier {
       userLocalAvatarPath = await NativeBridge.profilePhotoPath(userId) ?? '';
       signedIn = true;
       await refreshAll();
+      await _recoverPersistedCheckout();
       notifyListeners();
       return signedIn;
     } on ApiException catch (e) {
@@ -382,6 +386,7 @@ class TalaModel extends ChangeNotifier {
       userLocalAvatarPath = await NativeBridge.profilePhotoPath(userId) ?? '';
       signedIn = true;
       await refreshAll();
+      await _recoverPersistedCheckout();
       return true;
     } on ApiException catch (e) {
       lastError = e.message;
@@ -671,6 +676,28 @@ class TalaModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiException catch (e) { lastError = e.message; notifyListeners(); return false; }
+  }
+
+  Future<void> _recoverPersistedCheckout() async {
+    if (!signedIn || userId <= 0) return;
+    try {
+      final result = await _orderSubmissionGuard.recover(
+        (String reference) async => Map<String, dynamic>.from(
+          (await api.get('/orders/by-reference/${Uri.encodeComponent(reference)}')) as Map,
+        ),
+      );
+      if (result == null) return;
+      final order = _orderFromJson(result);
+      if (!orders.any((OrderEntry existing) => existing.id == order.id)) {
+        orders.insert(0, order);
+        notifyListeners();
+      }
+    } on ApiException catch (e) {
+      // Never send another order automatically and never delete the
+      // encrypted journal because an HTTP error could be transient.
+      lastError = e.message;
+      notifyListeners();
+    }
   }
 
   Future<OrderEntry> placeOrder() {
