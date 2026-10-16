@@ -693,7 +693,7 @@ class TalaModel extends ChangeNotifier {
     // Reject before mutating any existing basket, including unknown old-market shops.
     if (cartRestaurantId != null && cartRestaurantId != item.restaurantId) cart.clear();
     cartRestaurantId = item.restaurantId;
-    if (restaurant != null && !restaurant.delivery && restaurant.pickup) deliveryMode = 'pickup';
+    if (!restaurant.delivery && restaurant.pickup) deliveryMode = 'pickup';
     CartLine? existing;
     for (final CartLine line in cart) { if (line.item.id == item.id) { existing = line; break; } }
     if (existing == null) cart.add(CartLine(item: item, quantity: quantity, note: note));
