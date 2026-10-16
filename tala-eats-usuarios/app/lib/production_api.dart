@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'local_markets.dart';
 
 const String kProductionApiBase = String.fromEnvironment(
   'TALAEATS_API_BASE_URL',
@@ -19,6 +20,28 @@ class ApiException implements Exception {
 
 class NativeBridge {
   static const MethodChannel _channel = MethodChannel('com.talaeats.app/native');
+
+  // Non-sensitive customer shopping locality persists across Android restarts.
+  // Native storage is device-local; no GPS or customer address is saved here.
+  static Future<String?> readMarketCode() async {
+    try {
+      return await _channel.invokeMethod<String>('readMarketCode');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> writeMarketCode(String code) async {
+    if (!TalaMarket.valid(code)) throw ArgumentError.value(code, 'code');
+    try {
+      await _channel.invokeMethod<void>(
+        'writeMarketCode', <String, dynamic>{'code': code});
+    } on PlatformException {
+      throw ApiException(503, 'No se pudo guardar la zona de compras.');
+    } on MissingPluginException {
+      throw ApiException(503, 'Configuración Android de zonas no disponible.');
+    }
+  }
 
   static Future<String?> readToken() async {
     try { return await _channel.invokeMethod<String>('readToken'); } catch (_) { return null; }
@@ -215,6 +238,39 @@ class TalaApi {
   Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await get('/auth/me')) as Map);
   Future<Map<String, dynamic>> bootstrap() async => Map<String, dynamic>.from((await get('/platform/bootstrap')) as Map);
   Future<List<dynamic>> restaurants() async => List<dynamic>.from((await get('/restaurants')) as List);
+
+  /// Public paged catalog with *server-side* market_code.
+  /// Legacy backend versions silently ignore unknown query params, so
+  /// verify every record. A mismatched record fails closed (no mixed cities).
+  Future<List<dynamic>> restaurantsForMarket(String code) async {
+    if (!TalaMarket.valid(code)) {
+      throw ArgumentError.value(code, 'code', 'Mercado no soportado');
+    }
+    const int size = 100;
+    const int maxPages = 20;
+    final List<dynamic> found = <dynamic>[];
+    final Set<int> seen = <int>{};
+    try {
+      for (int page = 0; page < maxPages; page++) {
+        final int offset = page * size;
+        final dynamic data = await get(
+            '/restaurants?market_code=${Uri.encodeQueryComponent(code)}&limit=$size&offset=$offset');
+        if (data is! List) {
+          throw const FormatException('El catálogo del servidor no es una lista');
+        }
+        TalaMarket.verifyPage(code, data, seen);
+        found.addAll(data);
+        if (data.length < size) return found;
+      }
+    } on FormatException {
+      throw ApiException(503,
+          'Este servidor todavía no tiene habilitado el catálogo por localidad. '
+          'No se mostrarán negocios de otra ciudad.');
+    }
+    throw ApiException(503,
+        'El catálogo supera el máximo seguro de páginas. Actualiza la app.');
+  }
+
   Future<Map<String, dynamic>> restaurant(int id) async => Map<String, dynamic>.from((await get('/restaurants/$id')) as Map);
   Future<List<dynamic>> addresses() async => List<dynamic>.from((await get('/platform/addresses')) as List);
   Future<List<dynamic>> orders() async => List<dynamic>.from((await get('/orders/mine')) as List);

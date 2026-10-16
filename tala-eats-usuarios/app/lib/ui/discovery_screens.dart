@@ -410,7 +410,9 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 10),
+                  CustomerMarketSelector(model: model),
+                  const SizedBox(height: 16),
                   Reveal(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
