@@ -12,6 +12,7 @@ class PendingCheckoutRecovery {
     required Future<String?> Function() read,
     required Future<Map<String, dynamic>> Function(String reference) lookup,
     required Future<void> Function() clear,
+    required bool Function() stillCurrent,
   }) async {
     final String? pending = await read();
     if (pending == null || pending.isEmpty) return null;
@@ -39,6 +40,9 @@ class PendingCheckoutRecovery {
     if (id == null || id <= 0 || ownerFromApi != userId ||
         order['client_reference'] != ref) {
       throw ApiException(409, 'La respuesta del servidor no coincide con la compra pendiente.');
+    }
+    if (!stillCurrent()) {
+      throw ApiException(409, 'La sesión cambió al recuperar el pedido.');
     }
     await clear();
     return order;
