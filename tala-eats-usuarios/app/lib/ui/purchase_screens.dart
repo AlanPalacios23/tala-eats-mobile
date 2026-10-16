@@ -301,36 +301,59 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          if (restaurant.delivery)
-                            Expanded(
-                              child: DeliveryModeCard(
-                                icon: Icons.two_wheeler_rounded,
-                                title: 'A domicilio',
-                                subtitle: restaurant.eta,
-                                selected: delivery,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  model.setDeliveryMode('delivery');
-                                },
-                              ),
-                            ),
-                          if (restaurant.delivery && restaurant.pickup) const SizedBox(width: 10),
-                          if (restaurant.pickup)
-                            Expanded(
-                              child: DeliveryModeCard(
-                                icon: Icons.storefront_rounded,
-                                title: 'Recoger',
-                                subtitle: 'Sin costo de envío',
-                                selected: model.deliveryMode == 'pickup',
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  model.setDeliveryMode('pickup');
-                                },
-                              ),
-                            ),
-                        ],
+                      LayoutBuilder(
+                        builder: (BuildContext context, BoxConstraints bounds) {
+                          final Widget? deliveryOption = restaurant.delivery
+                              ? DeliveryModeCard(
+                                  icon: Icons.two_wheeler_rounded,
+                                  title: 'A domicilio',
+                                  subtitle: restaurant.eta,
+                                  selected: delivery,
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    model.setDeliveryMode('delivery');
+                                  },
+                                )
+                              : null;
+                          final Widget? pickupOption = restaurant.pickup
+                              ? DeliveryModeCard(
+                                  icon: Icons.storefront_rounded,
+                                  title: 'Recoger',
+                                  subtitle: 'Sin costo de envío',
+                                  selected: model.deliveryMode == 'pickup',
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    model.setDeliveryMode('pickup');
+                                  },
+                                )
+                              : null;
+                          // Full-width choices prevent compressed text and
+                          // inaccessible taps on 320dp/textScale 1.3 devices.
+                          if (deliveryOption != null && pickupOption != null) {
+                            if (bounds.maxWidth < 320) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: <Widget>[
+                                  deliveryOption,
+                                  const SizedBox(height: 10),
+                                  pickupOption,
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: <Widget>[
+                                Expanded(child: deliveryOption),
+                                const SizedBox(width: 10),
+                                Expanded(child: pickupOption),
+                              ],
+                            );
+                          }
+                          return deliveryOption ?? pickupOption ??
+                              const QuietNote(
+                                icon: Icons.storefront_outlined,
+                                text: 'Este comercio no ofrece una modalidad de entrega.',
+                              );
+                        },
                       ),
                       AnimatedSize(
                         duration: TalaMotion.of(context, TalaMotion.reveal),
@@ -754,25 +777,57 @@ class CustomerCheckoutBreakdown extends StatelessWidget {
 }
 
 class _CustomerAmountRow extends StatelessWidget {
-  const _CustomerAmountRow({required this.label, required this.amount, this.hint, this.bold = false});
+  const _CustomerAmountRow({
+    required this.label, required this.amount, this.hint, this.bold = false,
+  });
+
   final String label;
   final double? amount;
   final String? hint;
   final bool bold;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.end,
-    children: <Widget>[
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-        Text(label, style: TextStyle(color: bold ? kInk : kInkSoft, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, fontSize: bold ? 16 : 14)),
-        if (hint != null) Text(hint!, style: TalaText.caption.copyWith(fontSize: 11)),
-      ])),
-      const SizedBox(width: 8),
-      Text(amount == null ? 'Por confirmar' : moneyWithCents(amount!),
-        style: TextStyle(color: kInk, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, fontSize: bold ? 18 : 14)),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final Widget description = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(label, style: TextStyle(color: bold ? kInk : kInkSoft,
+          fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+          fontSize: bold ? 16 : 14)),
+        if (hint != null)
+          Text(hint!, style: TalaText.caption.copyWith(fontSize: 11)),
+      ],
+    );
+    final Widget price = Text(
+      amount == null ? 'Por confirmar' : moneyWithCents(amount!),
+      textAlign: TextAlign.right,
+      style: TextStyle(color: kInk,
+        fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+        fontSize: bold ? 18 : 14),
+    );
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints bounds) {
+        if (bounds.maxWidth < 310) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              description,
+              const SizedBox(height: 6),
+              Align(alignment: Alignment.centerRight, child: price),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            Expanded(child: description),
+            const SizedBox(width: 8),
+            price,
+          ],
+        );
+      },
+    );
+  }
 }
 
 class SummaryCard extends StatelessWidget {
