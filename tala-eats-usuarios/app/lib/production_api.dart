@@ -92,15 +92,17 @@ Future<String> readBoundedUtf8Response(Stream<List<int>> source, {int maxBytes =
   return utf8.decode(bytes);
 }
 
-/// Matches the server's existing middleware contract for POST /orders only.
-/// The value must be identical to client_reference in the immutable body.
+/// Only checkout orders carry an HTTP Idempotency-Key matching the body.
 String? orderIdempotencyKeyFor(String method, String path, Object? body) {
   if (method != 'POST' || path != '/orders' || body is! Map) return null;
   final dynamic raw = body['client_reference'];
   if (raw is! String || raw.isEmpty || raw.length > 180) return null;
-  if (!RegExp(r'^[A-Za-z0-9_-]+
-  TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+$'), '');
+  if (raw.contains(RegExp(r'[^A-Za-z0-9_-]'))) return null;
+  return raw;
+}
 
+class TalaApi {
+  TalaApi({String? baseUrl}) : baseUrl = (baseUrl ?? kProductionApiBase).replaceAll(RegExp(r'/+$'), '');
   final String baseUrl;
   final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
   String? token;
