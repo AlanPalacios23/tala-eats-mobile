@@ -113,6 +113,24 @@ void main() {
     }), isNull);
   });
 
+  test('P0 late result from logged-out session cannot erase new attempt', () async {
+    final guard = OrderSubmissionGuard();
+    final oldResponse = Completer<Map<String, dynamic>>();
+    final freshResponse = Completer<Map<String, dynamic>>();
+    final old = guard.submit(draft(), (_) => oldResponse.future);
+    final oldReference = guard.unresolvedClientReference;
+    guard.clearAfterConfirmedResolution(); // logout changes attempt generation
+    final fresh = guard.submit(draft(quantity: 2), (_) => freshResponse.future);
+    final newReference = guard.unresolvedClientReference;
+    expect(newReference, isNot(oldReference));
+    oldResponse.complete(<String, dynamic>{'id': 1});
+    await old;
+    expect(guard.unresolvedClientReference, newReference);
+    freshResponse.complete(<String, dynamic>{'id': 2});
+    expect((await fresh)['id'], 2);
+    expect(guard.unresolvedClientReference, isNull);
+  });
+
   test('P0 body remains unchanged for every retry and caller draft untouched', () async {
     final guard = OrderSubmissionGuard();
     final payload = draft();
