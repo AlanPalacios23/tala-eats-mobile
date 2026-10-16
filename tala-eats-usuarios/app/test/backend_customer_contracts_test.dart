@@ -88,8 +88,7 @@ void main() {
       'POST /auth/devices/2/revoke',
       'POST /auth/devices/revoke-others',
     ]);
-    expect(() => api.revokeCustomerDevice(0),
-      throwsArgumentError);
+    await expectLater(api.revokeCustomerDevice(0), throwsArgumentError);
   });
 
   test('V11: sustitución solo del pedido y respuesta permitida', () async {
@@ -107,9 +106,9 @@ void main() {
       'POST /v11/orders/71/substitutions/14/respond',
       'GET /v11/orders/71/refunds',
     ]);
-    expect(() => api.respondOrderSubstitution(71, 14, 'charge_extra'),
+    await expectLater(api.respondOrderSubstitution(71, 14, 'charge_extra'),
         throwsArgumentError);
-    expect(() => api.orderRefunds(-1), throwsArgumentError);
+    await expectLater(api.orderRefunds(-1), throwsArgumentError);
   });
 
   test('Direcciones: PATCH solo campos del dueño soportados', () async {
@@ -119,7 +118,7 @@ void main() {
     expect(updated['is_default'], true);
     expect(api.calls.single, 'PATCH /platform/addresses/3');
     expect(api.lastBody, <String, dynamic>{'is_default': true});
-    expect(() => api.updateCustomerAddress(3,
+    await expectLater(api.updateCustomerAddress(3,
       <String, dynamic>{'owner_id': 999}), throwsArgumentError);
   });
 }
