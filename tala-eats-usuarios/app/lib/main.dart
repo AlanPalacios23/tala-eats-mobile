@@ -170,7 +170,10 @@ class TalaModel extends ChangeNotifier {
   TalaModel({TalaApi? apiClient}) : api = apiClient ?? TalaApi();
 
   final TalaApi api;
-  final OrderSubmissionGuard _orderSubmissionGuard = OrderSubmissionGuard();
+  late final OrderSubmissionGuard _orderSubmissionGuard = OrderSubmissionGuard(
+    beforeSend: (String ref) => NativeBridge.writePendingOrder(userId, ref),
+    afterResolution: NativeBridge.clearPendingOrder,
+  );
   Future<OrderEntry>? _activePlaceOrder;
   int _orderSessionRevision = 0;
   bool signedIn = false;
@@ -266,6 +269,7 @@ class TalaModel extends ChangeNotifier {
       userLocalAvatarPath = await NativeBridge.profilePhotoPath(userId) ?? '';
       signedIn = true;
       await refreshAll();
+      await _attemptStartupOrderRecovery();
       if (pendingOrderId > 0) tabIndex = 2;
     } on ApiException catch (e) {
       signedIn = false;
@@ -360,6 +364,7 @@ class TalaModel extends ChangeNotifier {
       userLocalAvatarPath = await NativeBridge.profilePhotoPath(userId) ?? '';
       signedIn = true;
       await refreshAll();
+      await _attemptStartupOrderRecovery();
       notifyListeners();
       return signedIn;
     } on ApiException catch (e) {
@@ -671,6 +676,629 @@ class TalaModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiException catch (e) { lastError = e.message; notifyListeners(); return false; }
+  }
+
+  Future<OrderEntry?> _recoverPendingOrder() async {
+    final String? saved = await NativeBridge.readPendingOrder();
+    if (saved == null || saved.isEmpty) return null;
+    final int split = saved.indexOf('|');
+    final int? owner = split > 0 ? int.tryParse(saved.substring(0, split)) : null;
+    final String reference = split >= 0 ? saved.substring(split + 1) : '';
+    if (!signedIn || owner != userId ||
+        !RegExp(r'^[A-Za-z0-9_-]{1,80}
+    // Prevent two simultaneous button taps from inserting or charging twice.
+    final Future<OrderEntry>? inProgress = _activePlaceOrder;
+    if (inProgress != null) return inProgress;
+    final Future<OrderEntry> next = _placeOrderOnce();
+    _activePlaceOrder = next;
+    return next;
+  }
+
+  Future<OrderEntry> _placeOrderOnce() async {
+    final int sessionRevision = _orderSessionRevision;
+    try {
+    final OrderEntry? existing = await _recoverPendingOrder();
+    if (existing != null) return existing;
+    final Restaurant restaurant = cartRestaurant!;
+    AddressEntry? address;
+    if (deliveryMode == 'delivery') {
+      if (addresses.isEmpty) throw ApiException(400, 'Agrega una dirección de entrega antes de continuar.');
+      address = addresses[selectedAddress.clamp(0, addresses.length - 1).toInt()];
+      if (address.lat == null || address.lng == null) throw ApiException(400, 'Esta dirección todavía no tiene ubicación exacta. Edítala o agrégala de nuevo.');
+    }
+    final Map<String, dynamic> payload = <String, dynamic>{
+      'restaurant_id': restaurant.id,
+      'address': deliveryMode == 'delivery' ? address!.address : 'Recoger en ${restaurant.name}',
+      'notes': '', 'payment_method': paymentMethod, 'tip': deliveryMode == 'delivery' ? tip : 0,
+      'items': cart.map((CartLine line) => <String, dynamic>{'menu_item_id': line.item.id, 'quantity': line.quantity, 'options': line.note}).toList(),
+      'order_type': deliveryMode, 'coupon_code': coupon,
+      'delivery_lat': deliveryMode == 'delivery' ? address!.lat : null,
+      'delivery_lng': deliveryMode == 'delivery' ? address!.lng : null,
+    };
+    final Map<String, dynamic> raw = await _orderSubmissionGuard.submit(
+      payload, (Map<String, dynamic> frozen) => api.createOrder(frozen),
+    );
+    if (_orderSessionRevision != sessionRevision) {
+      throw ApiException(401, 'La sesión cambió mientras se registraba el pedido.');
+    }
+    final OrderEntry order = _orderFromJson(raw);
+    orders.insert(0, order);
+    cart.clear(); cartRestaurantId = null; coupon = ''; tip = 20;
+    notifyListeners();
+    return order;
+    } finally {
+      if (_orderSessionRevision == sessionRevision) _activePlaceOrder = null;
+    }
+  }
+
+  Future<String?> startMercadoPago(OrderEntry order) async {
+    final Map<String, dynamic> data = await api.checkout(order.id);
+    if (data['already_paid'] == true) { order.paymentStatus = 'paid'; notifyListeners(); return null; }
+    final String? url = (data['checkout_url'] ?? '').toString().isEmpty ? null : data['checkout_url'].toString();
+    if (url == null) throw ApiException(502, 'Mercado Pago no devolvió una URL de checkout.');
+    await NativeBridge.openExternal(url);
+    return url;
+  }
+
+  Future<bool> startStripePayment(OrderEntry order) async {
+    try {
+      final Map<String, dynamic> config = await api.stripeConfig();
+      if (config['enabled'] != true) {
+        throw ApiException(503, 'Stripe no está disponible en este momento.');
+      }
+      final Map<String, dynamic> intent = await api.stripePaymentIntent(order.id);
+      if (intent['already_paid'] == true || intent['payment_status'] == 'paid') {
+        order.paymentStatus = 'paid';
+        notifyListeners();
+        return true;
+      }
+      if (intent['payment_status'] == 'pending_confirmation') {
+        await refreshOrder(order);
+        return true;
+      }
+      final String clientSecret = (intent['client_secret'] ?? '').toString();
+      final String publishableKey = (intent['publishable_key'] ?? config['publishable_key'] ?? '').toString();
+      final String merchantCountry = (config['merchant_country'] ?? 'MX').toString();
+      final String appleMerchantId = (config['apple_merchant_id'] ?? '').toString();
+      if (clientSecret.isEmpty || publishableKey.isEmpty) {
+        throw ApiException(502, 'Stripe no devolvió la configuración necesaria para pagar.');
+      }
+
+      Stripe.publishableKey = publishableKey;
+      Stripe.urlScheme = 'talaeats';
+      if (Platform.isIOS && appleMerchantId.isNotEmpty) {
+        Stripe.merchantIdentifier = appleMerchantId;
+      }
+      await Stripe.instance.applySettings();
+
+      final bool testEnv = publishableKey.startsWith('pk_test_');
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Tala Eats',
+          returnURL: 'talaeats://stripe-redirect',
+          style: ThemeMode.system,
+          googlePay: Platform.isAndroid
+              ? PaymentSheetGooglePay(
+                  merchantCountryCode: merchantCountry,
+                  currencyCode: 'MXN',
+                  testEnv: testEnv,
+                  buttonType: PlatformButtonType.pay,
+                )
+              : null,
+          applePay: Platform.isIOS && appleMerchantId.isNotEmpty
+              ? PaymentSheetApplePay(
+                  merchantCountryCode: merchantCountry,
+                  buttonType: PlatformButtonType.order,
+                )
+              : null,
+        ),
+      );
+      await Stripe.instance.presentPaymentSheet();
+      // PaymentSheet success is not authoritative. The backend webhook owns
+      // payment_status, so refresh and keep pending until the server says paid.
+      await refreshOrder(order);
+      return true;
+    } on StripeException catch (e) {
+      // Closing/backing out of Stripe is a user cancellation, not a failed
+      // delivery order. The UI will cancel the temporary backend reservation
+      // and restore the cart before leaving the payment screen.
+      if (e.error.code == FailureCode.Canceled) return false;
+      final String message = e.error.localizedMessage?.trim().isNotEmpty == true
+          ? e.error.localizedMessage!.trim()
+          : 'No pudimos completar el pago con Stripe.';
+      throw ApiException(0, message);
+    }
+  }
+
+  Future<void> refreshOrder(OrderEntry order) async {
+    final Map<String, dynamic> live = await api.liveOrder(order.id);
+    final Map<String, dynamic> raw = Map<String, dynamic>.from(live['order'] as Map);
+    final OrderEntry fresh = _orderFromJson(raw);
+    order.status = fresh.status; order.rawStatus = fresh.rawStatus; order.paymentStatus = fresh.paymentStatus; order.eta = fresh.eta;
+    notifyListeners();
+  }
+
+  Future<void> refreshOrders() async {
+    try { _applyOrders(await api.orders()); notifyListeners(); } catch (_) {}
+  }
+
+  Future<bool> submitReview(OrderEntry order, int restaurantRating, {String comment = ''}) async {
+    try {
+      await api.post('/platform/reviews', <String,dynamic>{'order_id':order.id,'restaurant_rating':restaurantRating,'comment':comment.trim()});
+      return true;
+    } on ApiException catch(e) { lastError=e.message; notifyListeners(); return false; }
+  }
+
+  Future<bool> cancelOrder(OrderEntry order) async {
+    try {
+      final dynamic raw = await api.post('/orders/${order.id}/cancel?reason=${Uri.encodeQueryComponent('Cancelado por el cliente desde Android')}');
+      final OrderEntry fresh = _orderFromJson(Map<String,dynamic>.from(raw as Map));
+      order.status=fresh.status; order.rawStatus=fresh.rawStatus; order.paymentStatus=fresh.paymentStatus; notifyListeners(); return true;
+    } on ApiException catch(e) { lastError=e.message; notifyListeners(); return false; }
+  }
+
+  /// Cancels an unpaid provider reservation and restores the user's cart.
+  /// A final server refresh prevents cancelling an order that won a race and
+  /// was already confirmed as paid by the provider webhook.
+  Future<bool> abandonPendingOnlineOrder(OrderEntry order) async {
+    if (!order.isOnlinePayment) return false;
+    try {
+      try {
+        await refreshOrder(order);
+      } on ApiException {
+        // Cancellation remains server-authoritative even if the preflight
+        // refresh failed temporarily. The cancel endpoint will reject a paid
+        // order, which protects against a payment/webhook race.
+      }
+      if (order.paymentStatus == 'paid') return false;
+      if (order.rawStatus != 'cancelled') {
+        final bool cancelled = await cancelOrder(order);
+        if (!cancelled) {
+          try { await refreshOrder(order); } on ApiException {}
+          return false;
+        }
+      }
+      reorder(order);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  OrderEntry? get activeOrder {
+    for (final OrderEntry order in orders) {
+      // Provider-backed orders are only operational once the backend confirms
+      // payment. A pending Stripe/MP reservation must never look like an active
+      // delivery order on Home.
+      if (order.isAwaitingOnlinePayment) continue;
+      if (!<String>{'Entregado','Recogido','Cancelado'}.contains(order.status)) return order;
+    }
+    return null;
+  }
+
+  void reorder(OrderEntry order) {
+    cart.clear(); cartRestaurantId = order.restaurant.id; deliveryMode = order.deliveryMode;
+    for (final CartLine line in order.lines) cart.add(CartLine(item: line.item, quantity: line.quantity, note: line.note));
+    notifyListeners();
+  }
+
+  Future<bool> redeemReward() async {
+    try {
+      await api.post('/platform/rewards/redeem?points=500');
+      _applyWallet(await api.wallet()); notifyListeners(); return true;
+    } on ApiException catch (e) { lastError = e.message; return false; }
+  }
+
+  void setMarketing(bool value) { marketing = value; _syncPrivacy(); notifyListeners(); }
+  void setPersonalizedExperience(bool value) { personalizedExperience = value; _syncPrivacy(); notifyListeners(); }
+  void setAnalytics(bool value) { analytics = value; _syncPrivacy(); notifyListeners(); }
+  void setOrderPush(bool value) { orderPush = value; notifyListeners(); }
+  void setPromoPush(bool value) { promoPush = value; notifyListeners(); }
+  void setRewardPush(bool value) { rewardPush = value; notifyListeners(); }
+  void setTwoFactor(bool value) { twoFactor = value; notifyListeners(); }
+
+  void _syncPrivacy() {
+    api.updatePrivacy(<String, dynamic>{'marketing_opt_in': marketing, 'analytics_opt_in': analytics, 'personalization_opt_in': personalizedExperience}).catchError((Object _) => <String, dynamic>{});
+  }
+
+  Future<bool> updateProfile(String name, String phone) async {
+    try { final dynamic raw=await api.patch('/auth/me',<String,dynamic>{'name':name.trim(),'phone':phone.trim()}); _applyUser(Map<String,dynamic>.from(raw as Map)); notifyListeners(); return true; }
+    on ApiException catch(e){lastError=e.message;notifyListeners();return false;}
+  }
+
+
+  Future<bool> pickProfilePhoto() async {
+    try {
+      final String? path = await NativeBridge.pickProfilePhoto(userId);
+      if (path == null || path.trim().isEmpty) return false;
+      userLocalAvatarPath = path;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      lastError = 'No pudimos abrir tu galería. Revisa los permisos del dispositivo.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> removeLocalProfilePhoto() async {
+    await NativeBridge.clearProfilePhoto(userId);
+    userLocalAvatarPath = '';
+    notifyListeners();
+  }
+
+  Future<void> markNotificationRead(NotificationEntry notification) async {
+    if (notification.isRead) return;
+    try {
+      await api.patch('/platform/notifications/${notification.id}/read');
+      _applyNotifications(await api.notifications());
+      notifyListeners();
+    } on ApiException catch (e) {
+      lastError = e.message;
+      notifyListeners();
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await api.post('/platform/notifications/read-all');
+      _applyNotifications(await api.notifications());
+      notifyListeners();
+    } on ApiException catch (e) {
+      lastError = e.message;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> createSupportTicket(String message, {int? orderId, String category = 'general'}) async {
+    if (message.trim().length < 5) return false;
+    try {
+      await api.post('/platform/support', <String, dynamic>{'order_id': orderId, 'category': category, 'message': message.trim()});
+      return true;
+    } on ApiException catch (e) { lastError = e.message; return false; }
+  }
+
+  void _applyUser(Map<String, dynamic> user) {
+    userId = _asInt(user['id']); userName = (user['name'] ?? '').toString(); userEmail = (user['email'] ?? '').toString(); userPhone=(user['phone']??'').toString(); userAvatarUrl=(user['avatar_url']??'').toString();
+    twoFactor = user['two_factor_enabled'] == true; marketing = user['marketing_opt_in'] != false;
+    analytics = user['analytics_opt_in'] != false; personalizedExperience = user['personalization_opt_in'] != false;
+  }
+
+  void _applyBootstrap(Map<String, dynamic> data) {
+    if (data['user'] is Map) _applyUser(Map<String, dynamic>.from(data['user'] as Map));
+    if (data['wallet'] is Map) { final Map<String, dynamic> w = Map<String, dynamic>.from(data['wallet'] as Map); wallet = _asDouble(w['balance']); points = _asInt(w['points']); }
+    unreadNotifications = _asInt(data['unread_notifications']); onlinePayments = data['online_payments'] == true; googleSignin = data['google_signin'] == true;
+    supportEmail = (data['support_email'] ?? supportEmail).toString();
+  }
+
+  void _applyRestaurants(List<dynamic> rows) {
+    restaurants
+      ..clear()
+      ..addAll(rows.map((dynamic raw) {
+        final Map<String, dynamic> r = Map<String, dynamic>.from(raw as Map);
+        final int id = _asInt(r['id']); final int eta = _asInt(r['eta_min']);
+        return Restaurant(id: id, name: (r['name'] ?? 'Restaurante').toString(), category: (r['cuisine'] ?? 'Comida local').toString(), rating: _asDouble(r['rating']), eta: '$eta-${eta + 10} min', deliveryFee: _asDouble(r['delivery_fee']), image: _imageForRestaurant(id), description: (r['description'] ?? '').toString(), promo: r['sponsored'] == true ? 'Patrocinado' : '', delivery: true, pickup: r['pickup_enabled'] != false, isOpen:r['is_open']!=false, imageUrl:_remoteImageUrl(r));
+      }));
+  }
+
+  void _applyAddresses(List<dynamic> rows) {
+    addresses..clear()..addAll(rows.map((dynamic raw) => _addressFromJson(Map<String, dynamic>.from(raw as Map))));
+    if (addresses.isEmpty) selectedAddress = 0; else { final int d = addresses.indexWhere((AddressEntry a) => a.isDefault); selectedAddress = d >= 0 ? d : 0; }
+  }
+
+  void _applyOrders(List<dynamic> rows) { orders..clear()..addAll(rows.map((dynamic raw) => _orderFromJson(Map<String, dynamic>.from(raw as Map)))); }
+  void _applyFavorites(List<dynamic> rows) { favorites..clear()..addAll(rows.map((dynamic raw) => _asInt((raw as Map)['id']))); }
+  void _applyWallet(Map<String, dynamic> row) { wallet = _asDouble(row['balance']); points = _asInt(row['points']); plusMember=row['plus_member']==true; referralCode=(row['referral_code']??referralCode).toString(); walletTransactions..clear()..addAll(List<dynamic>.from((row['transactions']??const <dynamic>[]) as List).map((dynamic x)=>Map<String,dynamic>.from(x as Map))); }
+  void _applyLoyalty(Map<String,dynamic> row){points=_asInt(row['points']);wallet=_asDouble(row['wallet_balance']);loyaltyTier=(row['tier']??'BRONZE').toString();plusMember=row['plus_member']==true;referralCode=(row['referral_code']??'').toString();}
+  void _applyNotifications(List<dynamic> rows) {
+    notifications..clear()..addAll(rows.map((dynamic raw) { final Map<String,dynamic> n=Map<String,dynamic>.from(raw as Map); return NotificationEntry(id:_asInt(n['id']),kind:(n['kind']??'').toString(),title:(n['title']??'').toString(),message:(n['message']??'').toString(),isRead:n['is_read']==true,createdAt:(n['created_at']??'').toString()); }));
+    unreadNotifications = notifications.where((NotificationEntry n) => !n.isRead).length;
+  }
+  void _applyPrivacy(Map<String, dynamic> row) { marketing = row['marketing_opt_in'] != false; analytics = row['analytics_opt_in'] != false; personalizedExperience = row['personalization_opt_in'] != false; }
+
+  AddressEntry _addressFromJson(Map<String, dynamic> r) => AddressEntry(id:_asInt(r['id']),label:(r['label']??'Casa').toString(),address:(r['address']??'').toString(),lat:_asNullableDouble(r['lat']),lng:_asNullableDouble(r['lng']),isDefault:r['is_default']==true);
+
+  OrderEntry _orderFromJson(Map<String, dynamic> raw) {
+    final int restaurantId = _asInt(raw['restaurant_id']);
+    final Restaurant restaurant = _restaurantById(restaurantId) ?? Restaurant(id: restaurantId, name: 'Restaurante', category: 'Tala Eats', rating: 0, eta: '${_asInt(raw['estimated_minutes'])} min', deliveryFee: _asDouble(raw['delivery_fee']), image: _imageForRestaurant(restaurantId), description: '');
+    final List<CartLine> lines = <CartLine>[];
+    for (final dynamic value in List<dynamic>.from((raw['items'] ?? const <dynamic>[]) as List)) {
+      final Map<String, dynamic> i = Map<String, dynamic>.from(value as Map); final int itemId=_asInt(i['menu_item_id']);
+      final FoodItem item = FoodItem(id:itemId,restaurantId:restaurantId,name:(i['name_snapshot']??'Producto').toString(),description:'',price:_asDouble(i['unit_price']),image:_imageForRestaurant(restaurantId),category:'Pedido',imageUrl:_remoteImageUrl(i));
+      lines.add(CartLine(item:item,quantity:_asInt(i['quantity']),note:(i['options_snapshot']??'').toString()));
+    }
+    final String rawStatus=(raw['status']??'received').toString();
+    final String paymentStatus=(raw['payment_status']??'pending').toString();
+    final String paymentMethod=(raw['payment_method']??'cash').toString();
+    final String orderType=(raw['order_type']??'delivery').toString();
+    String customerStatus=_statusLabel(rawStatus,orderType);
+    if (rawStatus != 'cancelled' &&
+        <String>{'stripe','mercadopago'}.contains(paymentMethod) &&
+        paymentStatus != 'paid') {
+      customerStatus='Pago pendiente';
+    }
+    final int eta=_asInt(raw['estimated_minutes']);
+    final Map<String,dynamic> driver=raw['driver_info'] is Map ? Map<String,dynamic>.from(raw['driver_info'] as Map) : <String,dynamic>{};
+    return OrderEntry(id:_asInt(raw['id']),restaurant:restaurant,total:_asDouble(raw['total']),status:customerStatus,deliveryMode:orderType,lines:lines,eta:eta>0?'$eta min':'Calculando…',pin:(raw['delivery_pin']??'').toString(),paymentStatus:paymentStatus,paymentMethod:paymentMethod,rawStatus:rawStatus,driverName:(driver['name']??'').toString(),driverVehicle:(driver['vehicle']??'').toString(),driverRating:_asDouble(driver['rating']));
+  }
+
+  Restaurant? _restaurantById(int id) { for (final Restaurant r in restaurants) { if (r.id==id) return r; } return null; }
+  String _remoteImageUrl(Map<String, dynamic> row) {
+    String normalize(dynamic raw) {
+      final String value = (raw ?? '').toString().trim();
+      if (value.startsWith('https://')) return value;
+      if (value.startsWith('/')) {
+        final Uri base = Uri.parse(kProductionApiBase);
+        return base.replace(path: value, query: null, fragment: null).toString();
+      }
+      return '';
+    }
+
+    for (final String key in <String>[
+      'cover_image_url',
+      'image_url',
+      'banner_url',
+      'photo_url',
+      'cover_url',
+      'hero_image_url',
+    ]) {
+      final String value = normalize(row[key]);
+      if (value.isNotEmpty) return value;
+    }
+
+    for (final String key in <String>['media', 'image', 'photo', 'cover']) {
+      final dynamic nested = row[key];
+      if (nested is Map) {
+        final Map<String, dynamic> map = Map<String, dynamic>.from(nested);
+        for (final String child in <String>['url', 'public_url', 'image_url']) {
+          final String value = normalize(map[child]);
+          if (value.isNotEmpty) return value;
+        }
+      }
+    }
+    return '';
+  }
+  String _imageForRestaurant(int id) => ''; // Production: never substitute a real merchant/dish with demo food media.
+  static bool _asBool(dynamic value, {bool defaultValue = false}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final String text = value?.toString().trim().toLowerCase() ?? '';
+    if (text == 'true' || text == '1' || text == 'yes' || text == 'on') return true;
+    if (text == 'false' || text == '0' || text == 'no' || text == 'off') return false;
+    return defaultValue;
+  }
+  static int _asInt(dynamic value) => int.tryParse(value?.toString() ?? '') ?? 0;
+  static double _asDouble(dynamic value) => double.tryParse(value?.toString() ?? '') ?? 0;
+  static double? _asNullableDouble(dynamic value) => value == null ? null : double.tryParse(value.toString());
+  static String _statusLabel(String raw, String type) {
+    const Map<String,String> map=<String,String>{'received':'Recibido','confirmed':'Confirmado','preparing':'Preparando','ready':'Listo','assigned':'Repartidor asignado','picked_up':'Recogido por repartidor','on_the_way':'En camino','delivered':'Entregado','cancelled':'Cancelado'};
+    if (type=='pickup' && raw=='delivered') return 'Recogido';
+    return map[raw] ?? raw;
+  }
+}
+
+class TalaEatsApp extends StatefulWidget {
+  const TalaEatsApp({super.key, this.testMode = false});
+
+  final bool testMode;
+
+  @override
+  State<TalaEatsApp> createState() => _TalaEatsAppState();
+}
+
+class _TalaEatsAppState extends State<TalaEatsApp> {
+  final TalaModel model = TalaModel();
+  bool booted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.testMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => booted = true);
+      });
+      return;
+    }
+    // The brand moment lasts ~1.1 s and runs in parallel with the real
+    // bootstrap; it never delays a slower bootstrap any further.
+    Future.wait<void>(<Future<void>>[
+      model.initialize(),
+      Future<void>.delayed(const Duration(milliseconds: 1100)),
+    ]).whenComplete(() {
+      if (mounted) setState(() => booted = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Tala Eats',
+      theme: buildTalaTheme(),
+      home: AnimatedBuilder(
+        animation: model,
+        builder: (BuildContext context, Widget? child) {
+          final String stage;
+          final Widget screen;
+          if (!booted) {
+            stage = 'launch';
+            screen = const LaunchScreen();
+          } else if (!model.signedIn) {
+            if (model.pendingResetToken.isNotEmpty) {
+              stage = 'reset';
+              screen = ResetPasswordScreen(model: model, resetToken: model.pendingResetToken);
+            } else {
+              stage = 'login';
+              screen = LoginScreen(model: model);
+            }
+          } else {
+            stage = 'shell';
+            screen = CustomerShell(model: model);
+          }
+          return AnimatedSwitcher(
+            duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
+            switchInCurve: TalaMotion.ease,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (Widget child, Animation<double> animation) => FadeTransition(opacity: animation, child: child),
+            child: KeyedSubtree(key: ValueKey<String>(stage), child: screen),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Brand mark: rounded tile with the delivery glyph.
+class TalaLogoMark extends StatelessWidget {
+  const TalaLogoMark({super.key, this.size = 88});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: <Color>[Color(0xFFFF7A3D), kBrand, kBrandDeep]),
+        borderRadius: BorderRadius.circular(size * 0.3),
+        boxShadow: <BoxShadow>[BoxShadow(color: kBrand.withValues(alpha: 0.28), blurRadius: size * 0.34, offset: Offset(0, size * 0.14))],
+      ),
+      child: Icon(Icons.delivery_dining_rounded, color: Colors.white, size: size * 0.54),
+    );
+  }
+}
+
+/// Splash: centered brand, one elegant entrance, a quiet loader.
+class LaunchScreen extends StatefulWidget {
+  const LaunchScreen({super.key});
+
+  @override
+  State<LaunchScreen> createState() => _LaunchScreenState();
+}
+
+class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+  late final Animation<double> _mark = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.62, curve: Curves.easeOutCubic));
+  late final Animation<double> _word = CurvedAnimation(parent: _controller, curve: const Interval(0.22, 0.85, curve: Curves.easeOutCubic));
+  late final Animation<double> _loader = CurvedAnimation(parent: _controller, curve: const Interval(0.6, 1, curve: Curves.easeOut));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (TalaMotion.reduced(context)) {
+      _controller.value = 1;
+    } else if (_controller.value == 0 && !_controller.isAnimating) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFFFAF6),
+      body: Stack(
+        children: <Widget>[
+          const Positioned.fill(child: AuthBackdrop()),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                FadeTransition(
+                  opacity: _mark,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.86, end: 1).animate(_mark),
+                    child: const TalaLogoMark(size: 88),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                FadeTransition(
+                  opacity: _word,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero).animate(_word),
+                    child: const Column(
+                      children: <Widget>[
+                        Text('Tala Eats', style: TextStyle(color: kInk, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1.1)),
+                        SizedBox(height: 6),
+                        Text('Tu comida favorita, más cerca.', style: TextStyle(color: kMuted, fontSize: 15, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.paddingOf(context).bottom + 56,
+            child: FadeTransition(
+              opacity: _loader,
+              child: Center(
+                child: SizedBox(
+                  width: 64,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: const LinearProgressIndicator(minHeight: 3, backgroundColor: kSoftOrange, color: kBrand),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+).hasMatch(reference)) {
+      throw ApiException(409, 'Se detectó una compra pendiente de otra sesión. Cierra sesión antes de continuar.');
+    }
+    // Same-process retry uses the same key and frozen POST body.
+    if (_orderSubmissionGuard.unresolvedClientReference == reference) return null;
+    final int revision = _orderSessionRevision;
+    Map<String, dynamic> order;
+    try {
+      order = Map<String, dynamic>.from(
+        await api.get('/orders/by-reference/$reference') as Map,
+      );
+    } on ApiException catch (error) {
+      // A 404 is NOT proof the earlier POST was never committed: the old
+      // backend may not yet expose this route, or the first POST may race.
+      if (error.statusCode == 404) {
+        throw ApiException(409, 'Hay un pedido por verificar. Consulta Mis pedidos o contacta soporte antes de comprar de nuevo.');
+      }
+      rethrow;
+    }
+    if (revision != _orderSessionRevision || !signedIn ||
+        owner != userId || order['client_reference'] != reference ||
+        _asInt(order['user_id']) != userId) {
+      throw ApiException(409, 'No se pudo verificar la compra de esta sesión.');
+    }
+    final OrderEntry recovered = _orderFromJson(order);
+    await NativeBridge.clearPendingOrder();
+    if (!orders.any((OrderEntry previous) => previous.id == recovered.id)) {
+      orders.insert(0, recovered);
+      notifyListeners();
+    }
+    return recovered;
+  }
+
+  Future<void> _attemptStartupOrderRecovery() async {
+    try {
+      await _recoverPendingOrder();
+    } on ApiException catch (error) {
+      // Fail closed and let the owner see the reason. Never replay a charge
+      // automatically after restart or on a stale/unverified session.
+      lastError = error.message;
+      notifyListeners();
+    }
   }
 
   Future<OrderEntry> placeOrder() {
