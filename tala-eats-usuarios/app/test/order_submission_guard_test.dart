@@ -174,6 +174,27 @@ void main() {
     expect(sent[0], sent[1]);
     expect(payload.containsKey('client_reference'), false);
   });
+  test('F2 signed-out request releases guard so later valid login can order', () async {
+    final store = FakePendingOrderStore();
+    var accountId = 0;
+    var sent = 0;
+    final guard = OrderSubmissionGuard(store: store, accountId: () => accountId);
+    await expectLater(guard.submit(draft(), (_) async {
+      sent++;
+      return <String, dynamic>{'id': -1};
+    }), throwsA(isA<ApiException>().having((e) => e.statusCode, 'code', 401)));
+    expect(sent, 0);
+    accountId = 31;
+    final order = await guard.submit(draft(), (body) async {
+      sent++;
+      expect(body['client_reference'], startsWith('android-7-'));
+      return <String, dynamic>{'id': 310};
+    });
+    expect(order['id'], 310);
+    expect(sent, 1);
+    expect(store.data[31], isNull);
+  });
+
   test('F2 Android restart preserves original idempotency key and frozen body', () async {
     final store = FakePendingOrderStore();
     final draftBody = draft();
