@@ -36,6 +36,8 @@ public class MainActivity extends FlutterFragmentActivity {
     private static final String KEY_ALIAS = "talaeats_session_key_v1";
     private static final String PREF_TOKEN = "session_token";
     private static final String PREF_IV = "session_iv";
+    private static final String PREF_PENDING_ORDER = "pending_order";
+    private static final String PREF_PENDING_IV = "pending_order_iv";
     private String latestUri = "";
     private MethodChannel.Result pendingLocationResult;
     private static final int LOCATION_REQUEST = 9012;
@@ -72,6 +74,15 @@ public class MainActivity extends FlutterFragmentActivity {
                         result.success(readToken()); break;
                     case "clearToken":
                         clearToken(); result.success(null); break;
+                    case "writePendingOrder":
+                        Integer ownerId = call.argument("userId");
+                        String reference = call.argument("reference");
+                        savePendingOrder(ownerId == null ? 0 : ownerId, reference);
+                        result.success(null); break;
+                    case "readPendingOrder":
+                        result.success(readPendingOrder()); break;
+                    case "clearPendingOrder":
+                        clearPendingOrder(); result.success(null); break;
                     case "openUrl":
                         String url = call.argument("url");
                         if (url == null || !url.startsWith("https://")) { result.error("BAD_URL", "URL inválida", null); break; }
@@ -216,7 +227,54 @@ public class MainActivity extends FlutterFragmentActivity {
         return new String(cipher.doFinal(Base64.decode(enc, Base64.NO_WRAP)), StandardCharsets.UTF_8);
     }
 
+    private void savePendingOrder(int ownerId, String reference) throws Exception {
+        if (ownerId <= 0 || reference == null || reference.length() < 1
+                || reference.length() > 80 || !reference.matches("[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("Referencia de compra inválida");
+        }
+        // Write-ahead log: commit() MUST finish before POST /orders begins.
+        // Only account ID + opaque reference are stored; never cart/address/card.
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey());
+        String record = ownerId + "|" + reference;
+        String ciphertext = Base64.encodeToString(
+                cipher.doFinal(record.getBytes(StandardCharsets.UTF_8)), Base64.NO_WRAP);
+        String iv = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP);
+        boolean saved = getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(PREF_PENDING_ORDER, ciphertext)
+                .putString(PREF_PENDING_IV, iv).commit();
+        if (!saved) throw new IllegalStateException("No se pudo proteger el intento de compra");
+    }
+
+    private String readPendingOrder() throws Exception {
+        SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String ciphertext = prefs.getString(PREF_PENDING_ORDER, null);
+        String iv = prefs.getString(PREF_PENDING_IV, null);
+        if (ciphertext == null && iv == null) return null;
+        if (ciphertext == null || iv == null) throw new IllegalStateException("Intento de compra incompleto");
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(),
+                new GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)));
+        String record = new String(
+                cipher.doFinal(Base64.decode(ciphertext, Base64.NO_WRAP)),
+                StandardCharsets.UTF_8);
+        if (!record.matches("[0-9]+\\|[A-Za-z0-9_-]{1,80}")) {
+            throw new IllegalStateException("Intento de compra ilegible");
+        }
+        return record;
+    }
+
+    private void clearPendingOrder() {
+        boolean removed = getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(PREF_PENDING_ORDER).remove(PREF_PENDING_IV).commit();
+        if (!removed) throw new IllegalStateException("No se pudo limpiar el intento de compra");
+    }
+
     private void clearToken() {
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(PREF_TOKEN).remove(PREF_IV).apply();
+        // Logging out removes the encrypted purchase reference for that session.
+        boolean cleared = getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(PREF_TOKEN).remove(PREF_IV)
+                .remove(PREF_PENDING_ORDER).remove(PREF_PENDING_IV).commit();
+        if (!cleared) throw new IllegalStateException("No se pudo cerrar la sesión protegida");
     }
 }
