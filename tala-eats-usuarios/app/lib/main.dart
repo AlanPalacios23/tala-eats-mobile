@@ -8,6 +8,7 @@ import 'production_api.dart';
 import 'order_submission_guard.dart';
 import 'checkout_pricing.dart';
 import 'local_markets.dart';
+import 'customer_native_push.dart';
 
 part 'ui/design_system.dart';
 part 'ui/auth_screens.dart';
@@ -173,6 +174,72 @@ class TalaModel extends ChangeNotifier {
   TalaModel({TalaApi? apiClient}) : api = apiClient ?? TalaApi();
 
   final TalaApi api;
+  final CustomerNativePush _nativePush = CustomerNativePush();
+  bool nativePushActive = false;
+  bool nativePushBusy = false;
+  String nativePushError = '';
+
+  Future<void> _refreshPushInbox() async {
+    if (!signedIn || api.token == null) return;
+    try {
+      _applyNotifications(await api.notifications());
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<bool> _startPush({required bool askPermission}) async {
+    if (!signedIn || userId <= 0 || nativePushBusy) return false;
+    nativePushBusy = true;
+    nativePushError = '';
+    notifyListeners();
+    final int initiatingUser = userId;
+    try {
+      final enabled = await _nativePush.enable(
+        api, userId: initiatingUser, marketing: marketing,
+        askPermission: askPermission,
+        onInbox: () => unawaited(_refreshPushInbox()),
+        onOpenOrders: () {
+          if (signedIn && initiatingUser == userId) {
+            setTab(2);
+            unawaited(refreshOrders());
+          }
+        },
+      );
+      if (signedIn && userId == initiatingUser) nativePushActive = enabled;
+      return enabled;
+    } on ApiException catch (e) {
+      nativePushError = e.message;
+      return false;
+    } catch (_) {
+      nativePushError = 'No se pudo activar Firebase en este dispositivo.';
+      return false;
+    } finally {
+      nativePushBusy = false;
+      notifyListeners();
+    }
+  }
+
+  void _resumePush() {
+    if (signedIn && userId > 0) {
+      unawaited(_startPush(askPermission: false));
+    }
+  }
+
+  Future<bool> enableNativePush() => _startPush(askPermission: true);
+
+  Future<void> disableNativePush() async {
+    if (nativePushBusy) return;
+    nativePushBusy = true;
+    notifyListeners();
+    final int owner = userId;
+    final bool remote = await _nativePush.disable(api, owner);
+    nativePushActive = false;
+    nativePushBusy = false;
+    nativePushError = remote ? '' : 'Notificaciones desactivadas en el teléfono, '
+        'pero el servidor no confirmó la baja. Revisa tu conexión.';
+    notifyListeners();
+  }
+
   late final OrderSubmissionGuard _orderSubmissionGuard = OrderSubmissionGuard(
     store: AndroidPendingOrderStore(), accountId: () => userId,
   );
@@ -276,6 +343,7 @@ class TalaModel extends ChangeNotifier {
       signedIn = true;
       await refreshAll();
       await _recoverPersistedCheckout();
+      _resumePush();
       if (pendingOrderId > 0) tabIndex = 2;
     } on ApiException catch (e) {
       signedIn = false;
@@ -371,6 +439,7 @@ class TalaModel extends ChangeNotifier {
       signedIn = true;
       await refreshAll();
       await _recoverPersistedCheckout();
+      _resumePush();
       notifyListeners();
       return signedIn;
     } on ApiException catch (e) {
@@ -394,6 +463,7 @@ class TalaModel extends ChangeNotifier {
       signedIn = true;
       await refreshAll();
       await _recoverPersistedCheckout();
+      _resumePush();
       return true;
     } on ApiException catch (e) {
       lastError = e.message;
@@ -423,12 +493,19 @@ class TalaModel extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     _orderSessionRevision++;
     _activePlaceOrder = null;
     _orderSubmissionGuard.clearAfterConfirmedResolution();
-    api.post('/auth/logout').catchError((Object _) => null);
-    NativeBridge.clearToken();
+    try {
+      await _nativePush.disable(api, userId).timeout(const Duration(seconds: 10));
+    } catch (_) {}
+    nativePushActive = false;
+    nativePushError = '';
+    try {
+      await api.post('/auth/logout').timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    await NativeBridge.clearToken();
     api.token = null;
     signedIn = false;
     blockedRole = '';
@@ -969,7 +1046,12 @@ class TalaModel extends ChangeNotifier {
     } on ApiException catch (e) { lastError = e.message; return false; }
   }
 
-  void setMarketing(bool value) { marketing = value; _syncPrivacy(); notifyListeners(); }
+  void setMarketing(bool value) {
+    marketing = value;
+    _syncPrivacy();
+    unawaited(_nativePush.updateMarketing(api, value).catchError((Object _) {}));
+    notifyListeners();
+  }
   void setPersonalizedExperience(bool value) { personalizedExperience = value; _syncPrivacy(); notifyListeners(); }
   void setAnalytics(bool value) { analytics = value; _syncPrivacy(); notifyListeners(); }
   void setOrderPush(bool value) { orderPush = value; notifyListeners(); }
