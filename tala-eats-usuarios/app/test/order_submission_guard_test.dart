@@ -145,9 +145,11 @@ void main() {
     final oldResponse = Completer<Map<String, dynamic>>();
     final freshResponse = Completer<Map<String, dynamic>>();
     final old = guard.submit(draft(), (_) => oldResponse.future);
+    await Future<void>.delayed(Duration.zero);
     final oldReference = guard.unresolvedClientReference;
     guard.clearAfterConfirmedResolution(); // logout changes attempt generation
     final fresh = guard.submit(draft(quantity: 2), (_) => freshResponse.future);
+    await Future<void>.delayed(Duration.zero);
     final newReference = guard.unresolvedClientReference;
     expect(newReference, isNot(oldReference));
     oldResponse.complete(<String, dynamic>{'id': 1});
