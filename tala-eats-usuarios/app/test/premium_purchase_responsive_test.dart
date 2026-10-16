@@ -153,6 +153,8 @@ void main() {
       // Full render diagnostics needed to fix the underlying 320dp overflow.
       // Do not silence widget errors or relax this regression check.
       debugPrint(layoutError.toStringDeep());
+      // Render tree captures the offending Row and constraints at 320dp.
+      debugDumpRenderTree();
     }
     expect(layoutError, isNull);
     await tester.pumpWidget(const SizedBox.shrink());
