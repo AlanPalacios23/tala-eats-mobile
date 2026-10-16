@@ -64,7 +64,7 @@ class _CustomerDeviceSessionsScreenState extends State<CustomerDeviceSessionsScr
       if (outcome['revoked'] != true) throw ApiException(502, 'El servidor no confirmó la revocación.');
       if (!mounted) return;
       if (outcome['current'] == true) {
-        widget.model.logout();
+        await widget.model.logout();
         Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
         return;
       }
