@@ -81,8 +81,8 @@ public class MainActivity extends FlutterFragmentActivity {
                         Integer readUserId = call.argument("userId");
                         result.success(readPendingOrder(readUserId)); break;
                     case "clearPendingOrder":
-                        Integer clearUserId = call.argument("userId");
-                        clearPendingOrder(clearUserId); result.success(null); break;
+                        Integer pendingClearOwnerId = call.argument("userId");
+                        clearPendingOrder(pendingClearOwnerId); result.success(null); break;
                     case "openUrl":
                         String url = call.argument("url");
                         if (url == null || !url.startsWith("https://")) { result.error("BAD_URL", "URL inválida", null); break; }
