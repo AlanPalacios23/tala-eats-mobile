@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:talaeats_users/order_submission_guard.dart';
 import 'package:talaeats_users/pending_checkout_recovery.dart';
@@ -137,6 +138,23 @@ void main() {
     expect(recovered, isNull);
     expect(queried, isFalse);
     expect(removed, isFalse);
+  });
+
+  test('Logout during secure write stops stale network POST', () async {
+    final barrier = Completer<void>();
+    var posts = 0;
+    final guard = OrderSubmissionGuard(
+      beforeSend: (_) async { await barrier.future; },
+    );
+    final pending = guard.submit(checkout(), (_) async {
+      posts++;
+      return <String, dynamic>{'id': 5};
+    });
+    guard.clearAfterConfirmedResolution(); // logout before storage completes
+    barrier.complete();
+    await expectLater(pending,
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'code', 401)));
+    expect(posts, 0);
   });
 
   test('Confirmed 422 releases encrypted journal', () async {
