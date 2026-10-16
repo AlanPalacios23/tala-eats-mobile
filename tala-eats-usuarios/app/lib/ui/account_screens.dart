@@ -1156,6 +1156,12 @@ class SecurityScreen extends StatelessWidget {
                 subtitle: 'Te enviaremos un enlace a tu correo',
                 onTap: () => Navigator.of(context).push(premiumRoute(ChangePasswordScreen(model: model))),
               ),
+              AccountLink(
+                icon: Icons.devices_rounded,
+                title: 'Dispositivos y sesiones',
+                subtitle: 'Consultar y cerrar sesiones de tu cuenta',
+                onTap: () => Navigator.of(context).push(premiumRoute(CustomerDeviceSessionsScreen(model: model))),
+              ),
             ],
           ),
         ],
