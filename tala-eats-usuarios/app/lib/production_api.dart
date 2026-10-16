@@ -46,6 +46,9 @@ class NativeBridge {
     } on PlatformException {
       throw ApiException(409, 'No pudimos recuperar la compra pendiente '
           'de forma segura. Contacta soporte.');
+    } on MissingPluginException {
+      throw ApiException(409, 'Almacenamiento Android seguro no disponible. '
+          'No se enviará el pedido.');
     }
   }
 
@@ -56,6 +59,9 @@ class NativeBridge {
     } on PlatformException {
       throw ApiException(409, 'No pudimos guardar de forma segura tu pedido. '
           'No se envió el pedido.');
+    } on MissingPluginException {
+      throw ApiException(409, 'Almacenamiento Android seguro no disponible. '
+          'No se enviará el pedido.');
     }
   }
 
@@ -66,6 +72,9 @@ class NativeBridge {
     } on PlatformException {
       throw ApiException(409, 'No pudimos confirmar la recuperación local '
           'del pedido. Revisa Mis pedidos antes de continuar.');
+    } on MissingPluginException {
+      throw ApiException(409, 'Almacenamiento Android seguro no disponible. '
+          'No se enviará el pedido.');
     }
   }
 
