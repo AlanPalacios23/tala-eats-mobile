@@ -166,4 +166,33 @@ void main() {
       model.dispose();
     });
 
+  testWidgets('Sin métodos de pago: mensaje claro y reintento bloqueado durante carga',
+    (tester) async {
+      int retries = 0;
+      Widget screen({required bool loading}) => MaterialApp(
+        home: Scaffold(
+          body: PaymentUnavailableCard(
+            onRetry: () => retries++,
+            loading: loading,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(screen(loading: false));
+      expect(find.text('No hay métodos de pago disponibles'), findsOneWidget);
+      expect(find.textContaining('ni en efectivo ni en línea'), findsOneWidget);
+      expect(find.textContaining('No se hará ningún cargo'), findsOneWidget);
+      await tester.tap(find.text('Revisar de nuevo'));
+      await tester.pump();
+      expect(retries, 1);
+
+      await tester.pumpWidget(screen(loading: true));
+      await tester.pump();
+      final TextButton retry = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Revisar de nuevo'),
+      );
+      expect(retry.onPressed, isNull);
+      expect(retries, 1);
+    });
+
 }
