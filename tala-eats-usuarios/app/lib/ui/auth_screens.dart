@@ -772,7 +772,7 @@ class PremiumAuthScaffold extends StatelessWidget {
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: math.max(0, area.maxHeight - 36)),
+                    constraints: BoxConstraints(minHeight: math.max(0.0, area.maxHeight - 36.0)),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 460),
