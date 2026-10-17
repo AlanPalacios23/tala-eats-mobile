@@ -234,6 +234,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: 'Crea tu cuenta',
+      showSecondaryImage: true,
       subtitle: 'Un minuto y quedas listo para pedir en Tala Eats.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -376,6 +377,7 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: 'Confirma tus datos',
+      showSecondaryImage: true,
       subtitle: 'Revisa que tu correo sea correcto. Lo usarás para entrar y recuperar tu cuenta.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -460,6 +462,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: sent ? 'Revisa tu correo' : 'Recupera tu contraseña',
+      showSecondaryImage: true,
       subtitle: sent
           ? 'Si la cuenta existe, recibirás un enlace seguro. Ábrelo en este teléfono para crear tu nueva contraseña.'
           : 'Te enviaremos un enlace seguro para crear una nueva contraseña.',
@@ -565,6 +568,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Crea una nueva contraseña',
+      showSecondaryImage: true,
       subtitle: 'Elige una contraseña segura que no uses en otros servicios.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -622,6 +626,7 @@ class PasswordUpdatedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Contraseña actualizada',
+      showSecondaryImage: true,
       subtitle: 'Ya puedes iniciar sesión con tu nueva contraseña.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -701,7 +706,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 }
 
-/// Shared auth layout: brand lockup, strong title, calm form area.
+/// Auth photography stays behind the entire viewport, including when scrolled.
+/// A neutral white veil guarantees dark text and input borders stay readable.
 class PremiumAuthScaffold extends StatelessWidget {
   const PremiumAuthScaffold({
     super.key,
@@ -711,6 +717,7 @@ class PremiumAuthScaffold extends StatelessWidget {
     this.eyebrow = '',
     this.showBack = false,
     this.showFoodImage = false,
+    this.showSecondaryImage = false,
   });
 
   final String eyebrow;
@@ -719,83 +726,94 @@ class PremiumAuthScaffold extends StatelessWidget {
   final Widget child;
   final bool showBack;
   final bool showFoodImage;
+  final bool showSecondaryImage;
 
   @override
   Widget build(BuildContext context) {
+    final String? background = showFoodImage
+        ? 'assets/branding/login_food.png'
+        : showSecondaryImage
+            ? 'assets/branding/auth_secondary.jpg'
+            : null;
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF6),
+      backgroundColor: Colors.white,
       body: Stack(
         children: <Widget>[
-          if (showFoodImage) ...<Widget>[
-            Positioned(
-              top: 0, left: 0, right: 0, height: 260,
+          if (background == null)
+            const Positioned.fill(child: AuthBackdrop())
+          else ...<Widget>[
+            Positioned.fill(
               child: Image.asset(
-                'assets/branding/login_food.png',
+                background,
                 fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                semanticLabel: 'Fotografía gastronómica de Tala Eats',
+                alignment: Alignment.center,
+                semanticLabel: 'Fotografía de comida de Tala Eats',
               ),
             ),
             const Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: <Color>[
-                      Color(0xCCFFFFFF),
-                      Color(0xF5FFFAF6),
-                      Color(0xFFFFFFFF),
-                    ],
-                    stops: <double>[0, 0.34, 0.58],
-                  ),
+                  color: Color(0xBFFFFFFF),
                 ),
               ),
             ),
-          ] else
-            const Positioned.fill(child: AuthBackdrop()),
+          ],
           SafeArea(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      SizedBox(
-                        height: 48,
-                        child: Row(
-                          children: <Widget>[
-                            if (showBack)
-                              TalaCircleButton(icon: Icons.arrow_back_rounded, tooltip: 'Regresar', onPressed: () => Navigator.of(context).maybePop())
-                            else
-                              const AuthBrandMark(),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: showFoodImage ? 14 : 26),
-                      Reveal(
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints area) {
+                return SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: math.max(0, area.maxHeight - 36)),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            if (eyebrow.isNotEmpty) ...<Widget>[
-                              Text(eyebrow, style: TalaText.overline),
-                              const SizedBox(height: 8),
+                            if (showBack) ...<Widget>[
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TalaCircleButton(
+                                  icon: Icons.arrow_back_rounded,
+                                  tooltip: 'Regresar',
+                                  onPressed: () => Navigator.of(context).maybePop(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                             ],
-                            Text(title, style: TalaText.display),
-                            const SizedBox(height: 8),
-                            Text(subtitle, style: TalaText.muted.copyWith(fontSize: 15)),
+                            Reveal(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: <Widget>[
+                                  if (eyebrow.isNotEmpty) ...<Widget>[
+                                    Text(eyebrow, style: TalaText.overline),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  Text(title, textAlign: TextAlign.center, style: TalaText.display),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    subtitle,
+                                    textAlign: TextAlign.center,
+                                    style: TalaText.muted.copyWith(fontSize: 15),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Reveal(
+                              index: 2,
+                              child: Material(type: MaterialType.transparency, child: child),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      Reveal(index: 2, child: Material(type: MaterialType.transparency, child: child)),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
