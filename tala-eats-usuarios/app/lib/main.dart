@@ -248,6 +248,8 @@ class TalaModel extends ChangeNotifier {
   int _orderSessionRevision = 0;
   bool signedIn = false;
   bool loading = false;
+  bool ordersRefreshing = false;
+  String ordersLoadError = '';
   bool online = true;
   String lastError = '';
   String blockedRole = '';
@@ -517,6 +519,8 @@ class TalaModel extends ChangeNotifier {
     blockedRole = '';
     tabIndex = 0;
     restaurants.clear(); menu.clear(); cart.clear(); favorites.clear(); orders.clear(); addresses.clear(); notifications.clear(); _menusLoading.clear(); _menuLoadErrors.clear();
+    ordersLoadError = '';
+    ordersRefreshing = false;
     notifyListeners();
   }
 
@@ -989,7 +993,25 @@ class TalaModel extends ChangeNotifier {
   }
 
   Future<void> refreshOrders() async {
-    try { _applyOrders(await api.orders()); notifyListeners(); } catch (_) {}
+    if (ordersRefreshing) return;
+    ordersRefreshing = true;
+    notifyListeners();
+    try {
+      final List<dynamic> latest = await api.orders();
+      _applyOrders(latest);
+      ordersLoadError = '';
+    } on ApiException catch (e) {
+      // A failed network request is not proof that the account has no orders.
+      // Preserve the previously fetched history and offer explicit retry.
+      ordersLoadError = e.message.isNotEmpty
+          ? e.message
+          : 'No pudimos actualizar tus pedidos. Revisa tu conexión.';
+    } catch (_) {
+      ordersLoadError = 'No pudimos actualizar tus pedidos. Revisa tu conexión.';
+    } finally {
+      ordersRefreshing = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> submitReview(OrderEntry order, int restaurantRating, {String comment = ''}) async {
