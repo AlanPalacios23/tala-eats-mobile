@@ -1364,16 +1364,27 @@ class _RestaurantInfo extends StatelessWidget {
             runSpacing: 9,
             children: <Widget>[
               for (final (IconData icon, String value) in details)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(icon, color: kMuted, size: 16),
-                    const SizedBox(width: 5),
-                    Text(value, style: const TextStyle(
-                      color: kInkSoft, fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    )),
-                  ],
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: math.max(100.0, MediaQuery.sizeOf(context).width - 40.0),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(icon, color: kMuted, size: 16),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(value,
+                          softWrap: true,
+                          maxLines: 2,
+                          style: const TextStyle(
+                            color: kInkSoft, fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               if (restaurant.pickup && restaurant.delivery)
                 const Row(
