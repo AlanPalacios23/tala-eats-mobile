@@ -159,43 +159,79 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
 }
 
 class OfflineBanner extends StatelessWidget {
-  const OfflineBanner({super.key, required this.onRetry, this.busy = false});
+  const OfflineBanner({
+    super.key,
+    required this.onRetry,
+    this.busy = false,
+  });
 
   final Future<void> Function() onRetry;
   final bool busy;
 
   @override
   Widget build(BuildContext context) {
+    final Widget retry = TextButton(
+      onPressed: busy ? null : () { onRetry(); },
+      child: Text(busy ? 'Reintentando…' : 'Reintentar'),
+    );
     return DecoratedBox(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: kLine), boxShadow: kShadowLifted),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kLine),
+        boxShadow: kShadowLifted,
+      ),
       child: Material(
         type: MaterialType.transparency,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(color: kSoftOrange, shape: BoxShape.circle),
-                child: const Icon(Icons.cloud_off_rounded, color: kBrand, size: 19),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints bounds) {
+              final Widget message = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: kSoftOrange,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.cloud_off_rounded,
+                        color: kBrandDeep, size: 19),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text('Sin conexión',
+                            style: TextStyle(color: kInk,
+                                fontWeight: FontWeight.w800, fontSize: 14)),
+                        Text('Tu sesión sigue activa.',
+                            style: TextStyle(color: kMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+              if (bounds.maxWidth < 340) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text('Sin conexión', style: TextStyle(color: kInk, fontWeight: FontWeight.w800, fontSize: 14)),
-                    Text('Tu sesión sigue activa.', style: TextStyle(color: kMuted, fontSize: 12)),
+                    message,
+                    Align(alignment: Alignment.centerRight, child: retry),
                   ],
-                ),
-              ),
-              TextButton(
-                onPressed: busy ? null : () { onRetry(); },
-                child: Text(busy ? 'Reintentando…' : 'Reintentar'),
-              ),
-            ],
+                );
+              }
+              return Row(children: <Widget>[
+                Expanded(child: message),
+                const SizedBox(width: 4),
+                retry,
+              ]);
+            },
           ),
         ),
       ),
