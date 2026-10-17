@@ -181,6 +181,7 @@ void main() {
       await tester.pumpWidget(screen(loading: false));
       expect(find.text('No hay métodos de pago disponibles'), findsOneWidget);
       expect(find.textContaining('ni en efectivo ni en línea'), findsOneWidget);
+      expect(find.textContaining('No se hará ningún cargo'), findsOneWidget);
       await tester.tap(find.text('Revisar de nuevo'));
       await tester.pump();
       expect(retries, 1);
