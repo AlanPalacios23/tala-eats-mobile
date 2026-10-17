@@ -877,7 +877,13 @@ class _SearchScreenState extends State<SearchScreen> {
         : model.restaurants.where((Restaurant restaurant) => _fold(restaurant.name).contains(normalized) || _fold(restaurant.category).contains(normalized)).toList();
     final List<FoodItem> items = normalized.isEmpty
         ? <FoodItem>[]
-        : model.menu.where((FoodItem item) => _fold(item.name).contains(normalized) || _fold(item.category).contains(normalized)).toList();
+        : model.menu.where((FoodItem item) {
+            // A cached product from another market must never surface when
+            // its merchant is absent from the currently filtered catalog.
+            if (restaurantFor(model, item.restaurantId) == null) return false;
+            return _fold(item.name).contains(normalized) ||
+                _fold(item.category).contains(normalized);
+          }).toList();
     final List<Restaurant> nearby = model.restaurants
         .where((Restaurant r) => r.isOpen).toList();
 
@@ -1041,11 +1047,11 @@ class SearchDishTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
-    final bool open = restaurant?.isOpen ?? true;
+    final bool open = restaurant?.isOpen == true;
     return TalaCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
-      onTap: open ? () => showProductSheet(context, model, item) : () => showMessage(context, 'Este restaurante está cerrado por ahora.'),
+      onTap: open ? () => showProductSheet(context, model, item) : () => showMessage(context, restaurant == null ? 'Este platillo no está disponible por ahora.' : 'Este restaurante está cerrado por ahora.'),
       child: Row(
         children: <Widget>[
           DishThumb(item: item, size: 64, radius: 14),
