@@ -49,6 +49,8 @@ void main() {
     verifyFullBackground(tester, 'assets/branding/auth_secondary.jpg');
     expect(find.byType(TalaLogoMark), findsNothing);
     expect(find.text('Crea tu cuenta'), findsOneWidget);
+    await tester.ensureVisible(find.byType(TextField).at(2));
+    await tester.pumpAndSettle();
     expect(find.text('Crear una contraseña'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
