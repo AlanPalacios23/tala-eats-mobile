@@ -994,23 +994,30 @@ class TalaModel extends ChangeNotifier {
 
   Future<void> refreshOrders() async {
     if (ordersRefreshing) return;
+    final int sessionRevision = _orderSessionRevision;
     ordersRefreshing = true;
     notifyListeners();
     try {
       final List<dynamic> latest = await api.orders();
+      if (sessionRevision != _orderSessionRevision) return;
       _applyOrders(latest);
-      ordersLoadError = '';
     } on ApiException catch (e) {
-      // A failed network request is not proof that the account has no orders.
-      // Preserve the previously fetched history and offer explicit retry.
-      ordersLoadError = e.message.isNotEmpty
-          ? e.message
-          : 'No pudimos actualizar tus pedidos. Revisa tu conexión.';
+      if (sessionRevision == _orderSessionRevision) {
+        // Network failure does not prove that the account has no orders.
+        ordersLoadError = e.message.isNotEmpty
+            ? e.message
+            : 'No pudimos actualizar tus pedidos. Revisa tu conexión.';
+      }
     } catch (_) {
-      ordersLoadError = 'No pudimos actualizar tus pedidos. Revisa tu conexión.';
+      if (sessionRevision == _orderSessionRevision) {
+        ordersLoadError = 'No pudimos actualizar tus pedidos. Revisa tu conexión.';
+      }
     } finally {
-      ordersRefreshing = false;
-      notifyListeners();
+      // A stale response must not resurrect data or alter UI after logout.
+      if (sessionRevision == _orderSessionRevision) {
+        ordersRefreshing = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -1186,7 +1193,10 @@ class TalaModel extends ChangeNotifier {
     if (addresses.isEmpty) selectedAddress = 0; else { final int d = addresses.indexWhere((AddressEntry a) => a.isDefault); selectedAddress = d >= 0 ? d : 0; }
   }
 
-  void _applyOrders(List<dynamic> rows) { orders..clear()..addAll(rows.map((dynamic raw) => _orderFromJson(Map<String, dynamic>.from(raw as Map)))); }
+  void _applyOrders(List<dynamic> rows) {
+    orders..clear()..addAll(rows.map((dynamic raw) => _orderFromJson(Map<String, dynamic>.from(raw as Map))));
+    ordersLoadError = '';
+  }
   void _applyFavorites(List<dynamic> rows) { favorites..clear()..addAll(rows.map((dynamic raw) => _asInt((raw as Map)['id']))); }
   void _applyWallet(Map<String, dynamic> row) { wallet = _asDouble(row['balance']); points = _asInt(row['points']); plusMember=row['plus_member']==true; referralCode=(row['referral_code']??referralCode).toString(); walletTransactions..clear()..addAll(List<dynamic>.from((row['transactions']??const <dynamic>[]) as List).map((dynamic x)=>Map<String,dynamic>.from(x as Map))); }
   void _applyLoyalty(Map<String,dynamic> row){points=_asInt(row['points']);wallet=_asDouble(row['wallet_balance']);loyaltyTier=(row['tier']??'BRONZE').toString();plusMember=row['plus_member']==true;referralCode=(row['referral_code']??'').toString();}
