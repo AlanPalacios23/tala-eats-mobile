@@ -140,7 +140,8 @@ class ActiveOrderCard extends StatelessWidget {
         children: <Widget>[
           LayoutBuilder(
             builder: (BuildContext context, BoxConstraints bounds) {
-              final bool compact = bounds.maxWidth < 310;
+              final bool compact = bounds.maxWidth < 345 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 17;
               final Widget merchant = Row(
                 children: <Widget>[
                   RestaurantMedia(
@@ -153,7 +154,7 @@ class ActiveOrderCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(order.restaurant.name, maxLines: 1,
+                        Text(order.restaurant.name, maxLines: compact ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
                             style: TalaText.title),
                         const SizedBox(height: 2),
@@ -186,13 +187,25 @@ class ActiveOrderCard extends StatelessWidget {
             },
           ),
           const SizedBox(height: 14),
-          _SegmentedProgress(total: steps.length, current: current),
+          Semantics(
+            label: 'Progreso del pedido: etapa ${current + 1} de ${steps.length}, ${steps[current].$1}',
+            child: _SegmentedProgress(total: steps.length, current: current),
+          ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10,
+            runSpacing: 6,
             children: <Widget>[
-              Expanded(child: Text('Pedido #${order.id} · ${money(order.total)}', style: TalaText.caption)),
-              const Text('Ver pedido', style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13)),
-              const Icon(Icons.chevron_right_rounded, color: kBrandDeep, size: 20),
+              Text('Pedido #${order.id} · ${money(order.total)}', style: TalaText.caption),
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text('Ver pedido', style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13)),
+                  Icon(Icons.chevron_right_rounded, color: kBrandDeep, size: 20),
+                ],
+              ),
             ],
           ),
         ],
@@ -211,31 +224,60 @@ class PastOrderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool cancelled = order.status == 'Cancelado';
     final int items = order.lines.fold<int>(0, (int total, CartLine line) => total + line.quantity);
+    final Widget status = StatusPill(
+      label: order.status,
+      color: cancelled ? kDanger : kGreen,
+      background: cancelled ? kDangerSoft : kSoftGreen,
+    );
     return TalaCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          RestaurantMedia(assetPath: order.restaurant.image, imageUrl: order.restaurant.imageUrl, width: 48, height: 48, radius: 14, desaturate: cancelled),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(order.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title.copyWith(fontSize: 15)),
-                const SizedBox(height: 2),
-                Text('#${order.id} · ${money(order.total)} · $items ${items == 1 ? 'producto' : 'productos'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.caption),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints bounds) {
+          final bool compact = bounds.maxWidth < 345 ||
+              MediaQuery.textScalerOf(context).scale(14) > 17;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  RestaurantMedia(
+                    assetPath: order.restaurant.image,
+                    imageUrl: order.restaurant.imageUrl,
+                    width: 48, height: 48, radius: 14,
+                    desaturate: cancelled,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(order.restaurant.name,
+                          maxLines: compact ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TalaText.title.copyWith(fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text('#${order.id} · ${money(order.total)} · $items ${items == 1 ? 'producto' : 'productos'}',
+                          maxLines: compact ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TalaText.caption),
+                      ],
+                    ),
+                  ),
+                  if (!compact) ...<Widget>[
+                    const SizedBox(width: 8),
+                    status,
+                  ],
+                ],
+              ),
+              if (compact) ...<Widget>[
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: status),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          StatusPill(
-            label: order.status,
-            color: cancelled ? kDanger : kGreen,
-            background: cancelled ? kDangerSoft : kSoftGreen,
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -453,17 +495,45 @@ class OrderDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          RestaurantMedia(assetPath: order.restaurant.image, imageUrl: order.restaurant.imageUrl, width: 44, height: 44, radius: 12),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(order.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title)),
-                          StatusPill(
+                      LayoutBuilder(
+                        builder: (BuildContext context, BoxConstraints bounds) {
+                          final bool compact = bounds.maxWidth < 345 ||
+                              MediaQuery.textScalerOf(context).scale(14) > 17;
+                          final Widget payment = StatusPill(
                             label: paymentStatusLabel(order.paymentStatus),
                             color: order.paymentStatus == 'paid' ? kGreen : kInkSoft,
                             background: order.paymentStatus == 'paid' ? kSoftGreen : kSunken,
-                          ),
-                        ],
+                          );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Row(
+                                children: <Widget>[
+                                  RestaurantMedia(
+                                    assetPath: order.restaurant.image,
+                                    imageUrl: order.restaurant.imageUrl,
+                                    width: 44, height: 44, radius: 12,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(order.restaurant.name,
+                                      maxLines: compact ? 2 : 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TalaText.title),
+                                  ),
+                                  if (!compact) ...<Widget>[
+                                    const SizedBox(width: 8),
+                                    payment,
+                                  ],
+                                ],
+                              ),
+                              if (compact) ...<Widget>[
+                                const SizedBox(height: 10),
+                                Align(alignment: Alignment.centerRight, child: payment),
+                              ],
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       Text(order.status, style: TalaText.h1.copyWith(color: cancelled ? kDanger : kInk)),
