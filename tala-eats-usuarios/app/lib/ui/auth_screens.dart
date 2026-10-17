@@ -674,13 +674,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cambiar contraseña')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+    return PremiumAuthScaffold(
+      showBack: true,
+      showSecondaryImage: true,
+      title: 'Cambiar contraseña',
+      subtitle: 'Te enviaremos un enlace seguro a tu correo para definir una nueva contraseña.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const Text('Te enviaremos un enlace seguro a tu correo para que definas una nueva contraseña.', style: TalaText.body),
-          const SizedBox(height: 18),
           TalaCard(
             child: Row(
               children: <Widget>[
@@ -696,10 +697,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ],
           if (sent) ...<Widget>[
             const SizedBox(height: 12),
-            const AuthNotice(icon: Icons.mark_email_read_rounded, text: 'Listo. Revisa tu correo y abre el enlace para crear la nueva contraseña.'),
+            const AuthNotice(
+              icon: Icons.mark_email_read_rounded,
+              text: 'Listo. Revisa tu correo y abre el enlace para crear la nueva contraseña.',
+            ),
           ],
           const SizedBox(height: 18),
-          FilledButton(onPressed: loading ? null : submit, child: BusyLabel(busy: loading, label: sent ? 'Reenviar enlace' : 'Enviar enlace seguro')),
+          FilledButton(
+            onPressed: loading ? null : submit,
+            child: BusyLabel(busy: loading, label: sent ? 'Reenviar enlace' : 'Enviar enlace seguro'),
+          ),
         ],
       ),
     );
