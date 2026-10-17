@@ -863,10 +863,7 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
         children: <Widget>[
           const Text('Buscar', style: TalaText.display),
-          const SizedBox(height: 3),
-          Text('Explora comercios de ' + TalaMarket.labelFor(model.marketCode),
-              style: TalaText.muted),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           TextField(
             controller: controller,
             autofocus: false,
