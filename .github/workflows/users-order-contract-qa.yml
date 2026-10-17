@@ -65,12 +65,28 @@ jobs:
         run: flutter test --reporter=compact test/quiet_ui_regression_test.dart
       - name: "QA teclado y Reduce Motion: 320/360/390/430 dp"
         run: flutter test --reporter=compact test/customer_keyboard_reduced_motion_test.dart
-      - name: "Generar capturas Flutter SINTETICAS sin datos privados"
+      - name: Roboto explicito en AppBar, botones y avisos
+        run: flutter test --reporter=compact test/android_roboto_theme_contract_test.dart
+      - name: "Preparar Roboto e íconos Material para capturas legibles"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Test-only font, fetched from Google's official open-source collection.
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf" \
+            --output "$RUNNER_TEMP/tala-roboto-qa.ttf"
+          test "$(stat -c%s "$RUNNER_TEMP/tala-roboto-qa.ttf")" -gt 10000
+          FLUTTER_SDK="$(dirname "$(dirname "$(readlink -f "$(command -v flutter)")")")"
+          MATERIAL_FONT="$(find "$FLUTTER_SDK" -name MaterialIcons-Regular.otf -print -quit)"
+          test -n "$MATERIAL_FONT" && test -s "$MATERIAL_FONT"
+          echo "TALA_VISUAL_ROBOTO_PATH=$RUNNER_TEMP/tala-roboto-qa.ttf" >> "$GITHUB_ENV"
+          echo "TALA_VISUAL_MATERIAL_ICONS_PATH=$MATERIAL_FONT" >> "$GITHUB_ENV"
+      - name: "Generar capturas Flutter SINTETICAS con Roboto legible"
         run: flutter test --update-goldens --dart-define=TALA_VISUAL_CAPTURE=true --reporter=compact test/customer_visual_reference_capture_test.dart
       - name: "Conservar solo capturas PNG sintéticas para revisión"
         uses: actions/upload-artifact@v4
         with:
-          name: talaeats-usuarios-v1028-capturas-sinteticas
+          name: talaeats-usuarios-v1029-capturas-roboto-legibles
           path: tala-eats-usuarios/app/test/goldens/*_mock_*.png
           if-no-files-found: error
           retention-days: 7
