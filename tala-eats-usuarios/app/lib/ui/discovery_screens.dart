@@ -1391,8 +1391,10 @@ class _RestaurantInfo extends StatelessWidget {
           ),
           if (restaurant.promo.isNotEmpty) ...<Widget>[
             const SizedBox(height: 12),
-            StatusPill(label: restaurant.promo, color: kBrandDeep,
-                background: kSoftOrange, dot: false),
+            Text(restaurant.promo,
+                softWrap: true,
+                style: const TextStyle(color: kBrandDeep,
+                    fontSize: 13, fontWeight: FontWeight.w600)),
           ],
           if (closed) ...<Widget>[
             const SizedBox(height: 12),
