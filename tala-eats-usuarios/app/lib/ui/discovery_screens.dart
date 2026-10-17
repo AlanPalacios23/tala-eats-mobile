@@ -1339,9 +1339,6 @@ class _RestaurantInfo extends StatelessWidget {
       if (restaurant.rating > 0)
         (Icons.star_rounded, restaurant.rating.toStringAsFixed(1)),
       if (restaurant.delivery) (Icons.schedule_rounded, restaurant.eta),
-      (restaurant.delivery
-          ? Icons.two_wheeler_rounded
-          : Icons.storefront_rounded, fee),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
@@ -1386,17 +1383,46 @@ class _RestaurantInfo extends StatelessWidget {
                     ],
                   ),
                 ),
-              if (restaurant.pickup && restaurant.delivery)
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Delivery and pickup share one deliberate row at every viewport.
+          // Text can wrap inside its column rather than pushing pickup below.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Icon(restaurant.delivery
+                        ? Icons.two_wheeler_rounded : Icons.storefront_rounded,
+                        color: kMuted, size: 16),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(fee,
+                        softWrap: true,
+                        maxLines: 2,
+                        style: const TextStyle(color: kInkSoft, fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (restaurant.pickup && restaurant.delivery) ...<Widget>[
+                const SizedBox(width: 8),
                 const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Icon(Icons.storefront_outlined, color: kMuted, size: 16),
                     SizedBox(width: 5),
                     Text('Para recoger', style: TextStyle(
-                        color: kInkSoft, fontSize: 13,
-                        fontWeight: FontWeight.w600)),
+                      color: kInkSoft, fontSize: 12, fontWeight: FontWeight.w600,
+                    )),
                   ],
                 ),
+              ],
             ],
           ),
           if (restaurant.promo.isNotEmpty) ...<Widget>[
@@ -1631,7 +1657,8 @@ class RestaurantCartBar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
-  int quantity = 1;
+  final int originallyInCart = cartQuantityFor(model, item);
+  int quantity = math.max(1, originallyInCart);
   String preference = '';
   const List<String> options = <String>['Sin cambios', 'Sin cebolla', 'Extra salsa', 'Bien cocido'];
   showModalBottomSheet<void>(
@@ -1725,22 +1752,29 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                       builder: (BuildContext context, BoxConstraints bounds) {
                         final Widget quantityControl = QuantityStepper(
                           quantity: quantity,
-                          onDecrement: quantity > 1
+                          onDecrement: quantity > (originallyInCart > 0 ? 0 : 1)
                               ? () => setModalState(() => quantity -= 1)
                               : null,
                           onIncrement: () => setModalState(() => quantity += 1),
                         );
                         final Widget addAction = FilledButton(
                           onPressed: () async {
-                            final bool added = await addItemWithGuard(
-                              sheetContext, model, item, quantity,
-                              note: preference,
-                            );
-                            if (added && sheetContext.mounted) {
-                              Navigator.of(sheetContext).pop();
+                            if (originallyInCart > 0 &&
+                                model.cartRestaurantId == item.restaurantId) {
+                              model.setCartItemQuantity(item, quantity, note: preference);
+                              if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                            } else {
+                              final bool added = await addItemWithGuard(
+                                sheetContext, model, item, quantity,
+                                note: preference,
+                              );
+                              if (added && sheetContext.mounted) {
+                                Navigator.of(sheetContext).pop();
+                              }
                             }
                           },
-                          child: Text('Agregar · ${money(item.price * quantity)}'),
+                          child: Text(quantity == 0 ? 'Quitar del carrito'
+                              : '${originallyInCart > 0 ? 'Actualizar' : 'Agregar'} · ${money(item.price * quantity)}'),
                         );
                         if (bounds.maxWidth < 340) {
                           return Column(
