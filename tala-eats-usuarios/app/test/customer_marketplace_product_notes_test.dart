@@ -56,7 +56,7 @@ void main() {
     await tester.enterText(note, 'Entregar en bolsa separada');
     await tester.pump();
     final button = find.textContaining('Agregar ·');
-    await tester.testTextInput.hide();
+    tester.testTextInput.hide();
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.tap(button);
