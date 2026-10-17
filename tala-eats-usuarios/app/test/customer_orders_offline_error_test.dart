@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:talaeats_users/main.dart';
@@ -15,6 +16,17 @@ class OrdersOfflineApi extends TalaApi {
   }
 }
 
+class DelayedOrdersApi extends TalaApi {
+  final Completer<List<dynamic>> pending = Completer<List<dynamic>>();
+
+  @override
+  Future<List<dynamic>> orders() => pending.future;
+
+  @override
+  Future<dynamic> post(String path, [Object? body]) async =>
+      <String, dynamic>{};
+}
+
 const Restaurant sampleMerchant = Restaurant(
   id: 88, name: 'Comercio de prueba',
   category: 'Comida local', rating: 4.5, eta: '25 min',
@@ -29,6 +41,23 @@ OrderEntry sampleOrder() => OrderEntry(
 );
 
 void main() {
+  test('Consulta tardía nunca revive historial después de logout', () async {
+    final api = DelayedOrdersApi();
+    final model = TalaModel(apiClient: api);
+    model.orders.add(sampleOrder());
+    final Future<void> stale = model.refreshOrders();
+    expect(model.ordersRefreshing, true);
+    await model.logout();
+    api.pending.complete(<dynamic>[
+      <String, dynamic>{'id': 880, 'status': 'preparing'},
+    ]);
+    await stale;
+    expect(model.orders, isEmpty);
+    expect(model.ordersLoadError, isEmpty);
+    expect(model.ordersRefreshing, false);
+    model.dispose();
+  });
+
   test('Fallo al cargar historial conserva pedidos previos y muestra error',
       () async {
     final api = OrdersOfflineApi();
