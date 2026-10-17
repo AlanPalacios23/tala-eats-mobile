@@ -58,16 +58,47 @@ void main() {
     model.dispose();
   });
 
-  testWidgets('Intro Flutter usa solo imagen original, sin animación ni barra de carga',
+  testWidgets('Intro único usa imagen original con movimiento lento, sin spinner',
       (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: LaunchScreen()));
+    await tester.pump();
     expect(find.byType(Image), findsOneWidget);
     final image = tester.widget<Image>(find.byType(Image));
     expect(image.image, isA<AssetImage>());
     expect((image.image as AssetImage).assetName,
         'assets/branding/tala_intro.png');
+    final motion = find.byKey(
+        const ValueKey<String>('tala-intro-photo-transform'));
+    expect(motion, findsOneWidget);
+    final double initial =
+        tester.widget<Transform>(motion).transform.getMaxScaleOnAxis();
+    await tester.pump(const Duration(milliseconds: 1750));
+    final double middle =
+        tester.widget<Transform>(motion).transform.getMaxScaleOnAxis();
+    await tester.pump(const Duration(milliseconds: 1850));
+    final double finished =
+        tester.widget<Transform>(motion).transform.getMaxScaleOnAxis();
+    expect(middle, greaterThan(initial));
+    expect(finished, greaterThan(middle));
+    expect(finished, closeTo(1.038, 0.001));
     expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.byType(TalaLogoMark), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Reducir movimiento muestra arte final sin hacer zoom animado',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: true),
+        child: LaunchScreen(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final transform = tester.widget<Transform>(find.byKey(
+        const ValueKey<String>('tala-intro-photo-transform')));
+    expect(transform.transform.getMaxScaleOnAxis(), closeTo(1.038, 0.001));
     expect(tester.takeException(), isNull);
   });
 
