@@ -42,23 +42,55 @@ class CartScreen extends StatelessWidget {
               if (restaurant != null) ...<Widget>[
                 Reveal(
                   child: TalaCard(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
-                    child: Row(
-                      children: <Widget>[
-                        RestaurantMedia(assetPath: restaurant.image, imageUrl: restaurant.imageUrl, width: 52, height: 52, radius: 14),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title),
-                              const SizedBox(height: 2),
-                              Text('$itemCount ${itemCount == 1 ? 'producto' : 'productos'} · ${restaurant.eta}', style: TalaText.caption),
-                            ],
-                          ),
-                        ),
-                        TextButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Agregar más')),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                    child: LayoutBuilder(
+                      builder: (BuildContext context, BoxConstraints bounds) {
+                        // Leave room for real merchant names and large text.
+                        // The secondary action moves below instead of squeezing
+                        // the title against the photo on compact phones.
+                        final bool compactHeader = bounds.maxWidth < 340 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 17;
+                        final Widget addMore = TextButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          child: const Text('Agregar más'),
+                        );
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            Row(
+                              children: <Widget>[
+                                RestaurantMedia(
+                                  assetPath: restaurant.image,
+                                  imageUrl: restaurant.imageUrl,
+                                  width: 52, height: 52, radius: 14,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(restaurant.name,
+                                        maxLines: compactHeader ? 2 : 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TalaText.title),
+                                      const SizedBox(height: 2),
+                                      Text('$itemCount ${itemCount == 1 ? 'producto' : 'productos'} · ${restaurant.eta}',
+                                        maxLines: 2, overflow: TextOverflow.ellipsis,
+                                        style: TalaText.caption),
+                                    ],
+                                  ),
+                                ),
+                                if (!compactHeader) ...<Widget>[
+                                  const SizedBox(width: 6),
+                                  addMore,
+                                ],
+                              ],
+                            ),
+                            if (compactHeader)
+                              Align(alignment: Alignment.centerRight, child: addMore),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -330,7 +362,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           // Full-width choices prevent compressed text and
                           // inaccessible taps on 320dp/textScale 1.3 devices.
                           if (deliveryOption != null && pickupOption != null) {
-                            if (bounds.maxWidth < 320) {
+                            if (bounds.maxWidth < 375 || MediaQuery.textScalerOf(context).scale(14) > 17) {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: <Widget>[
@@ -642,7 +674,7 @@ class DeliveryModeCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
                   const SizedBox(height: 2),
-                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.caption),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TalaText.caption),
                 ],
               ),
             ),
@@ -807,7 +839,7 @@ class _CustomerAmountRow extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints bounds) {
-        if (bounds.maxWidth < 310) {
+        if (bounds.maxWidth < 345) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
