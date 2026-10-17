@@ -718,9 +718,10 @@ class TrackingScreen extends StatefulWidget {
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen> {
+class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObserver {
   Timer? _timer;
   bool refreshing = false;
+  bool _foreground = true;
 
   OrderEntry get order => widget.order;
   TalaModel get model => widget.model;
@@ -737,20 +738,46 @@ class _TrackingScreenState extends State<TrackingScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(silent: true));
+    WidgetsBinding.instance.addObserver(this);
+    final AppLifecycleState? lifecycle = WidgetsBinding.instance.lifecycleState;
+    _foreground = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _foreground) _refresh(silent: true);
+    });
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _timer?.cancel();
+    if (!_foreground || !mounted || terminal) return;
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!terminal) _refresh(silent: true);
+      if (_foreground && mounted && !terminal) _refresh(silent: true);
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final bool nextForeground = state == AppLifecycleState.resumed;
+    if (_foreground == nextForeground) return;
+    _foreground = nextForeground;
+    if (_foreground) {
+      _startPolling();
+      if (!terminal) _refresh(silent: true);
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
   Future<void> _refresh({bool silent = false}) async {
-    if (refreshing || terminal) return;
+    if (!mounted || !_foreground || refreshing || terminal) return;
     if (mounted) setState(() => refreshing = true);
     try {
       await model.refreshOrder(order);
@@ -758,6 +785,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
     } on ApiException catch (e) {
       if (!silent && mounted) showMessage(context, e.message);
     } finally {
+      if (terminal) {
+        _timer?.cancel();
+        _timer = null;
+      }
       if (mounted) setState(() => refreshing = false);
     }
   }
@@ -772,15 +803,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
             children: <Widget>[
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: <Widget>[
                   if (!terminal) const LiveBadge() else const StatusPill(label: 'Finalizado', color: kGreen, background: kSoftGreen),
-                  const Spacer(),
                   AnimatedSwitcher(
                     duration: TalaMotion.of(context, TalaMotion.select),
                     child: refreshing
                         ? const SizedBox(key: ValueKey<String>('r'), width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Estimado ${order.eta}', key: ValueKey<String>(order.eta), style: TalaText.caption),
+                        : Text('Estimado ${order.eta}', key: ValueKey<String>(order.eta), maxLines: 2, style: TalaText.caption),
                   ),
                 ],
               ),
@@ -814,7 +848,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 label: const Text('Actualizar ahora'),
               ),
               const SizedBox(height: 14),
-              const QuietNote(icon: Icons.sync_rounded, text: 'Esta pantalla se actualiza sola mientras la tienes abierta.'),
+              const QuietNote(icon: Icons.sync_rounded, text: 'El estado se consulta cuando la app está activa. Esta línea representa etapas, no ubicación GPS en tiempo real.'),
             ],
           ),
         );
@@ -959,7 +993,7 @@ class LiveBadge extends StatelessWidget {
         children: <Widget>[
           SkeletonPulse(child: Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle))),
           const SizedBox(width: 6),
-          const Text('En vivo', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          const Text('Estado automático', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
         ],
       ),
     );
