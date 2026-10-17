@@ -17,6 +17,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
+  final TextEditingController otp = TextEditingController();
+  final FocusNode otpFocus = FocusNode();
   bool hidePassword = true;
   bool loading = false;
   String error = '';
@@ -25,27 +27,52 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     email.dispose();
     password.dispose();
+    otp.dispose();
+    otpFocus.dispose();
     super.dispose();
   }
 
   Future<void> submit() async {
+    if (loading) return;
     FocusScope.of(context).unfocus();
+    final String address = email.text.trim();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(address)) {
+      setState(() => error = 'Escribe un correo electrónico válido.');
+      return;
+    }
+    if (password.text.isEmpty) {
+      setState(() => error = 'Escribe tu contraseña.');
+      return;
+    }
+    final String code = otp.text.trim();
+    if (code.isNotEmpty && !RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() => error = 'El código 2FA debe tener 6 dígitos.');
+      otpFocus.requestFocus();
+      return;
+    }
     setState(() {
       loading = true;
       error = '';
     });
-    final bool ok = await widget.model.login(email.text, password.text);
+    final bool ok = await widget.model.login(address, password.text, otp: code);
     if (!mounted) return;
     if (ok) {
       HapticFeedback.lightImpact();
       return;
     }
     HapticFeedback.mediumImpact();
+    final String message = widget.model.blockedRole.isNotEmpty
+        ? 'Esta cuenta pertenece a otra aplicación de Tala Eats.'
+        : (widget.model.lastError.isNotEmpty
+            ? widget.model.lastError
+            : 'Revisa tu correo y contraseña e inténtalo de nuevo.');
+    if (RegExp(r'(2fa|otp|autenticador|verificaci[oó]n)', caseSensitive: false)
+        .hasMatch(message)) {
+      otpFocus.requestFocus();
+    }
     setState(() {
       loading = false;
-      error = widget.model.blockedRole.isNotEmpty
-          ? 'Esta cuenta pertenece a otra aplicación de Tala Eats.'
-          : (widget.model.lastError.isNotEmpty ? widget.model.lastError : 'Revisa tu correo y contraseña e inténtalo de nuevo.');
+      error = message;
     });
   }
 
@@ -53,7 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Bienvenido de vuelta',
-      subtitle: 'Pide lo que se te antoje y sigue tu pedido en tiempo real.',
+      subtitle: 'Tu comida favorita, más cerca.',
+      showFoodImage: true,
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -70,10 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: password,
               obscureText: hidePassword,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) {
-                if (!loading) submit();
-              },
+              textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.password],
               decoration: InputDecoration(
                 labelText: 'Contraseña',
@@ -83,6 +108,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () => setState(() => hidePassword = !hidePassword),
                   icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: otp,
+              focusNode: otpFocus,
+              key: const ValueKey<String>('login-otp'),
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              autofillHints: const <String>[AutofillHints.oneTimeCode],
+              onSubmitted: (_) { if (!loading) submit(); },
+              decoration: const InputDecoration(
+                labelText: 'Código 2FA (si aplica)',
+                hintText: '6 dígitos de tu autenticador',
+                prefixIcon: Icon(Icons.security_rounded),
               ),
             ),
             Align(
@@ -113,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
               spacing: 2,
               runSpacing: 0,
               children: <Widget>[
-                const Text('¿Aún no tienes cuenta?', style: TalaText.muted),
+                const Text('¿Aún no tienes cuenta?', style: TextStyle(color: Color(0xFF171717), fontWeight: FontWeight.w800, fontSize: 13)),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(premiumRoute(SignUpScreen(model: widget.model))),
                   child: const Text('Crear cuenta'),
@@ -200,6 +244,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: 'Crea tu cuenta',
+      showSecondaryImage: true,
       subtitle: 'Un minuto y quedas listo para pedir en Tala Eats.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -342,6 +387,7 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: 'Confirma tus datos',
+      showSecondaryImage: true,
       subtitle: 'Revisa que tu correo sea correcto. Lo usarás para entrar y recuperar tu cuenta.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -406,12 +452,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> submit() async {
+    if (loading) return;
     FocusScope.of(context).unfocus();
+    final String address = email.text.trim();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(address)) {
+      setState(() => error = 'Escribe un correo electrónico válido.');
+      return;
+    }
     setState(() {
       loading = true;
       error = '';
     });
-    final bool ok = await widget.model.requestPasswordReset(email.text);
+    final bool ok = await widget.model.requestPasswordReset(address);
     if (!mounted) return;
     if (ok) HapticFeedback.lightImpact();
     setState(() {
@@ -426,9 +478,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: sent ? 'Revisa tu correo' : 'Recupera tu contraseña',
+      showSecondaryImage: true,
       subtitle: sent
-          ? 'Si la cuenta existe, recibirás un enlace seguro. Ábrelo en este teléfono para crear tu nueva contraseña.'
-          : 'Te enviaremos un enlace seguro para crear una nueva contraseña.',
+          ? 'Recibimos tu solicitud. Si la cuenta existe y el servicio de correo está disponible, recibirás un enlace seguro.'
+          : 'Solicita un enlace seguro para crear una nueva contraseña.',
       child: AnimatedSwitcher(
         duration: TalaMotion.of(context, TalaMotion.reveal),
         child: sent
@@ -451,6 +504,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     controller: email,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
+                    autofillHints: const <String>[AutofillHints.email],
                     autocorrect: false,
                     onSubmitted: (_) {
                       if (!loading) submit();
@@ -531,6 +585,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Crea una nueva contraseña',
+      showSecondaryImage: true,
       subtitle: 'Elige una contraseña segura que no uses en otros servicios.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -588,6 +643,7 @@ class PasswordUpdatedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Contraseña actualizada',
+      showSecondaryImage: true,
       subtitle: 'Ya puedes iniciar sesión con tu nueva contraseña.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -635,13 +691,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cambiar contraseña')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+    return PremiumAuthScaffold(
+      showBack: true,
+      showSecondaryImage: true,
+      title: 'Cambiar contraseña',
+      subtitle: 'Te enviaremos un enlace seguro a tu correo para definir una nueva contraseña.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const Text('Te enviaremos un enlace seguro a tu correo para que definas una nueva contraseña.', style: TalaText.body),
-          const SizedBox(height: 18),
           TalaCard(
             child: Row(
               children: <Widget>[
@@ -657,17 +714,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ],
           if (sent) ...<Widget>[
             const SizedBox(height: 12),
-            const AuthNotice(icon: Icons.mark_email_read_rounded, text: 'Listo. Revisa tu correo y abre el enlace para crear la nueva contraseña.'),
+            const AuthNotice(
+              icon: Icons.mark_email_read_rounded,
+              text: 'Listo. Revisa tu correo y abre el enlace para crear la nueva contraseña.',
+            ),
           ],
           const SizedBox(height: 18),
-          FilledButton(onPressed: loading ? null : submit, child: BusyLabel(busy: loading, label: sent ? 'Reenviar enlace' : 'Enviar enlace seguro')),
+          FilledButton(
+            onPressed: loading ? null : submit,
+            child: BusyLabel(busy: loading, label: sent ? 'Reenviar enlace' : 'Enviar enlace seguro'),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Shared auth layout: brand lockup, strong title, calm form area.
+/// Auth photography stays behind the entire viewport, including when scrolled.
+/// A neutral white veil guarantees dark text and input borders stay readable.
 class PremiumAuthScaffold extends StatelessWidget {
   const PremiumAuthScaffold({
     super.key,
@@ -676,6 +740,8 @@ class PremiumAuthScaffold extends StatelessWidget {
     required this.child,
     this.eyebrow = '',
     this.showBack = false,
+    this.showFoodImage = false,
+    this.showSecondaryImage = false,
   });
 
   final String eyebrow;
@@ -683,56 +749,111 @@ class PremiumAuthScaffold extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final bool showBack;
+  final bool showFoodImage;
+  final bool showSecondaryImage;
 
   @override
   Widget build(BuildContext context) {
+    final String? background = showFoodImage
+        ? 'assets/branding/login_food.png'
+        : showSecondaryImage
+            ? 'assets/branding/auth_secondary.jpg'
+            : null;
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF6),
+      backgroundColor: Colors.white,
       body: Stack(
         children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
-          SafeArea(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      SizedBox(
-                        height: 48,
-                        child: Row(
-                          children: <Widget>[
-                            if (showBack)
-                              TalaCircleButton(icon: Icons.arrow_back_rounded, tooltip: 'Regresar', onPressed: () => Navigator.of(context).maybePop())
-                            else
-                              const AuthBrandMark(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 26),
-                      Reveal(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            if (eyebrow.isNotEmpty) ...<Widget>[
-                              Text(eyebrow, style: TalaText.overline),
-                              const SizedBox(height: 8),
-                            ],
-                            Text(title, style: TalaText.display),
-                            const SizedBox(height: 8),
-                            Text(subtitle, style: TalaText.muted.copyWith(fontSize: 15)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Reveal(index: 2, child: Material(type: MaterialType.transparency, child: child)),
-                    ],
-                  ),
-                ),
+          if (background == null)
+            const Positioned.fill(child: AuthBackdrop())
+          else
+            Positioned.fill(
+              child: Image.asset(
+                background,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                semanticLabel: 'Fotografía de comida de Tala Eats',
               ),
+            ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints area) {
+                return SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: math.max(0.0, area.maxHeight - 36.0)),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            if (showBack) ...<Widget>[
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TalaCircleButton(
+                                  icon: Icons.arrow_back_rounded,
+                                  tooltip: 'Regresar',
+                                  onPressed: () => Navigator.of(context).maybePop(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            Reveal(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: background == null ? Colors.transparent : const Color(0xD9FFFFFF),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: <Widget>[
+                                  if (eyebrow.isNotEmpty) ...<Widget>[
+                                    Text(eyebrow, style: TalaText.overline),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  Text(title, textAlign: TextAlign.center, style: TalaText.display.copyWith(color: const Color(0xFF111111), fontWeight: FontWeight.w900)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    subtitle,
+                                    textAlign: TextAlign.center,
+                                    style: TalaText.muted.copyWith(color: const Color(0xFF171717), fontSize: 15, fontWeight: FontWeight.w800),
+                                  ),
+                                ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Reveal(
+                              index: 2,
+                              child: Theme(
+                                data: Theme.of(context).copyWith(
+                                  inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+                                    labelStyle: const TextStyle(color: Color(0xFF242424), fontWeight: FontWeight.w800),
+                                    prefixIconColor: const Color(0xFF4F4F4F),
+                                    suffixIconColor: const Color(0xFF4F4F4F),
+                                  ),
+                                  textButtonTheme: TextButtonThemeData(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF9D2B00),
+                                      backgroundColor: const Color(0xE6FFFFFF),
+                                      textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                                      minimumSize: const Size(48, 44),
+                                    ),
+                                  ),
+                                ),
+                                child: Material(type: MaterialType.transparency, child: child),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -951,12 +1072,15 @@ class LegalLoginNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
+      decoration: BoxDecoration(color: const Color(0xE6FFFFFF), borderRadius: BorderRadius.circular(18)),
+      child: Column(
       children: <Widget>[
         const Text(
-          'Al iniciar sesión aceptas los Términos y Condiciones de Uso y reconoces el Aviso de Privacidad de Tala Eats. Precios, disponibilidad y cargos se confirman antes de finalizar cada pedido.',
+          'Al iniciar sesión aceptas los Términos y Condiciones y reconoces el Aviso de Privacidad de Tala Eats.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
+          style: TextStyle(color: Color(0xFF171717), fontSize: 12, fontWeight: FontWeight.w700, height: 1.5),
         ),
         const SizedBox(height: 2),
         Wrap(
@@ -974,6 +1098,7 @@ class LegalLoginNotice extends StatelessWidget {
           ],
         ),
       ],
+      ),
     );
   }
 }
