@@ -103,16 +103,17 @@ const bool captureRequested =
 // design font and official Material icon glyphs for legible review screenshots.
 // Assets are sourced temporarily in CI and never committed or distributed.
 Future<void> loadVisualFonts() async {
-  Future<ByteData> fontFile(String key) async {
+  Future<ByteData> fontFile(String key) {
     final String path = Platform.environment[key] ?? '';
     if (path.isEmpty || !File(path).existsSync()) {
       throw StateError('Missing visual QA font: $key');
     }
-    final Uint8List bytes = await File(path).readAsBytes();
+    // testWidgets uses FakeAsync: real asynchronous file I/O can deadlock.
+    final Uint8List bytes = File(path).readAsBytesSync();
     if (bytes.length < 10000) {
       throw StateError('Visual QA font too small/corrupt: $key');
     }
-    return ByteData.sublistView(bytes);
+    return Future<ByteData>.value(ByteData.sublistView(bytes));
   }
 
   final FontLoader roboto = FontLoader('Roboto')
