@@ -147,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
               spacing: 2,
               runSpacing: 0,
               children: <Widget>[
-                const Text('¿Aún no tienes cuenta?', style: TalaText.muted),
+                const Text('¿Aún no tienes cuenta?', style: TextStyle(color: Color(0xFF171717), fontWeight: FontWeight.w800, fontSize: 13)),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(premiumRoute(SignUpScreen(model: widget.model))),
                   child: const Text('Crear cuenta'),
@@ -714,7 +714,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 }
 
 /// Auth photography stays behind the entire viewport, including when scrolled.
-/// A neutral white veil guarantees dark text and input borders stay readable.
+/// Photos retain their native colors. Only text has local contrast backing.
 class PremiumAuthScaffold extends StatelessWidget {
   const PremiumAuthScaffold({
     super.key,
@@ -748,7 +748,7 @@ class PremiumAuthScaffold extends StatelessWidget {
         children: <Widget>[
           if (background == null)
             const Positioned.fill(child: AuthBackdrop())
-          else ...<Widget>[
+          else
             Positioned.fill(
               child: Image.asset(
                 background,
@@ -757,14 +757,6 @@ class PremiumAuthScaffold extends StatelessWidget {
                 semanticLabel: 'Fotografía de comida de Tala Eats',
               ),
             ),
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Color(0x88FFFFFF),
-                ),
-              ),
-            ),
-          ],
           SafeArea(
             child: LayoutBuilder(
               builder: (BuildContext context, BoxConstraints area) {
@@ -792,27 +784,80 @@ class PremiumAuthScaffold extends StatelessWidget {
                               const SizedBox(height: 12),
                             ],
                             Reveal(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: <Widget>[
-                                  if (eyebrow.isNotEmpty) ...<Widget>[
-                                    Text(eyebrow, style: TalaText.overline),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: background == null
+                                      ? Colors.transparent
+                                      : const Color(0xD9FFFFFF),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: <Widget>[
+                                    if (eyebrow.isNotEmpty) ...<Widget>[
+                                      Text(eyebrow, style: TalaText.overline),
+                                      const SizedBox(height: 8),
+                                    ],
+                                    Text(title,
+                                      textAlign: TextAlign.center,
+                                      style: TalaText.display.copyWith(
+                                        color: const Color(0xFF111111),
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
                                     const SizedBox(height: 8),
+                                    Text(subtitle,
+                                      textAlign: TextAlign.center,
+                                      style: TalaText.muted.copyWith(
+                                        color: const Color(0xFF171717),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.38,
+                                      ),
+                                    ),
                                   ],
-                                  Text(title, textAlign: TextAlign.center, style: TalaText.display),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    subtitle,
-                                    textAlign: TextAlign.center,
-                                    style: TalaText.muted.copyWith(color: kInkSoft, fontSize: 15, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 20),
                             Reveal(
                               index: 2,
-                              child: Material(type: MaterialType.transparency, child: child),
+                              child: Theme(
+                                data: Theme.of(context).copyWith(
+                                  inputDecorationTheme: Theme.of(context)
+                                      .inputDecorationTheme.copyWith(
+                                    labelStyle: const TextStyle(
+                                      color: Color(0xFF242424),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    hintStyle: const TextStyle(
+                                      color: Color(0xFF555555),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    prefixIconColor: const Color(0xFF4F4F4F),
+                                    suffixIconColor: const Color(0xFF4F4F4F),
+                                  ),
+                                  textButtonTheme: TextButtonThemeData(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF9D2B00),
+                                      backgroundColor: const Color(0xE6FFFFFF),
+                                      minimumSize: const Size(48, 44),
+                                      textStyle: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                child: Material(type: MaterialType.transparency, child: child),
+                              ),
                             ),
                           ],
                         ),
@@ -1039,12 +1084,18 @@ class LegalLoginNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xE6FFFFFF),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
       children: <Widget>[
         const Text(
           'Al iniciar sesión aceptas los Términos y Condiciones y reconoces el Aviso de Privacidad de Tala Eats.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
+          style: TextStyle(color: Color(0xFF171717), fontSize: 12, fontWeight: FontWeight.w700, height: 1.5),
         ),
         const SizedBox(height: 2),
         Wrap(
