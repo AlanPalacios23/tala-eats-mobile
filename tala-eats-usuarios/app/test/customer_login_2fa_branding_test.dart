@@ -18,7 +18,7 @@ class LoginOtpCaptureApi extends TalaApi {
 }
 
 void main() {
-  testWidgets('Login muestra OTP editable y lo envía al backend, sin inventar autenticación',
+  testWidgets('Usuarios: solo correo y contraseña; MFA backend nunca se ignora',
       (WidgetTester tester) async {
     final api = LoginOtpCaptureApi();
     final model = TalaModel(apiClient: api);
@@ -30,37 +30,26 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey<String>('login-otp')), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byKey(const ValueKey<String>('login-otp')), findsNothing);
     expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
     expect(find.text('Crear cuenta'), findsOneWidget);
     expect(find.text('Términos y Condiciones'), findsOneWidget);
     expect(find.text('Aviso de Privacidad'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('auth-surface')), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).at(0), 'qa@example.invalid');
     await tester.enterText(find.byType(TextField).at(1), 'ContraseñaQA123!');
     await tester.ensureVisible(find.text('Iniciar sesión'));
     await tester.tap(find.text('Iniciar sesión'));
     await tester.pumpAndSettle();
+
     expect(api.requests, 1);
-    expect(api.lastOtp, isEmpty);
-    expect(find.textContaining('2FA requerido'), findsOneWidget);
-
-    final otpField = find.byKey(const ValueKey<String>('login-otp'));
-    await tester.ensureVisible(otpField);
-    await tester.enterText(otpField, '12345');
-    await tester.ensureVisible(find.text('Iniciar sesión'));
-    await tester.tap(find.text('Iniciar sesión'));
-    await tester.pumpAndSettle();
-    expect(api.requests, 1, reason: 'OTP parcial no debe consultar servidor');
-
-    await tester.ensureVisible(otpField);
-    await tester.enterText(otpField, '123456');
-    await tester.ensureVisible(find.text('Iniciar sesión'));
-    await tester.tap(find.text('Iniciar sesión'));
-    await tester.pumpAndSettle();
-    expect(api.requests, 2);
-    expect(api.lastOtp, '123456');
-    expect(model.signedIn, false, reason: 'Solo backend puede aprobar 2FA');
+    expect(api.lastOtp, isEmpty,
+        reason: 'Usuarios nunca inventa ni solicita un OTP.');
+    expect(find.textContaining('requiere verificación adicional'), findsOneWidget);
+    expect(model.signedIn, false,
+        reason: 'Un backend que exige 2FA sigue bloqueando el login.');
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
