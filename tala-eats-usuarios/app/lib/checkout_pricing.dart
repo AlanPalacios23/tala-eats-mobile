@@ -95,7 +95,7 @@ class CheckoutPricingPreview {
     if (!delivery) return 'Pedido para recoger, sin cargo de envío. El servidor confirma los importes antes del cobro.';
     if (policy!.version == '1.6.2') {
       final p = policy!;
-      return 'Referencia de envío desde ${moneyWithCents(p.baseDeliveryFee)} hasta ${p.deliveryIncludedKm?.toStringAsFixed(1) ?? '—'} km y ${moneyWithCents(p.deliveryPerAdditionalKm ?? 0)} por km adicional. No es una cotización; el servidor confirma el importe según GPS.';
+      return 'Referencia de envío desde ${moneyWithCents(p.baseDeliveryFee)} hasta ${p.deliveryIncludedKm?.toStringAsFixed(1) ?? '—'} km y ${moneyWithCents(p.deliveryPerAdditionalKm ?? 0)} por km adicional. Es referencia, no cotización definitiva; el servidor confirma el importe según GPS.';
     }
     return 'Importe estimado. El envío puede subir por distancia y los precios/promociones se verifican al confirmar el pedido.';
   }
