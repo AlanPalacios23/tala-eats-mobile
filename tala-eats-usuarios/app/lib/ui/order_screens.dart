@@ -75,11 +75,27 @@ class _OrdersScreenState extends State<OrdersScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 40),
                 child: StatusView(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Aún no tienes pedidos',
-                  body: 'Cuando hagas tu primer pedido podrás seguirlo aquí en tiempo real.',
-                  actionLabel: 'Explorar restaurantes',
-                  onAction: () => model.setTab(0),
+                  icon: model.ordersLoadError.isNotEmpty
+                      ? Icons.cloud_off_rounded
+                      : Icons.receipt_long_outlined,
+                  title: model.ordersRefreshing
+                      ? 'Cargando tus pedidos'
+                      : model.ordersLoadError.isNotEmpty
+                          ? 'No pudimos cargar tus pedidos'
+                          : 'Aún no tienes pedidos',
+                  body: model.ordersLoadError.isNotEmpty
+                      ? 'Revisa tu conexión. Puedes intentar actualizar el historial.'
+                      : 'Cuando hagas tu primer pedido podrás seguirlo aquí en tiempo real.',
+                  actionLabel: model.ordersRefreshing
+                      ? null
+                      : model.ordersLoadError.isNotEmpty
+                          ? 'Reintentar'
+                          : 'Explorar restaurantes',
+                  onAction: model.ordersRefreshing
+                      ? null
+                      : model.ordersLoadError.isNotEmpty
+                          ? () { model.refreshOrders(); }
+                          : () => model.setTab(0),
                 ),
               )
             else ...<Widget>[
