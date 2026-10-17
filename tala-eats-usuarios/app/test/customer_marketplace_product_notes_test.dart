@@ -52,7 +52,7 @@ void main() {
     expect(find.text('Extra salsa'), findsNothing);
     final note = find.byKey(const ValueKey<String>('product-merchant-note'));
     expect(note, findsOneWidget);
-    expect(tester.widget<TextField>(note).maxLength, 180);
+    expect(tester.widget<TextFormField>(note).maxLength, 180);
     await tester.enterText(note, 'Entregar en bolsa separada');
     await tester.pump();
     final button = find.textContaining('Agregar ·');
