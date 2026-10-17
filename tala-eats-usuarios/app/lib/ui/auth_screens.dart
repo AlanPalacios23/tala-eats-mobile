@@ -726,7 +726,34 @@ class PremiumAuthScaffold extends StatelessWidget {
       backgroundColor: const Color(0xFFFFFAF6),
       body: Stack(
         children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
+          if (showFoodImage) ...<Widget>[
+            Positioned(
+              top: 0, left: 0, right: 0, height: 260,
+              child: Image.asset(
+                'assets/branding/login_food.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                semanticLabel: 'Fotografía gastronómica de Tala Eats',
+              ),
+            ),
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Color(0xCCFFFFFF),
+                      Color(0xF5FFFAF6),
+                      Color(0xFFFFFFFF),
+                    ],
+                    stops: <double>[0, 0.34, 0.58],
+                  ),
+                ),
+              ),
+            ),
+          ] else
+            const Positioned.fill(child: AuthBackdrop()),
           SafeArea(
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -737,23 +764,6 @@ class PremiumAuthScaffold extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      if (showFoodImage) ...<Widget>[
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: Semantics(
-                            label: 'Fotografía gastronómica de Tala Eats',
-                            image: true,
-                            child: Image.asset(
-                              'assets/branding/login_food.png',
-                              height: 190,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
                       SizedBox(
                         height: 48,
                         child: Row(
