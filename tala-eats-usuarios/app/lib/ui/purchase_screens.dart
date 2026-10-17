@@ -710,9 +710,9 @@ class PaymentUnavailableCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Pago en línea no disponible por ahora', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
+                    Text('No hay métodos de pago disponibles', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
                     SizedBox(height: 4),
-                    Text('No se hará ningún cargo. Intenta de nuevo cuando el servidor vuelva a ofrecer un método disponible.', style: TextStyle(color: kInkSoft, fontSize: 13, height: 1.4)),
+                    Text('No podemos confirmar tu pedido por ahora, ni en efectivo ni en línea. No se hará ningún cargo. Revisa de nuevo antes de continuar.', style: TextStyle(color: kInkSoft, fontSize: 13, height: 1.4)),
                   ],
                 ),
               ),
