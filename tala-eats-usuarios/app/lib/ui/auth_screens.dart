@@ -1113,6 +1113,7 @@ class LegalLoginNotice extends StatelessWidget {
           ],
         ),
       ],
+      ),
     );
   }
 }
