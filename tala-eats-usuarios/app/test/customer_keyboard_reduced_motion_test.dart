@@ -81,6 +81,10 @@ void main() {
           width, reducedMotion: true);
       await tester.pumpAndSettle();
       final Finder field = find.byType(TextField);
+      // Coupon is below the fold. Scroll to build it before focusing;
+      // ensureVisible alone cannot locate an unmounted lazy list child.
+      await tester.scrollUntilVisible(field, 150,
+          scrollable: find.byType(Scrollable).first);
       await tester.ensureVisible(field);
       await tester.enterText(field, 'PRUEBA');
       await tester.pumpAndSettle();
