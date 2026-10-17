@@ -28,8 +28,9 @@ concurrency:
   group: users-order-contract-${{ github.ref }}
   cancel-in-progress: true
 
-# No release signing, distributed APK, runtime deployment, live PSP, token, Android device,
-# Firebase or user data. The GitHub Actions app is Flutter-only QA.
+# Flutter-only QA. No release signing, Play Store, runtime deployment, live PSP,
+# tokens, Firebase setup, physical Android device or real user data. A debug APK
+# artifact is available only for the explicitly requested Usuarios PR branch.
 jobs:
   users-order-contract:
     name: Flutter analyze + tests + compilacion Android debug efimera
@@ -106,8 +107,19 @@ jobs:
       - name: Compilar Java nativo y Flutter Android debug (efímero, sin publicar)
         timeout-minutes: 12
         run: flutter build apk --debug --no-pub
-      - name: No subir ni distribuir APK
+      - name: Verificar APK debug y checksum
         run: |
-          test -f build/app/outputs/flutter-apk/app-debug.apk
-          echo 'NATIVE_ANDROID_DEBUG_COMPILE_PASS no signing release, no APK artifact, no deploy'
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          (cd build/app/outputs/flutter-apk && sha256sum app-debug.apk > app-debug.apk.sha256)
+          echo 'NATIVE_ANDROID_DEBUG_COMPILE_PASS; not a signed release and no deploy'
+      - name: Compartir APK DEBUG solicitado (solo PR Usuarios y temporal)
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/usuarios-orders-bootstrap-resilience-20261016' || github.head_ref == 'fix/usuarios-login-2fa-single-splash-20261017' || github.head_ref == 'fix/usuarios-auth-fullscreen-pricing-20261017') && github.event.pull_request.head.repo.full_name == 'AlanPalacios23/tala-eats-mobile' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: TALA-EATS-Usuarios-v1.0.32-PR34-AUTH-PRICING-DEBUG
+          path: |
+            tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
+            tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 7
 
