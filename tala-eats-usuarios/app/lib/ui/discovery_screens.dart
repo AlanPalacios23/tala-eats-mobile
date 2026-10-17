@@ -650,11 +650,11 @@ class RestaurantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool favorite = model.favorites.contains(restaurant.id);
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery
-        ? 'Solo para recoger'
-        : (restaurant.deliveryFee <= 0
-            ? 'Envío gratis'
-            : 'Envío ' + money(restaurant.deliveryFee));
+    // RestaurantPublic.delivery_fee is a merchant field, NOT a customer quote.
+    // The 1.6.2 contract calculates delivery from customer GPS at checkout.
+    final String fee = restaurant.delivery
+        ? 'Envío según distancia'
+        : 'Solo para recoger';
     Widget media = AspectRatio(
       aspectRatio: 16 / 9,
       child: RestaurantMedia(
@@ -1331,11 +1331,10 @@ class _RestaurantInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery
-        ? 'Para recoger'
-        : (restaurant.deliveryFee <= 0
-            ? 'Envío gratis'
-            : 'Envío ' + money(restaurant.deliveryFee));
+    // Never advertise a restaurant-level delivery_fee as final shipping.
+    final String fee = restaurant.delivery
+        ? 'Envío según distancia'
+        : 'Para recoger';
     final List<(IconData, String)> details = <(IconData, String)>[
       if (restaurant.rating > 0)
         (Icons.star_rounded, restaurant.rating.toStringAsFixed(1)),
