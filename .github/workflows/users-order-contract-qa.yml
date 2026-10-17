@@ -63,6 +63,17 @@ jobs:
         run: flutter test --reporter=compact test/android_back_offline_media_test.dart
       - name: "UI limpia y funcionalidades conservadas en 320-430 dp"
         run: flutter test --reporter=compact test/quiet_ui_regression_test.dart
+      - name: "QA teclado y Reduce Motion: 320/360/390/430 dp"
+        run: flutter test --reporter=compact test/customer_keyboard_reduced_motion_test.dart
+      - name: "Generar capturas Flutter SINTETICAS sin datos privados"
+        run: flutter test --update-goldens --dart-define=TALA_VISUAL_CAPTURE=true --reporter=compact test/customer_visual_reference_capture_test.dart
+      - name: "Conservar solo capturas PNG sintéticas para revisión"
+        uses: actions/upload-artifact@v4
+        with:
+          name: talaeats-usuarios-v1028-capturas-sinteticas
+          path: tala-eats-usuarios/app/test/goldens/*_mock_*.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Backend externo solo GET (diagnostico, no equivalente a E2E)
