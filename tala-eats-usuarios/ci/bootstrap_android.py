@@ -124,7 +124,7 @@ dependencies {
                 body = re.sub(
                     r'<item name="' + re.escape(key) + r'">.*?</item>', '', body,
                     flags=re.S)
-                body += '\\n        <item name="' + key + '">' + value + '</item>'
+                body += '\n        <item name="' + key + '">' + value + '</item>'
             xml = xml[:m.start()] + m.group(1) + body + m.group(3) + xml[m.end():]
         else:
             xml = '''<?xml version="1.0" encoding="utf-8"?>
