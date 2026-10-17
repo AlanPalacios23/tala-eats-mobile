@@ -112,7 +112,9 @@ Future<void> snapshot(WidgetTester tester, Widget page,
           disableAnimations: true,
           accessibleNavigation: true,
         ),
-        child: page,
+        // Shell tabs normally live inside a Scaffold. Mirror that Material
+        // ancestor here; nested route Scaffolds remain valid in test mode.
+        child: Scaffold(body: page),
       ),
     ),
   ));
