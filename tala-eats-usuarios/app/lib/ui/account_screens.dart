@@ -43,7 +43,6 @@ class AccountScreen extends StatelessWidget {
           const SizedBox(height: 18),
           Reveal(
             child: TalaCard(
-              shadow: true,
               padding: const EdgeInsets.all(16),
               onTap: () => Navigator.of(context).push(premiumRoute(EditProfileScreen(model: model))),
               child: Row(
@@ -65,8 +64,6 @@ class AccountScreen extends StatelessWidget {
                         Text(model.userName.trim().isEmpty ? 'Tu perfil' : model.userName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.h2.copyWith(fontSize: 19)),
                         const SizedBox(height: 2),
                         Text(model.userEmail, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.muted),
-                        const SizedBox(height: 6),
-                        const Text('Editar perfil', style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -143,8 +140,6 @@ class AccountScreen extends StatelessWidget {
             icon: const Icon(Icons.logout_rounded),
             label: const Text('Cerrar sesión'),
           ),
-          const SizedBox(height: 16),
-          const Text('Tala Eats · v1.0.12', textAlign: TextAlign.center, style: TalaText.caption),
         ],
       ),
     );
@@ -152,6 +147,8 @@ class AccountScreen extends StatelessWidget {
 }
 
 /// The single place where saldo, puntos and nivel are summarized.
+/// Wallet, points and membership remain one tap away without a large
+/// promotional gradient panel competing with profile and account controls.
 class TalaClubAccountCard extends StatelessWidget {
   const TalaClubAccountCard({super.key, required this.model});
 
@@ -161,62 +158,40 @@ class TalaClubAccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Tala Club. Saldo ${money(model.wallet)}, ${model.points} puntos, nivel ${model.loyaltyTier}',
+      label: 'Tala Club. Saldo ${money(model.wallet)}, '
+          '${model.points} puntos, nivel ${model.loyaltyTier}',
       excludeSemantics: true,
-      child: Pressable(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: const <BoxShadow>[BoxShadow(color: Color(0x22CE3C0A), blurRadius: 22, offset: Offset(0, 9))],
-          ),
-          child: Material(
-            borderRadius: BorderRadius.circular(22),
-            clipBehavior: Clip.antiAlias,
-            color: kBrand,
-            child: InkWell(
-              onTap: () => Navigator.of(context).push(premiumRoute(WalletScreen(model: model))),
-              child: Ink(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: <Color>[Color(0xFFCF4512), kBrandDeep, Color(0xFFAA2D09)]),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
-                  child: Row(
-                    children: <Widget>[
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(15)),
-                        child: const Icon(Icons.workspace_premium_rounded, color: Colors.white),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Row(
-                              children: <Widget>[
-                                const Text('Tala Club', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(99)),
-                                  child: Text(model.loyaltyTier.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.8)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text('${money(model.wallet)} de saldo · ${model.points} puntos', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.white),
-                    ],
-                  ),
-                ),
+      child: TalaCard(
+        onTap: () => Navigator.of(context).push(
+            premiumRoute(WalletScreen(model: model))),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 46, height: 46,
+              decoration: BoxDecoration(
+                color: kSoftOrange,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.account_balance_wallet_outlined,
+                  color: kBrandDeep, size: 23),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text('Tala Club', style: TalaText.title),
+                  const SizedBox(height: 3),
+                  Text('${money(model.wallet)} de saldo · '
+                      '${model.points} puntos',
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: TalaText.muted),
+                ],
               ),
             ),
-          ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, color: kSubtle),
+          ],
         ),
       ),
     );
