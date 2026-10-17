@@ -14,6 +14,27 @@ const Color kDanger = Color(0xFFC6312A);
 const Color kDangerSoft = Color(0xFFFFEDEA);
 const Color kScrim = Color(0x591C140F);
 
+/// WCAG contrast for small labels on colored notices and status surfaces.
+/// Adapts functional text only; logo and original brand color stay unchanged.
+class TalaReadableText {
+  static double contrast(Color foreground, Color background) {
+    final double a = foreground.computeLuminance();
+    final double b = background.computeLuminance();
+    return ((a > b ? a : b) + 0.05) / ((a < b ? a : b) + 0.05);
+  }
+
+  static Color against(Color foreground, Color background) {
+    if (contrast(foreground, background) >= 4.5) return foreground;
+    for (int i = 1; i <= 20; i++) {
+      final Color candidate = Color.lerp(
+        foreground, Colors.black, i / 20,
+      )!;
+      if (contrast(candidate, background) >= 4.5) return candidate;
+    }
+    return Colors.black;
+  }
+}
+
 const List<BoxShadow> kShadowSoft = <BoxShadow>[
   BoxShadow(color: Color(0x0B25211E), blurRadius: 20, offset: Offset(0, 6)),
 ];
@@ -808,8 +829,10 @@ class AuthNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = danger ? kDanger : kGreen;
     final Color background = danger ? kDangerSoft : kSoftGreen;
+    final Color color = TalaReadableText.against(
+      danger ? kDanger : kGreen, background,
+    );
     return Semantics(
       liveRegion: danger,
       child: Container(
@@ -1124,7 +1147,13 @@ class MetaLine extends StatelessWidget {
 
 /// Status pill (Abierto / Cerrado / order states).
 class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.label, required this.color, required this.background, this.dot = true});
+  const StatusPill({
+    super.key,
+    required this.label,
+    required this.color,
+    required this.background,
+    this.dot = true,
+  });
 
   final String label;
   final Color color;
@@ -1133,18 +1162,39 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(99)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (dot) ...<Widget>[
-            Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
+    final Color textColor = TalaReadableText.against(color, background);
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: (screenWidth - 40).clamp(120.0, 600.0).toDouble()),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (dot) ...<Widget>[
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: textColor,
+                    shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(label,
+                softWrap: true,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: textColor,
+                    fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
           ],
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-        ],
+        ),
       ),
     );
   }
