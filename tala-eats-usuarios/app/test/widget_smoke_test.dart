@@ -154,6 +154,8 @@ void main() {
     await tester.pumpWidget(const TalaEatsApp(testMode: true));
     await tester.pump();
 
+    await tester.ensureVisible(find.text('Crear cuenta'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Crear cuenta'));
     await tester.pumpAndSettle();
 
@@ -166,6 +168,8 @@ void main() {
     await tester.pumpWidget(const TalaEatsApp(testMode: true));
     await tester.pump();
 
+    await tester.ensureVisible(find.text('¿Olvidaste tu contraseña?'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('¿Olvidaste tu contraseña?'));
     await tester.pumpAndSettle();
 
