@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:talaeats_users/main.dart';
 import 'package:talaeats_users/production_api.dart';
@@ -96,6 +99,30 @@ TalaModel sampleModel() {
 const bool captureRequested =
     bool.fromEnvironment('TALA_VISUAL_CAPTURE', defaultValue: false);
 
+// Flutter test renders Ahem rectangles by default. Register the exact Android
+// design font and official Material icon glyphs for legible review screenshots.
+// Assets are sourced temporarily in CI and never committed or distributed.
+Future<void> loadVisualFonts() async {
+  Future<ByteData> fontFile(String key) async {
+    final String path = Platform.environment[key] ?? '';
+    if (path.isEmpty || !File(path).existsSync()) {
+      throw StateError('Missing visual QA font: $key');
+    }
+    final Uint8List bytes = await File(path).readAsBytes();
+    if (bytes.length < 10000) {
+      throw StateError('Visual QA font too small/corrupt: $key');
+    }
+    return ByteData.sublistView(bytes);
+  }
+
+  final FontLoader roboto = FontLoader('Roboto')
+    ..addFont(fontFile('TALA_VISUAL_ROBOTO_PATH'));
+  final FontLoader icons = FontLoader('MaterialIcons')
+    ..addFont(fontFile('TALA_VISUAL_MATERIAL_ICONS_PATH'));
+  await Future.wait(<Future<void>>[roboto.load(), icons.load()]);
+}
+
+
 Future<void> snapshot(WidgetTester tester, Widget page,
     String file, {double width = 390, double textScale = 1.0}) async {
   tester.view.physicalSize = Size(width, 844);
@@ -130,6 +157,7 @@ Future<void> snapshot(WidgetTester tester, Widget page,
 void main() {
   testWidgets('Reference images — seven key screens, isolated mock data',
       (WidgetTester tester) async {
+    await loadVisualFonts();
     final TalaModel m = sampleModel();
     final Map<String, Widget> pages = <String, Widget>{
       '01_home_mock_390.png': HomeScreen(model: m),
