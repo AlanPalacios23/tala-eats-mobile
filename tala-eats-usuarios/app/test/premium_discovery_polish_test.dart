@@ -65,8 +65,9 @@ void main() {
       home: Scaffold(body: SearchScreen(model: model)),
     ));
     await tester.pump(const Duration(milliseconds: 350));
-    expect(find.text('Explora comercios de Tala'), findsOneWidget);
-    expect(find.text('Explora por categoría'), findsOneWidget);
+    expect(find.text('Buscar'), findsOneWidget);
+    expect(find.text('Explora por categoría'), findsNothing,
+        reason: 'Buscar mantiene el foco en encontrar comercios, sin chips decorativos.');
     expect(find.text('Comercios disponibles'), findsOneWidget);
     expect(find.text('Taquería local'), findsOneWidget);
     expect(find.text('Verduras frescas'), findsOneWidget);

@@ -482,10 +482,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  TalaSectionHeader(
-                    title: 'Restaurantes y comercios',
-                    trailing: model.restaurants.isEmpty ? null : TalaCountChip(label: '${model.restaurants.length}'),
-                  ),
+                  const TalaSectionHeader(title: 'Restaurantes y comercios'),
                   const SizedBox(height: 14),
                 ],
               ),
@@ -841,28 +838,9 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void setQuickQuery(String value) {
-    controller.text = value;
-    controller.selection = TextSelection.collapsed(offset: value.length);
-    setState(() => query = value);
-    HapticFeedback.selectionClick();
-  }
-
   void clear() {
     controller.clear();
     setState(() => query = '');
-  }
-
-  List<String> _quickSearches() {
-    final List<String> seen = <String>[];
-    final Set<String> keys = <String>{};
-    for (final Restaurant restaurant in widget.model.restaurants) {
-      final String label = restaurant.category.trim();
-      if (label.isEmpty) continue;
-      if (keys.add(_fold(label))) seen.add(label);
-      if (seen.length == 8) break;
-    }
-    return seen;
   }
 
   @override
@@ -875,9 +853,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final List<FoodItem> items = normalized.isEmpty
         ? <FoodItem>[]
         : model.menu.where((FoodItem item) => _fold(item.name).contains(normalized) || _fold(item.category).contains(normalized)).toList();
-    final List<String> quick = _quickSearches();
     final List<Restaurant> nearby = model.restaurants
-        .where((Restaurant r) => r.isOpen).take(4).toList();
+        .where((Restaurant r) => r.isOpen).toList();
 
     return SafeArea(
       bottom: false,
@@ -886,10 +863,7 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 130),
         children: <Widget>[
           const Text('Buscar', style: TalaText.display),
-          const SizedBox(height: 3),
-          Text('Explora comercios de ' + TalaMarket.labelFor(model.marketCode),
-              style: TalaText.muted),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           TextField(
             controller: controller,
             autofocus: false,
@@ -921,45 +895,36 @@ class _SearchScreenState extends State<SearchScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        if (quick.isNotEmpty) ...<Widget>[
-                          const Text('Explora por categoría',
-                              style: TextStyle(color: kInk, fontSize: 16,
-                                  fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: <Widget>[
-                              for (final String label in quick)
-                                TalaChoicePill(
-                                  label: label,
-                                  icon: DishThumb.iconFor(label),
-                                  selected: false,
-                                  onTap: () => setQuickQuery(label),
-                                ),
-                            ],
-                          ),
-                        ],
                         if (nearby.isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 30),
-                          TalaSectionHeader(
-                            title: 'Comercios disponibles',
-                            subtitle: 'Disponibles en ' +
-                                TalaMarket.labelFor(model.marketCode),
-                          ),
+                          const TalaSectionHeader(title: 'Comercios disponibles'),
                           const SizedBox(height: 14),
                           for (final Restaurant restaurant in nearby)
                             SearchRestaurantTile(model: model,
                                 restaurant: restaurant),
                         ],
-                        if (quick.isEmpty && nearby.isEmpty)
-                          const StatusView(
-                            icon: Icons.storefront_outlined,
-                            title: 'Aún no hay comercios para explorar',
-                            body: 'Cuando haya negocios disponibles en esta '
-                                'localidad los encontrarás aquí.',
-                            compact: true,
-                          ),
+                        if (nearby.isEmpty)
+                          if (model.loading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (model.lastError.isNotEmpty)
+                            StatusView(
+                              icon: Icons.cloud_off_rounded,
+                              title: 'No pudimos cargar los comercios',
+                              body: 'Comprueba tu conexión e inténtalo de nuevo.',
+                              actionLabel: 'Reintentar',
+                              onAction: model.refreshAll,
+                              compact: true,
+                            )
+                          else
+                            const StatusView(
+                              icon: Icons.storefront_outlined,
+                              title: 'Aún no hay comercios para explorar',
+                              body: 'Cuando haya negocios disponibles en esta '
+                                  'localidad los encontrarás aquí.',
+                              compact: true,
+                            ),
                       ],
                     ),
                   )
@@ -976,14 +941,14 @@ class _SearchScreenState extends State<SearchScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               if (restaurants.isNotEmpty) ...<Widget>[
-                                TalaSectionHeader(title: 'Restaurantes', trailing: TalaCountChip(label: '${restaurants.length}')),
+                                const TalaSectionHeader(title: 'Restaurantes'),
                                 const SizedBox(height: 12),
                                 for (int i = 0; i < restaurants.length; i++)
                                   Reveal(index: i, child: SearchRestaurantTile(model: model, restaurant: restaurants[i])),
                                 const SizedBox(height: 16),
                               ],
                               if (items.isNotEmpty) ...<Widget>[
-                                TalaSectionHeader(title: 'Platillos', trailing: TalaCountChip(label: '${items.length}')),
+                                const TalaSectionHeader(title: 'Platillos'),
                                 const SizedBox(height: 12),
                                 for (int i = 0; i < items.length; i++) Reveal(index: i, child: SearchDishTile(model: model, item: items[i])),
                               ],
@@ -1366,104 +1331,86 @@ class _RestaurantInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery ? 'Recoger' : (restaurant.deliveryFee <= 0 ? 'Gratis' : money(restaurant.deliveryFee));
+    final String fee = !restaurant.delivery
+        ? 'Para recoger'
+        : (restaurant.deliveryFee <= 0
+            ? 'Envío gratis'
+            : 'Envío ' + money(restaurant.deliveryFee));
+    final List<(IconData, String)> details = <(IconData, String)>[
+      if (restaurant.rating > 0)
+        (Icons.star_rounded, restaurant.rating.toStringAsFixed(1)),
+      if (restaurant.delivery) (Icons.schedule_rounded, restaurant.eta),
+      (restaurant.delivery
+          ? Icons.two_wheeler_rounded
+          : Icons.storefront_rounded, fee),
+    ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
-      child: Reveal(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                closed
-                    ? const StatusPill(label: 'Cerrado ahora', color: kInkSoft, background: kSunken)
-                    : const StatusPill(label: 'Abierto', color: kGreen, background: kSoftGreen),
-                if (restaurant.promo.isNotEmpty) StatusPill(label: restaurant.promo, color: kBrandDeep, background: kSoftOrange, dot: false),
-                if (restaurant.pickup && restaurant.delivery) const StatusPill(label: 'También para recoger', color: kInkSoft, background: kSunken, dot: false),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(restaurant.name, style: TalaText.h1.copyWith(fontSize: 28)),
-            const SizedBox(height: 4),
-            Text(restaurant.category, style: TalaText.muted.copyWith(fontSize: 15)),
-            if (restaurant.description.trim().isNotEmpty) ...<Widget>[
-              const SizedBox(height: 10),
-              Text(restaurant.description, style: TalaText.body),
-            ],
-            const SizedBox(height: 16),
-            TalaCard(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              child: Row(
-                children: <Widget>[
-                  if (restaurant.rating > 0) ...<Widget>[
-                    Expanded(child: _InfoStat(icon: Icons.star_rounded, iconColor: kGold, value: restaurant.rating.toStringAsFixed(1), label: 'Calificación')),
-                    const _InfoDivider(),
-                  ],
-                  Expanded(child: _InfoStat(icon: Icons.schedule_rounded, value: restaurant.eta, label: 'Entrega')),
-                  const _InfoDivider(),
-                  Expanded(
-                    child: _InfoStat(
-                      icon: restaurant.delivery ? Icons.two_wheeler_rounded : Icons.storefront_rounded,
-                      value: fee,
-                      label: restaurant.delivery ? 'Envío' : 'Modalidad',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (closed) ...<Widget>[
-              const SizedBox(height: 12),
-              const AuthNotice(
-                icon: Icons.schedule_rounded,
-                text: 'Este comercio está cerrado por ahora. Puedes ver su menú y pedir cuando vuelva a abrir.',
-                danger: true,
-              ),
-            ],
-            const SizedBox(height: 24),
-            const Text('Menú', style: TalaText.h2),
-            const SizedBox(height: 4),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(restaurant.name, style: TalaText.h1.copyWith(fontSize: 28)),
+          const SizedBox(height: 4),
+          Text(restaurant.category,
+              style: TalaText.muted.copyWith(fontSize: 15)),
+          if (restaurant.description.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 10),
+            Text(restaurant.description, style: TalaText.body),
           ],
-        ),
+          const SizedBox(height: 14),
+          // Compact factual metadata instead of status chips and a boxed
+          // three-column scorecard. Avoids repeated 'Abierto' labels.
+          Wrap(
+            spacing: 14,
+            runSpacing: 9,
+            children: <Widget>[
+              for (final (IconData icon, String value) in details)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(icon, color: kMuted, size: 16),
+                    const SizedBox(width: 5),
+                    Text(value, style: const TextStyle(
+                      color: kInkSoft, fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    )),
+                  ],
+                ),
+              if (restaurant.pickup && restaurant.delivery)
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(Icons.storefront_outlined, color: kMuted, size: 16),
+                    SizedBox(width: 5),
+                    Text('Para recoger', style: TextStyle(
+                        color: kInkSoft, fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                  ],
+                ),
+            ],
+          ),
+          if (restaurant.promo.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(restaurant.promo,
+                softWrap: true,
+                style: const TextStyle(color: kBrandDeep,
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+          if (closed) ...<Widget>[
+            const SizedBox(height: 12),
+            const AuthNotice(
+              icon: Icons.schedule_rounded,
+              text: 'Este comercio está cerrado por ahora. Puedes ver su menú y pedir cuando vuelva a abrir.',
+              danger: true,
+            ),
+          ],
+          const SizedBox(height: 24),
+          const Text('Menú', style: TalaText.h2),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
-}
-
-class _InfoStat extends StatelessWidget {
-  const _InfoStat({required this.icon, required this.value, required this.label, this.iconColor = kBrand});
-
-  final IconData icon;
-  final Color iconColor;
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icon, size: 16, color: iconColor),
-            const SizedBox(width: 4),
-            Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: kInk))),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: kMuted, fontSize: 11, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
-}
-
-class _InfoDivider extends StatelessWidget {
-  const _InfoDivider();
-
-  @override
-  Widget build(BuildContext context) => Container(width: 1, height: 30, color: kLine);
 }
 
 class _CategoryBarDelegate extends SliverPersistentHeaderDelegate {
