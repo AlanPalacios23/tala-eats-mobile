@@ -991,6 +991,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
   bool cancelling = false;
   bool allowPop = false;
   Timer? _paymentPollTimer;
+  bool _isForeground = true;
   String error = '';
 
   @override
@@ -1000,7 +1001,11 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
     // Server/webhook is authoritative. Poll only while this screen is visible,
     // rather than asking customers to repeatedly tap "Verificar pago".
     _paymentPollTimer = Timer.periodic(const Duration(seconds: 8), (Timer _) {
-      if (mounted && !opening && !checking && !cancelling && !paid) {
+      // Native Stripe/MP may move Android to background. Do not poll an
+      // invisible payment page; on resume the server state is read once.
+      if (mounted && _isForeground &&
+          (ModalRoute.of(context)?.isCurrent ?? false) &&
+          !opening && !checking && !cancelling && !paid) {
         unawaited(verify());
       }
     });
@@ -1018,7 +1023,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !paid && !cancelling) {
+    _isForeground = state == AppLifecycleState.resumed;
+    if (_isForeground && mounted && !paid && !cancelling) {
       unawaited(verify());
     }
   }
