@@ -65,6 +65,8 @@ jobs:
         run: flutter test --reporter=compact test/quiet_ui_regression_test.dart
       - name: "QA teclado y Reduce Motion: 320/360/390/430 dp"
         run: flutter test --reporter=compact test/customer_keyboard_reduced_motion_test.dart
+      - name: Roboto explicito en AppBar, botones y avisos
+        run: flutter test --reporter=compact test/android_roboto_theme_contract_test.dart
       - name: "Preparar Roboto e íconos Material para capturas legibles"
         shell: bash
         run: |
