@@ -1027,6 +1027,17 @@ class TalaModel extends ChangeNotifier {
           ? e.error.localizedMessage!.trim()
           : 'No pudimos completar el pago con Stripe.';
       throw ApiException(0, message);
+    } on MissingPluginException {
+      throw ApiException(503,
+          'El módulo nativo de Stripe no está disponible en esta instalación. Reinstala la APK actualizada.');
+    } on PlatformException catch (e) {
+      throw ApiException(503,
+          'Android no pudo abrir el pago seguro con Stripe. ${e.message ?? 'Revisa el dispositivo y vuelve a intentar.'}');
+    } catch (_) {
+      // Do not swallow provider failures or pretend they mean "cancelled".
+      // Keep the pending order intact; users may retry safely.
+      throw ApiException(503,
+          'No pudimos mostrar la ventana segura de Stripe. Inténtalo de nuevo. Si continúa, contacta soporte.');
     }
   }
 
