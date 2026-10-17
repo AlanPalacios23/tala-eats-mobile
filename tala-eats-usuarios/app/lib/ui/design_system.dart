@@ -1165,7 +1165,7 @@ class StatusPill extends StatelessWidget {
     final Color textColor = TalaReadableText.against(color, background);
     final double screenWidth = MediaQuery.sizeOf(context).width;
     return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: (screenWidth - 40).clamp(120.0, 600.0)),
+      constraints: BoxConstraints(maxWidth: (screenWidth - 40).clamp(120.0, 600.0).toDouble()),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
