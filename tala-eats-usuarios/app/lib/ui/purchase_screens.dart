@@ -839,7 +839,7 @@ class _CustomerAmountRow extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints bounds) {
-        if (bounds.maxWidth < 310) {
+        if (bounds.maxWidth < 345) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
