@@ -1695,8 +1695,7 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
           line.item.restaurantId == item.restaurantId)
       .map((CartLine line) => line.note)
       .firstOrNull ?? '';
-  final TextEditingController noteController =
-      TextEditingController(text: previousNote);
+  String noteValue = previousNote;
   bool saving = false;
   showModalBottomSheet<void>(
     context: context,
@@ -1765,9 +1764,10 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                       Text('Opcional · No cambia el precio ni la presentación.',
                         style: TalaText.caption),
                       const SizedBox(height: 10),
-                      TextField(
+                      TextFormField(
                         key: const ValueKey<String>('product-merchant-note'),
-                        controller: noteController,
+                        initialValue: previousNote,
+                        onChanged: (String value) => noteValue = value,
                         maxLength: 180,
                         minLines: 1,
                         maxLines: 3,
@@ -1800,7 +1800,7 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                         final Widget addAction = FilledButton(
                           onPressed: saving ? null : () async {
                             setModalState(() => saving = true);
-                            final String note = noteController.text.trim();
+                            final String note = noteValue.trim();
                             if (originallyInCart > 0 &&
                                 model.cartRestaurantId == item.restaurantId) {
                               model.setCartItemQuantity(item, quantity, note: note);
@@ -1851,5 +1851,5 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
         },
       );
     },
-  ).whenComplete(noteController.dispose);
+  );
 }
