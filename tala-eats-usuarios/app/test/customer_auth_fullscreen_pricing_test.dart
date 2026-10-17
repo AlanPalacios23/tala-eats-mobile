@@ -26,7 +26,8 @@ void main() {
     expect(find.byType(TalaLogoMark), findsNothing);
     expect(find.text('Bienvenido de vuelta'), findsOneWidget);
     expect(find.text('Tala Eats'), findsNothing);
-    expect(find.byKey(const ValueKey<String>('login-otp')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('login-otp')), findsNothing);
+    expect(find.byType(TextField), findsNWidgets(2));
     expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
     await tester.ensureVisible(find.text('Aviso de Privacidad'));
     expect(find.text('Términos y Condiciones'), findsOneWidget);
