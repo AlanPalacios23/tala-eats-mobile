@@ -41,7 +41,7 @@ void main() {
       expect(find.text('Restaurantes y comercios'), findsOneWidget);
       expect(find.text('Restaurante de la localidad'), findsOneWidget);
       expect(find.text('20-30 min'), findsWidgets);
-      expect(find.text('Envío ' + money(35)), findsWidgets);
+      expect(find.text('Envío según distancia'), findsWidgets);
       expect(find.text('Abierto'), findsNothing,
           reason: 'No repetir una etiqueta de abierto en cada fotografía');
       expect(tester.takeException(), isNull, reason: 'Overflow a $width dp');

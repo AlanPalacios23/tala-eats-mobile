@@ -107,6 +107,36 @@ dependencies {
             s,c2=re.subn(r'(<style name="NormalTheme" parent=")[^"]+("[^>]*>)',r'\1Theme.MaterialComponents.DayNight.NoActionBar\2',s)
             if c1!=1 or c2!=1: raise RuntimeError(f'Unexpected native theme format: {file}')
             write(file,s)
+        # Android 12+ always shows a short OS-managed launch surface.
+        # Hide the default generated Flutter/T glyph so it blends into the
+        # single Flutter 4-second Tala Eats artwork, with no duplicate logo.
+        v31 = target/'app/src/main/res/values-v31/styles.xml'
+        v31.parent.mkdir(parents=True, exist_ok=True)
+        if v31.is_file():
+            xml = v31.read_text(encoding='utf-8')
+            m = re.search(r'(<style name="LaunchTheme"[^>]*>)(.*?)(</style>)', xml, re.S)
+            if not m: raise RuntimeError('Missing Android 12 LaunchTheme')
+            body = m.group(2)
+            for key, value in [
+                ('android:windowSplashScreenAnimatedIcon', '@android:color/transparent'),
+                ('android:windowSplashScreenBackground', '@android:color/white'),
+            ]:
+                body = re.sub(
+                    r'<item name="' + re.escape(key) + r'">.*?</item>', '', body,
+                    flags=re.S)
+                body += '\n        <item name="' + key + '">' + value + '</item>'
+            xml = xml[:m.start()] + m.group(1) + body + m.group(3) + xml[m.end():]
+        else:
+            xml = '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">
+    <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+    <item name="android:windowSplashScreenBackground">@android:color/white</item>
+  </style>
+  <style name="NormalTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
+</resources>
+'''
+        write(v31, xml)
         write(target/'app/proguard-rules.pro','''-dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivity$g
 -dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Args
 -dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Error

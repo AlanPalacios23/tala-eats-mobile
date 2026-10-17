@@ -132,6 +132,31 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
               children: List<Widget>.generate(pages.length, (int i) => TickerMode(enabled: i == index, child: pages[i])),
             ),
           ),
+          // The basket stays reachable from Home, Buscar, Pedidos and Cuenta.
+          // A restaurant detail route retains its larger bottom basket bar.
+          Positioned(
+            right: 16,
+            bottom: 88,
+            child: AnimatedBuilder(
+              animation: model,
+              builder: (BuildContext context, Widget? child) {
+                if (model.cart.isEmpty) return const SizedBox.shrink();
+                final int count = cartItemCount(model);
+                return FloatingActionButton.extended(
+                  key: const ValueKey<String>('global-cart-fab'),
+                  heroTag: 'customer-global-cart',
+                  backgroundColor: kBrandDeep,
+                  foregroundColor: Colors.white,
+                  tooltip: 'Ver carrito con $count productos',
+                  onPressed: () => Navigator.of(context)
+                      .push(premiumRoute(CartScreen(model: model))),
+                  icon: const Icon(Icons.shopping_bag_outlined),
+                  label: Text('$count · ${money(model.subtotal)}',
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                );
+              },
+            ),
+          ),
           // Keeps scrolled content from colliding with the status bar icons.
           Positioned(
             left: 0,
@@ -650,11 +675,11 @@ class RestaurantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool favorite = model.favorites.contains(restaurant.id);
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery
-        ? 'Solo para recoger'
-        : (restaurant.deliveryFee <= 0
-            ? 'Envío gratis'
-            : 'Envío ' + money(restaurant.deliveryFee));
+    // RestaurantPublic.delivery_fee is a merchant field, NOT a customer quote.
+    // The 1.6.2 contract calculates delivery from customer GPS at checkout.
+    final String fee = restaurant.delivery
+        ? 'Envío según distancia'
+        : 'Solo para recoger';
     Widget media = AspectRatio(
       aspectRatio: 16 / 9,
       child: RestaurantMedia(
@@ -1331,18 +1356,14 @@ class _RestaurantInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool closed = !restaurant.isOpen;
-    final String fee = !restaurant.delivery
-        ? 'Para recoger'
-        : (restaurant.deliveryFee <= 0
-            ? 'Envío gratis'
-            : 'Envío ' + money(restaurant.deliveryFee));
+    // Never advertise a restaurant-level delivery_fee as final shipping.
+    final String fee = restaurant.delivery
+        ? 'Envío según distancia'
+        : 'Para recoger';
     final List<(IconData, String)> details = <(IconData, String)>[
       if (restaurant.rating > 0)
         (Icons.star_rounded, restaurant.rating.toStringAsFixed(1)),
       if (restaurant.delivery) (Icons.schedule_rounded, restaurant.eta),
-      (restaurant.delivery
-          ? Icons.two_wheeler_rounded
-          : Icons.storefront_rounded, fee),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
@@ -1365,28 +1386,68 @@ class _RestaurantInfo extends StatelessWidget {
             runSpacing: 9,
             children: <Widget>[
               for (final (IconData icon, String value) in details)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: math.max(100.0, MediaQuery.sizeOf(context).width - 40.0),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(icon, color: kMuted, size: 16),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(value,
+                          softWrap: true,
+                          maxLines: 2,
+                          style: const TextStyle(
+                            color: kInkSoft, fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Delivery and pickup share one deliberate row at every viewport.
+          // Text can wrap inside its column rather than pushing pickup below.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Icon(icon, color: kMuted, size: 16),
+                    Icon(restaurant.delivery
+                        ? Icons.two_wheeler_rounded : Icons.storefront_rounded,
+                        color: kMuted, size: 16),
                     const SizedBox(width: 5),
-                    Text(value, style: const TextStyle(
-                      color: kInkSoft, fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    )),
+                    Flexible(
+                      child: Text(fee,
+                        softWrap: true,
+                        maxLines: 2,
+                        style: const TextStyle(color: kInkSoft, fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ],
                 ),
-              if (restaurant.pickup && restaurant.delivery)
+              ),
+              if (restaurant.pickup && restaurant.delivery) ...<Widget>[
+                const SizedBox(width: 8),
                 const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Icon(Icons.storefront_outlined, color: kMuted, size: 16),
                     SizedBox(width: 5),
                     Text('Para recoger', style: TextStyle(
-                        color: kInkSoft, fontSize: 13,
-                        fontWeight: FontWeight.w600)),
+                      color: kInkSoft, fontSize: 12, fontWeight: FontWeight.w600,
+                    )),
                   ],
                 ),
+              ],
             ],
           ),
           if (restaurant.promo.isNotEmpty) ...<Widget>[
@@ -1621,7 +1682,8 @@ class RestaurantCartBar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
-  int quantity = 1;
+  final int originallyInCart = cartQuantityFor(model, item);
+  int quantity = math.max(1, originallyInCart);
   String preference = '';
   const List<String> options = <String>['Sin cambios', 'Sin cebolla', 'Extra salsa', 'Bien cocido'];
   showModalBottomSheet<void>(
@@ -1715,22 +1777,29 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                       builder: (BuildContext context, BoxConstraints bounds) {
                         final Widget quantityControl = QuantityStepper(
                           quantity: quantity,
-                          onDecrement: quantity > 1
+                          onDecrement: quantity > (originallyInCart > 0 ? 0 : 1)
                               ? () => setModalState(() => quantity -= 1)
                               : null,
                           onIncrement: () => setModalState(() => quantity += 1),
                         );
                         final Widget addAction = FilledButton(
                           onPressed: () async {
-                            final bool added = await addItemWithGuard(
-                              sheetContext, model, item, quantity,
-                              note: preference,
-                            );
-                            if (added && sheetContext.mounted) {
-                              Navigator.of(sheetContext).pop();
+                            if (originallyInCart > 0 &&
+                                model.cartRestaurantId == item.restaurantId) {
+                              model.setCartItemQuantity(item, quantity, note: preference);
+                              if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                            } else {
+                              final bool added = await addItemWithGuard(
+                                sheetContext, model, item, quantity,
+                                note: preference,
+                              );
+                              if (added && sheetContext.mounted) {
+                                Navigator.of(sheetContext).pop();
+                              }
                             }
                           },
-                          child: Text('Agregar · ${money(item.price * quantity)}'),
+                          child: Text(quantity == 0 ? 'Quitar del carrito'
+                              : '${originallyInCart > 0 ? 'Actualizar' : 'Agregar'} · ${money(item.price * quantity)}'),
                         );
                         if (bounds.maxWidth < 340) {
                           return Column(
