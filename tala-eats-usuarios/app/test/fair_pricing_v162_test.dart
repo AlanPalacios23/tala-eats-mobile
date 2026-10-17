@@ -46,7 +46,7 @@ void main() {
     expect(view.serviceFee, closeTo(16.10, 0.001));
     expect(view.estimatedReferenceTotal, closeTo(308.10, 0.001));
     expect(view.disclosure, contains('42.00'));
-    expect(view.disclosure, contains('3.0 km'));
+    expect(view.disclosure, contains('3 km'));
     expect(view.disclosure, contains('8.00'));
     expect(view.disclosure, isNot(contains('35.00')));
   });
