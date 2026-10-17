@@ -760,7 +760,7 @@ class PremiumAuthScaffold extends StatelessWidget {
             const Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Color(0xBFFFFFFF),
+                  color: Color(0x88FFFFFF),
                 ),
               ),
             ),
@@ -804,7 +804,7 @@ class PremiumAuthScaffold extends StatelessWidget {
                                   Text(
                                     subtitle,
                                     textAlign: TextAlign.center,
-                                    style: TalaText.muted.copyWith(fontSize: 15),
+                                    style: TalaText.muted.copyWith(color: kInkSoft, fontSize: 15, fontWeight: FontWeight.w600),
                                   ),
                                 ],
                               ),
