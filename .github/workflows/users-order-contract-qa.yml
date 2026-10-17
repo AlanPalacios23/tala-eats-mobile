@@ -90,6 +90,8 @@ jobs:
           path: tala-eats-usuarios/app/test/goldens/*_mock_*.png
           if-no-files-found: error
           retention-days: 7
+      - name: Estado visual accesible con texto WCAG AA y 320dp
+        run: flutter test --reporter=compact test/customer_status_contrast_accessibility_test.dart
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Backend externo solo GET (diagnostico, no equivalente a E2E)
