@@ -9,6 +9,8 @@ on:
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
       - 'tala-eats-usuarios/ci/bootstrap_android.py'
+      - 'tala-eats-usuarios/ci/build_signed_play_bundle.py'
+      - 'tala-eats-usuarios/ci/test_signed_release_gate.py'
       - '.github/workflows/users-order-contract-qa.yml'
   push:
     branches: [main]
@@ -18,6 +20,8 @@ on:
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
       - 'tala-eats-usuarios/ci/bootstrap_android.py'
+      - 'tala-eats-usuarios/ci/build_signed_play_bundle.py'
+      - 'tala-eats-usuarios/ci/test_signed_release_gate.py'
       - '.github/workflows/users-order-contract-qa.yml'
   workflow_dispatch:
 
@@ -48,6 +52,10 @@ jobs:
           flutter-version: '3.47.6'
           channel: stable
           cache: true
+      - name: Preflight Play Console API 36, release firmado obligatorio y sin secretos
+        run: |
+          python3 ../ci/build_signed_play_bundle.py --check
+          python3 ../ci/test_signed_release_gate.py
       - name: Dependencias Flutter
         run: flutter pub get
       - name: Analisis estatico (sin APK)
@@ -113,10 +121,10 @@ jobs:
           (cd build/app/outputs/flutter-apk && sha256sum app-debug.apk > app-debug.apk.sha256)
           echo 'NATIVE_ANDROID_DEBUG_COMPILE_PASS; not a signed release and no deploy'
       - name: Compartir APK DEBUG solicitado (solo PR Usuarios y temporal)
-        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/usuarios-orders-bootstrap-resilience-20261016' || github.head_ref == 'fix/usuarios-login-2fa-single-splash-20261017' || github.head_ref == 'fix/usuarios-auth-fullscreen-pricing-20261017' || github.head_ref == 'fix/usuarios-ux-cart-stripe-email-20261017' || github.head_ref == 'fix/usuarios-auth-original-photos-legibility-20261017' || github.head_ref == 'fix/usuarios-premium-auth-no-otp-20261017' || github.head_ref == 'fix/usuarios-auth-hero-continuity-motion-20261017') && github.event.pull_request.head.repo.full_name == 'AlanPalacios23/tala-eats-mobile' }}
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/usuarios-orders-bootstrap-resilience-20261016' || github.head_ref == 'fix/usuarios-login-2fa-single-splash-20261017' || github.head_ref == 'fix/usuarios-auth-fullscreen-pricing-20261017' || github.head_ref == 'fix/usuarios-ux-cart-stripe-email-20261017' || github.head_ref == 'fix/usuarios-auth-original-photos-legibility-20261017' || github.head_ref == 'fix/usuarios-premium-auth-no-otp-20261017' || github.head_ref == 'fix/usuarios-auth-hero-continuity-motion-20261017' || github.head_ref == 'release/usuarios-v1.0.37-play-ready-20261017') && github.event.pull_request.head.repo.full_name == 'AlanPalacios23/tala-eats-mobile' }}
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.36-HERO-INTRO-MOTION-DEBUG
+          name: TALA-EATS-Usuarios-v1.0.37-RC-DEBUG-NO-PUBLICAR
           path: |
             tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
             tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk.sha256
