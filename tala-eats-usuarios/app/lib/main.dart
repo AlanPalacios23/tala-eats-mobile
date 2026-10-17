@@ -738,7 +738,7 @@ class TalaModel extends ChangeNotifier {
 
   // Treat the detail sheet as an editor when this product is already in
   // the basket: do not add "2 more" when the user is reviewing 2 existing.
-  void setCartItemQuantity(FoodItem item, int quantity, {String note = ''}) {
+  void setCartItemQuantity(FoodItem item, int quantity, {String? note}) {
     if (cartRestaurantId != item.restaurantId || quantity < 0) return;
     final int index = cart.indexWhere((CartLine line) =>
         line.item.id == item.id && line.item.restaurantId == item.restaurantId);
@@ -748,7 +748,7 @@ class TalaModel extends ChangeNotifier {
       if (cart.isEmpty) cartRestaurantId = null;
     } else {
       cart[index].quantity = quantity;
-      if (note.trim().isNotEmpty) cart[index].note = note.trim();
+      if (note != null) cart[index].note = note.trim();
     }
     notifyListeners();
   }

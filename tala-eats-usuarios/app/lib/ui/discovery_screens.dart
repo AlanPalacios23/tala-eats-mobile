@@ -1690,8 +1690,13 @@ class RestaurantCartBar extends StatelessWidget {
 void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
   final int originallyInCart = cartQuantityFor(model, item);
   int quantity = math.max(1, originallyInCart);
-  String preference = '';
-  const List<String> options = <String>['Sin cambios', 'Sin cebolla', 'Extra salsa', 'Bien cocido'];
+  final String previousNote = model.cart
+      .where((CartLine line) => line.item.id == item.id &&
+          line.item.restaurantId == item.restaurantId)
+      .map((CartLine line) => line.note)
+      .firstOrNull ?? '';
+  String noteValue = previousNote;
+  bool saving = false;
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1704,8 +1709,13 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
         builder: (BuildContext context, StateSetter setModalState) {
           final Restaurant? restaurant = restaurantFor(model, item.restaurantId);
           final bool hasPhoto = item.imageUrl.startsWith('https://');
-          return Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
+          final double keyboard = MediaQuery.viewInsetsOf(context).bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: keyboard),
+            child: Container(
+            constraints: BoxConstraints(
+              maxHeight: (MediaQuery.sizeOf(context).height - keyboard) * 0.9,
+            ),
             decoration: const BoxDecoration(color: kSurface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1749,27 +1759,26 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                       const SizedBox(height: 12),
                       Text(money(item.price), style: TalaText.price.copyWith(fontSize: 22, color: kBrandDeep)),
                       const SizedBox(height: 22),
-                      const Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: <Widget>[
-                          Text('Preferencias', style: TalaText.title),
-                          Text('Opcional', style: TalaText.caption),
-                        ],
-                      ),
+                      const Text('Nota para el comercio', style: TalaText.title),
+                      const SizedBox(height: 6),
+                      Text('Opcional · No cambia el precio ni la presentación.',
+                        style: TalaText.caption),
                       const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: options.map((String label) {
-                          final bool selected = (label == 'Sin cambios' && preference.isEmpty) || preference == label;
-                          return TalaChoicePill(
-                            label: label,
-                            selected: selected,
-                            onTap: () => setModalState(() => preference = label == 'Sin cambios' ? '' : label),
-                          );
-                        }).toList(),
+                      TextFormField(
+                        key: const ValueKey<String>('product-merchant-note'),
+                        initialValue: previousNote,
+                        onChanged: (String value) => noteValue = value,
+                        maxLength: 180,
+                        minLines: 1,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        textInputAction: TextInputAction.done,
+                        decoration: InputDecoration(
+                          hintText: 'Escribe una indicación si la necesitas',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1789,22 +1798,26 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                           onIncrement: () => setModalState(() => quantity += 1),
                         );
                         final Widget addAction = FilledButton(
-                          onPressed: () async {
+                          onPressed: saving ? null : () async {
+                            setModalState(() => saving = true);
+                            final String note = noteValue.trim();
                             if (originallyInCart > 0 &&
                                 model.cartRestaurantId == item.restaurantId) {
-                              model.setCartItemQuantity(item, quantity, note: preference);
+                              model.setCartItemQuantity(item, quantity, note: note);
                               if (sheetContext.mounted) Navigator.of(sheetContext).pop();
                             } else {
                               final bool added = await addItemWithGuard(
                                 sheetContext, model, item, quantity,
-                                note: preference,
+                                note: note,
                               );
                               if (added && sheetContext.mounted) {
                                 Navigator.of(sheetContext).pop();
+                              } else if (sheetContext.mounted) {
+                                setModalState(() => saving = false);
                               }
                             }
                           },
-                          child: Text(quantity == 0 ? 'Quitar del carrito'
+                          child: Text(saving ? 'Guardando…' : quantity == 0 ? 'Quitar del carrito'
                               : '${originallyInCart > 0 ? 'Actualizar' : 'Agregar'} · ${money(item.price * quantity)}'),
                         );
                         if (bounds.maxWidth < 340) {
@@ -1833,6 +1846,7 @@ void showProductSheet(BuildContext context, TalaModel model, FoodItem item) {
                 ),
               ],
             ),
+          ),
           );
         },
       );
