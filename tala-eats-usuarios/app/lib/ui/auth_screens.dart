@@ -751,6 +751,19 @@ class PremiumAuthScaffold extends StatelessWidget {
             )
           else
             const Positioned.fill(child: AuthBackdrop()),
+          // Keep the same hero scrim behind Android's status-bar inset.
+          // The hero's gradient below starts at this exact opacity; without
+          // this strip a bright band appears above both auth photographs.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.paddingOf(context).top,
+            child: const ColoredBox(
+              key: ValueKey<String>('auth-status-bar-scrim'),
+              color: Color(0x59000000),
+            ),
+          ),
           SafeArea(
             child: LayoutBuilder(
               builder: (BuildContext context, BoxConstraints area) {
