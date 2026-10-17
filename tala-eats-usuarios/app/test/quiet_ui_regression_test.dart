@@ -145,12 +145,8 @@ void main() {
     expect(find.text('Para recoger'), findsWidgets);
     expect(find.text('Promoción del comercio'), findsOneWidget,
         reason: 'Mantener promociones reales del comercio.');
-    final Object? layoutError = tester.takeException();
-    if (layoutError != null) {
-      debugPrint('RESTAURANT_QUIET_UI_LAYOUT_ERROR');
-      debugDumpRenderTree();
-    }
-    expect(layoutError, isNull);
+    expect(tester.takeException(), isNull,
+        reason: 'Promociones reales deben ajustarse a 320dp con texto 1.3');
     await tester.pumpWidget(const SizedBox.shrink());
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
