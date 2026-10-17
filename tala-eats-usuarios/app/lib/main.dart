@@ -1413,8 +1413,8 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
       });
       return;
     }
-    // One intentional brand frame for four seconds, in parallel with real
-    // session restoration. Never display a second Flutter animation/loader.
+    // One gentle photographic intro for four seconds while restoring session.
+    // Never insert a second loading screen or wait beyond the existing dwell.
     Future.wait<void>(<Future<void>>[
       model.initialize(),
       Future<void>.delayed(const Duration(seconds: 4)),
@@ -1450,10 +1450,23 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
             screen = CustomerShell(model: model);
           }
           return AnimatedSwitcher(
-            duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
-            switchInCurve: TalaMotion.ease,
+            duration: TalaMotion.of(context, const Duration(milliseconds: 620)),
+            switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (Widget child, Animation<double> animation) => FadeTransition(opacity: animation, child: child),
+            // Crossfade plus a subtle 1.5% easing makes the first real page
+            // arrive naturally instead of cutting directly from a still photo.
+            transitionBuilder: (Widget child, Animation<double> animation) =>
+                FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.985, end: 1.0)
+                        .animate(CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        )),
+                    child: child,
+                  ),
+                ),
             child: KeyedSubtree(key: ValueKey<String>(stage), child: screen),
           );
         },
@@ -1483,8 +1496,9 @@ class TalaLogoMark extends StatelessWidget {
   }
 }
 
-/// One static screen using the exact Tala Eats reference art supplied for QA.
-/// The four-second dwell time is controlled by TalaEatsApp, not by animation.
+/// Single photographic introduction using the approved, original artwork.
+/// A non-looping, minimal Ken Burns motion runs inside the existing four-second
+/// dwell. Reduced-motion devices get the finished still frame immediately.
 class LaunchScreen extends StatelessWidget {
   const LaunchScreen({super.key});
 
@@ -1493,11 +1507,27 @@ class LaunchScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SizedBox.expand(
-        child: Image.asset(
-          'assets/branding/tala_intro.png',
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
-          semanticLabel: 'Tala Eats',
+        child: TweenAnimationBuilder<double>(
+          key: const ValueKey<String>('tala-intro-motion'),
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: TalaMotion.of(context, const Duration(milliseconds: 3400)),
+          curve: Curves.easeInOutCubic,
+          builder: (BuildContext context, double progress, Widget? child) {
+            return Transform.scale(
+              key: const ValueKey<String>('tala-intro-photo-transform'),
+              scale: 1.0 + progress * 0.038,
+              child: Opacity(
+                opacity: 0.94 + progress * 0.06,
+                child: child,
+              ),
+            );
+          },
+          child: Image.asset(
+            'assets/branding/tala_intro.png',
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            semanticLabel: 'Tala Eats',
+          ),
         ),
       ),
     );
