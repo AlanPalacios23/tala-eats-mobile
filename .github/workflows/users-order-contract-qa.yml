@@ -90,6 +90,8 @@ jobs:
           path: tala-eats-usuarios/app/test/goldens/*_mock_*.png
           if-no-files-found: error
           retention-days: 7
+      - name: Pedidos offline e historial sin falsos vacios
+        run: flutter test --reporter=compact test/customer_orders_offline_error_test.dart
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Backend externo solo GET (diagnostico, no equivalente a E2E)
