@@ -27,7 +27,7 @@ void main() {
     expect(preview(500, mode: 'pickup').deliveryReference, 0);
     expect(preview(500, mode: 'pickup').estimatedReferenceTotal, 525);
   });
-  test('delivery reference text reads the CURRENT server policy, never a fixed $35', () {
+  test('delivery reference text reads the CURRENT server policy, never a fixed \$35', () {
     final changed = <String, dynamic>{...policy,
       'delivery_base_fee': '42.00',
       'delivery_included_km': '3.00',
