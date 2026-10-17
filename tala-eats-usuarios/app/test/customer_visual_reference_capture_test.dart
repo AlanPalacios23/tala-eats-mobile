@@ -158,7 +158,8 @@ Future<void> snapshot(WidgetTester tester, Widget page,
 void main() {
   testWidgets('Reference images — seven key screens, isolated mock data',
       (WidgetTester tester) async {
-    await loadVisualFonts();
+    // Run outside FakeAsync so the engine can complete font registration.
+    await tester.runAsync(loadVisualFonts);
     final TalaModel m = sampleModel();
     final Map<String, Widget> pages = <String, Widget>{
       '01_home_mock_390.png': HomeScreen(model: m),
