@@ -736,6 +736,23 @@ class TalaModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Treat the detail sheet as an editor when this product is already in
+  // the basket: do not add "2 more" when the user is reviewing 2 existing.
+  void setCartItemQuantity(FoodItem item, int quantity, {String note = ''}) {
+    if (cartRestaurantId != item.restaurantId || quantity < 0) return;
+    final int index = cart.indexWhere((CartLine line) =>
+        line.item.id == item.id && line.item.restaurantId == item.restaurantId);
+    if (index < 0) return;
+    if (quantity == 0) {
+      cart.removeAt(index);
+      if (cart.isEmpty) cartRestaurantId = null;
+    } else {
+      cart[index].quantity = quantity;
+      if (note.trim().isNotEmpty) cart[index].note = note.trim();
+    }
+    notifyListeners();
+  }
+
   void changeQuantity(CartLine line, int delta) {
     line.quantity += delta;
     if (line.quantity <= 0) cart.remove(line);
@@ -1243,7 +1260,46 @@ class TalaModel extends ChangeNotifier {
     final List<CartLine> lines = <CartLine>[];
     for (final dynamic value in List<dynamic>.from((raw['items'] ?? const <dynamic>[]) as List)) {
       final Map<String, dynamic> i = Map<String, dynamic>.from(value as Map); final int itemId=_asInt(i['menu_item_id']);
-      final FoodItem item = FoodItem(id:itemId,restaurantId:restaurantId,name:(i['name_snapshot']??'Producto').toString(),description:'',price:_asDouble(i['unit_price']),image:_imageForRestaurant(restaurantId),category:'Pedido',imageUrl:_remoteImageUrl(i));
+      // A backend order snapshot is authoritative for price/quantity, but may
+      // omit the photo. Preserve the catalogue image across Stripe cancellation
+      // and cart restore, even after refreshOrder() replaces the order snapshot.
+      FoodItem? known;
+      for (final CartLine cartLine in cart) {
+        if (cartLine.item.id == itemId && cartLine.item.restaurantId == restaurantId) {
+          known = cartLine.item;
+          break;
+        }
+      }
+      if (known == null) {
+        for (final FoodItem menuItem in menu) {
+          if (menuItem.id == itemId && menuItem.restaurantId == restaurantId) {
+            known = menuItem;
+            break;
+          }
+        }
+      }
+      if (known == null) {
+        for (final OrderEntry previous in orders) {
+          if (previous.restaurant.id != restaurantId) continue;
+          for (final CartLine previousLine in previous.lines) {
+            if (previousLine.item.id == itemId && previousLine.item.imageUrl.isNotEmpty) {
+              known = previousLine.item;
+              break;
+            }
+          }
+          if (known != null) break;
+        }
+      }
+      final String orderImage = _remoteImageUrl(i);
+      final FoodItem item = FoodItem(
+        id: itemId, restaurantId: restaurantId,
+        name: (i['name_snapshot'] ?? 'Producto').toString(),
+        description: known?.description ?? '',
+        price: _asDouble(i['unit_price']),
+        image: known?.image ?? _imageForRestaurant(restaurantId),
+        category: known?.category ?? 'Pedido',
+        imageUrl: orderImage.isNotEmpty ? orderImage : (known?.imageUrl ?? ''),
+      );
       lines.add(CartLine(item:item,quantity:_asInt(i['quantity']),note:(i['options_snapshot']??'').toString()));
     }
     final String rawStatus=(raw['status']??'received').toString();
