@@ -61,6 +61,8 @@ jobs:
         run: flutter test --reporter=compact test/premium_purchase_responsive_test.dart
       - name: Android Back, offline y fallback de imagenes
         run: flutter test --reporter=compact test/android_back_offline_media_test.dart
+      - name: "UI limpia y funcionalidades conservadas en 320-430 dp"
+        run: flutter test --reporter=compact test/quiet_ui_regression_test.dart
       - name: Todos los tests Flutter Usuarios
         run: flutter test --reporter=compact
       - name: Backend externo solo GET (diagnostico, no equivalente a E2E)
