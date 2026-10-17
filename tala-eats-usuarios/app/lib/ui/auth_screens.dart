@@ -17,6 +17,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
+  final TextEditingController otp = TextEditingController();
+  final FocusNode otpFocus = FocusNode();
   bool hidePassword = true;
   bool loading = false;
   String error = '';
@@ -25,27 +27,42 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     email.dispose();
     password.dispose();
+    otp.dispose();
+    otpFocus.dispose();
     super.dispose();
   }
 
   Future<void> submit() async {
     FocusScope.of(context).unfocus();
+    final String code = otp.text.trim();
+    if (code.isNotEmpty && !RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() => error = 'El código 2FA debe tener 6 dígitos.');
+      otpFocus.requestFocus();
+      return;
+    }
     setState(() {
       loading = true;
       error = '';
     });
-    final bool ok = await widget.model.login(email.text, password.text);
+    final bool ok = await widget.model.login(email.text, password.text, otp: code);
     if (!mounted) return;
     if (ok) {
       HapticFeedback.lightImpact();
       return;
     }
     HapticFeedback.mediumImpact();
+    final String message = widget.model.blockedRole.isNotEmpty
+        ? 'Esta cuenta pertenece a otra aplicación de Tala Eats.'
+        : (widget.model.lastError.isNotEmpty
+            ? widget.model.lastError
+            : 'Revisa tu correo y contraseña e inténtalo de nuevo.');
+    if (RegExp(r'(2fa|otp|autenticador|verificaci[oó]n)', caseSensitive: false)
+        .hasMatch(message)) {
+      otpFocus.requestFocus();
+    }
     setState(() {
       loading = false;
-      error = widget.model.blockedRole.isNotEmpty
-          ? 'Esta cuenta pertenece a otra aplicación de Tala Eats.'
-          : (widget.model.lastError.isNotEmpty ? widget.model.lastError : 'Revisa tu correo y contraseña e inténtalo de nuevo.');
+      error = message;
     });
   }
 
@@ -53,7 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Bienvenido de vuelta',
-      subtitle: 'Pide lo que se te antoje y sigue tu pedido en tiempo real.',
+      subtitle: 'Tu comida favorita, más cerca.',
+      showFoodImage: true,
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -70,10 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: password,
               obscureText: hidePassword,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) {
-                if (!loading) submit();
-              },
+              textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.password],
               decoration: InputDecoration(
                 labelText: 'Contraseña',
@@ -83,6 +98,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () => setState(() => hidePassword = !hidePassword),
                   icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: otp,
+              focusNode: otpFocus,
+              key: const ValueKey<String>('login-otp'),
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              autofillHints: const <String>[AutofillHints.oneTimeCode],
+              onSubmitted: (_) { if (!loading) submit(); },
+              decoration: const InputDecoration(
+                labelText: 'Código 2FA (si aplica)',
+                hintText: '6 dígitos de tu autenticador',
+                prefixIcon: Icon(Icons.security_rounded),
               ),
             ),
             Align(
@@ -676,6 +710,7 @@ class PremiumAuthScaffold extends StatelessWidget {
     required this.child,
     this.eyebrow = '',
     this.showBack = false,
+    this.showFoodImage = false,
   });
 
   final String eyebrow;
@@ -683,6 +718,7 @@ class PremiumAuthScaffold extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final bool showBack;
+  final bool showFoodImage;
 
   @override
   Widget build(BuildContext context) {
@@ -690,7 +726,34 @@ class PremiumAuthScaffold extends StatelessWidget {
       backgroundColor: const Color(0xFFFFFAF6),
       body: Stack(
         children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
+          if (showFoodImage) ...<Widget>[
+            Positioned(
+              top: 0, left: 0, right: 0, height: 260,
+              child: Image.asset(
+                'assets/branding/login_food.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                semanticLabel: 'Fotografía gastronómica de Tala Eats',
+              ),
+            ),
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Color(0xCCFFFFFF),
+                      Color(0xF5FFFAF6),
+                      Color(0xFFFFFFFF),
+                    ],
+                    stops: <double>[0, 0.34, 0.58],
+                  ),
+                ),
+              ),
+            ),
+          ] else
+            const Positioned.fill(child: AuthBackdrop()),
           SafeArea(
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -712,7 +775,7 @@ class PremiumAuthScaffold extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 26),
+                      SizedBox(height: showFoodImage ? 14 : 26),
                       Reveal(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -954,7 +1017,7 @@ class LegalLoginNotice extends StatelessWidget {
     return Column(
       children: <Widget>[
         const Text(
-          'Al iniciar sesión aceptas los Términos y Condiciones de Uso y reconoces el Aviso de Privacidad de Tala Eats. Precios, disponibilidad y cargos se confirman antes de finalizar cada pedido.',
+          'Al iniciar sesión aceptas los Términos y Condiciones y reconoces el Aviso de Privacidad de Tala Eats.',
           textAlign: TextAlign.center,
           style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
         ),
