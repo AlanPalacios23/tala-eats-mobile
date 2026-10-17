@@ -49,6 +49,24 @@ void main() {
     expect(CustomerNativePush.firebaseConfigured, isFalse);
   });
 
+  test('Firebase project mismatch bloquea registro, nunca mezcla cuentas', () {
+    const config = <String, dynamic>{
+      'enabled': true, 'provider': 'fcm',
+      'project_id': 'talaeats-prod-project',
+    };
+    expect(CustomerNativePush.matchesServerProject(config,
+        configuredProjectId: 'talaeats-other-project'), false);
+    expect(CustomerNativePush.matchesServerProject(config,
+        configuredProjectId: 'talaeats-prod-project'), true);
+    expect(CustomerNativePush.matchesServerProject(<String, dynamic>{
+      'enabled': true, 'provider': 'fcm',
+    }, configuredProjectId: 'talaeats-prod-project'), false);
+    expect(CustomerNativePush.matchesServerProject(<String, dynamic>{
+      'enabled': false, 'provider': 'fcm',
+      'project_id': 'talaeats-prod-project',
+    }, configuredProjectId: 'talaeats-prod-project'), false);
+  });
+
   test('FCM config and register customer-only, Android-only', () async {
     final api = _PushApi();
     final config = await api.customerPushConfig();

@@ -19,6 +19,15 @@ class CustomerNativePush {
       _apiKey.isNotEmpty && _appId.isNotEmpty &&
       _senderId.isNotEmpty && _projectId.isNotEmpty;
 
+  /// Fail closed if customer APK and backend FCM configurations target
+  /// different Firebase projects. Firebase project IDs are public, never keys.
+  static bool matchesServerProject(Map<String, dynamic> config,
+      {String? configuredProjectId}) {
+    final local = configuredProjectId ?? _projectId;
+    return config['enabled'] == true && config['provider'] == 'fcm' &&
+        local.isNotEmpty && config['project_id'] == local;
+  }
+
   StreamSubscription<String>? _rotatingToken;
   StreamSubscription<RemoteMessage>? _foreground;
   StreamSubscription<RemoteMessage>? _opened;
@@ -52,6 +61,11 @@ class CustomerNativePush {
     if (config['enabled'] != true || config['provider'] != 'fcm') {
       if (askPermission) throw ApiException(503,
         'El servidor todavía no tiene notificaciones FCM activas.');
+      return false;
+    }
+    if (!matchesServerProject(config)) {
+      if (askPermission) throw ApiException(503,
+        'El proyecto Firebase de la aplicación y del servidor no coincide.');
       return false;
     }
     if (Firebase.apps.isEmpty) {
