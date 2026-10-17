@@ -35,7 +35,7 @@ Future<void> _render(WidgetTester tester, Widget screen,
     theme: buildTalaTheme(),
     home: MediaQuery(
       data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-      child: screen,
+      child: Scaffold(body: screen),
     ),
   ));
   await tester.pump(const Duration(milliseconds: 500));
