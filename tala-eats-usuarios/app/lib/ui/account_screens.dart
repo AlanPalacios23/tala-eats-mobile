@@ -732,90 +732,43 @@ class PremiumWalletHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: <Color>[Color(0xFFFF7A3D), kBrand, Color(0xFFD43D0B)]),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const <BoxShadow>[BoxShadow(color: Color(0x33E9470F), blurRadius: 30, offset: Offset(0, 14))],
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
+    return TalaCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Positioned(right: -30, top: -40, child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)))),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const Text('TALA CLUB', style: TalaText.overline),
+          const SizedBox(height: 16),
+          const Text('Saldo disponible', style: TalaText.muted),
+          const SizedBox(height: 5),
+          Text(money(model.wallet), maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TalaText.display.copyWith(fontSize: 34)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: <Widget>[
-              Row(
-                children: <Widget>[
-                  const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 20),
-                  const SizedBox(width: 6),
-                  const Text('TALA CLUB', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 1.2, fontSize: 11)),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(99)),
-                    child: Text('Nivel ${model.loyaltyTier}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              const Text('Saldo disponible', style: TextStyle(color: Color(0xFFFFE6DA), fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text(money(model.wallet), style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1.2, height: 1.05)),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  _HeroChip(icon: Icons.stars_rounded, label: '${model.points} puntos'),
-                  if (model.plusMember) const _HeroChip(icon: Icons.verified_rounded, label: 'Membresía activa'),
-                  if (model.referralCode.isNotEmpty)
-                    _HeroChip(
-                      icon: Icons.content_copy_rounded,
-                      label: 'Código ${model.referralCode}',
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: model.referralCode));
-                        HapticFeedback.selectionClick();
-                        showMessage(context, 'Código copiado.');
-                      },
-                    ),
-                ],
-              ),
+              Text(model.points.toString() + ' puntos', style: TalaText.muted),
+              Text('Nivel ' + model.loyaltyTier, style: TalaText.muted),
+              if (model.plusMember)
+                const Text('Membresía activa', style: TalaText.muted),
             ],
           ),
+          if (model.referralCode.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: model.referralCode));
+                HapticFeedback.selectionClick();
+                showMessage(context, 'Código copiado.');
+              },
+              icon: const Icon(Icons.content_copy_rounded, size: 17),
+              label: Text('Copiar código ' + model.referralCode),
+            ),
+          ],
         ],
-      ),
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  const _HeroChip({required this.icon, required this.label, this.onTap});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.18),
-      borderRadius: BorderRadius.circular(99),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(99),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(icon, color: Colors.white, size: 16),
-              const SizedBox(width: 6),
-              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -882,13 +835,17 @@ class _RewardProgressCardState extends State<RewardProgressCard> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            alignment: WrapAlignment.spaceBetween,
             children: <Widget>[
               Text('$points / 500 pts', style: TalaText.caption),
-              const Spacer(),
               Text(
-                ready ? 'Premio disponible' : 'Te faltan ${500 - points} pts',
-                style: TextStyle(color: ready ? kGreen : kBrandDeep, fontWeight: FontWeight.w800, fontSize: 12),
+                ready ? 'Premio disponible'
+                    : 'Te faltan ' + (500 - points).toString() + ' pts',
+                style: TextStyle(color: ready ? kGreen : kBrandDeep,
+                    fontWeight: FontWeight.w800, fontSize: 12),
               ),
             ],
           ),
