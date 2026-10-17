@@ -51,7 +51,10 @@ void main() {
     expect(find.text('Crea tu cuenta'), findsOneWidget);
     await tester.ensureVisible(find.byType(TextField).at(2));
     await tester.pumpAndSettle();
-    expect(find.text('Crear una contraseña'), findsOneWidget);
+    final registrationFields = tester.widgetList<TextField>(
+      find.byType(TextField)).toList();
+    expect(registrationFields.any(
+      (field) => field.decoration?.labelText == 'Crear una contraseña'), isTrue);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     model.dispose();
