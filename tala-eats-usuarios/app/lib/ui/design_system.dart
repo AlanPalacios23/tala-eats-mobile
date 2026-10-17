@@ -74,6 +74,8 @@ ThemeData buildTalaTheme() {
   final RoundedRectangleBorder buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(16));
   return ThemeData(
     useMaterial3: true,
+    // Make Roboto explicit for Android and for faithful, legible golden tests.
+    fontFamily: 'Roboto',
     colorScheme: scheme,
     scaffoldBackgroundColor: kBackground,
     canvasColor: kBackground,
@@ -106,7 +108,7 @@ ThemeData buildTalaTheme() {
       elevation: 0,
       centerTitle: false,
       titleSpacing: 4,
-      titleTextStyle: TextStyle(color: kInk, fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+      titleTextStyle: TextStyle(fontFamily: 'Roboto', color: kInk, fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.3),
       iconTheme: IconThemeData(color: kInk),
       actionsIconTheme: IconThemeData(color: kInk),
     ),
@@ -119,7 +121,7 @@ ThemeData buildTalaTheme() {
         minimumSize: const Size.fromHeight(54),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, letterSpacing: -0.1),
+        textStyle: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w700, fontSize: 16, letterSpacing: -0.1),
         shape: buttonShape,
       ),
     ),
@@ -130,7 +132,7 @@ ThemeData buildTalaTheme() {
         backgroundColor: Colors.white,
         side: const BorderSide(color: kLineStrong),
         padding: const EdgeInsets.symmetric(horizontal: 18),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        textStyle: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w700, fontSize: 15),
         shape: buttonShape,
       ),
     ),
@@ -138,7 +140,7 @@ ThemeData buildTalaTheme() {
       style: TextButton.styleFrom(
         foregroundColor: kBrandDeep,
         minimumSize: const Size(48, 44),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        textStyle: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w700, fontSize: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
@@ -180,7 +182,7 @@ ThemeData buildTalaTheme() {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: kInk,
-      contentTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+      contentTextStyle: const TextStyle(fontFamily: 'Roboto', color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
       actionTextColor: const Color(0xFFFFB498),
       behavior: SnackBarBehavior.floating,
       elevation: 0,
