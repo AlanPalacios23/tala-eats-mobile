@@ -1,7 +1,7 @@
 name: talaeats_users
 description: Tala Eats Usuarios Android production frontend.
 publish_to: 'none'
-version: 1.0.30+41
+version: 1.0.35+46
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -21,3 +21,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/branding/
