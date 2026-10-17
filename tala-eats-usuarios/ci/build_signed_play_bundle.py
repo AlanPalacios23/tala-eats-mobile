@@ -64,6 +64,7 @@ def require_local_configuration() -> Path:
         raise RuntimeError("Firebase Sender ID inválido.")
     if not re.fullmatch(r"1:[0-9]{6,25}:android:[0-9a-fA-F]+", firebase_app):
         raise RuntimeError("Firebase App ID Android inválido.")
+    os.environ["TALAEATS_UPLOAD_KEYSTORE"] = str(keystore)
     # No activate Push just by having public config. Server also requires FCM
     # credential, encryption key, enabled flag and a matching project.
     return keystore
