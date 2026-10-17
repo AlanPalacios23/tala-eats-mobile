@@ -1,0 +1,29 @@
+name: Importar foto de autenticacion Usuarios (temporal)
+on:
+  push:
+    branches:
+      - fix/usuarios-auth-fullscreen-pricing-20261017
+    paths:
+      - .github/workflows/usuarios-auth-image-import.yml
+permissions:
+  contents: write
+jobs:
+  import-secondary-photo:
+    if: github.repository == 'AlanPalacios23/tala-eats-mobile'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar e instalar foto suministrada
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tala-eats-usuarios/app/assets/branding
+          curl --fail --location --retry 3 --silent --show-error 'https://d2ol7oe51mr4n9.cloudfront.net/user_3JRVgcDQUmpH7yGXahR2Kecqub1/011d1e16-1716-441d-bdbd-d0320881c5c5.png' -o tala-eats-usuarios/app/assets/branding/auth_secondary.jpg
+          echo '16f86aac5a5966c3a3f1235dcaeaecb8a664c9887e648b8153c31297b6feb45c  tala-eats-usuarios/app/assets/branding/auth_secondary.jpg' | sha256sum -c -
+          file tala-eats-usuarios/app/assets/branding/auth_secondary.jpg
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tala-eats-usuarios/app/assets/branding/auth_secondary.jpg
+          git commit -m 'assets(usuarios): foto original para registro y recuperacion'
+          git push origin HEAD:fix/usuarios-auth-fullscreen-pricing-20261017
