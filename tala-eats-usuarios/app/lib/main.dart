@@ -1251,7 +1251,11 @@ class TalaModel extends ChangeNotifier {
   }
 
   void _applyOrders(List<dynamic> rows) {
-    orders..clear()..addAll(rows.map((dynamic raw) => _orderFromJson(Map<String, dynamic>.from(raw as Map))));
+    // Materialize incoming orders BEFORE discarding existing photo metadata.
+    // OrderPublic may only carry item names/prices, not catalogue image URLs.
+    final List<OrderEntry> fresh = rows.map((dynamic raw) =>
+        _orderFromJson(Map<String, dynamic>.from(raw as Map))).toList();
+    orders..clear()..addAll(fresh);
     ordersLoadError = '';
   }
   void _applyFavorites(List<dynamic> rows) { favorites..clear()..addAll(rows.map((dynamic raw) => _asInt((raw as Map)['id']))); }
