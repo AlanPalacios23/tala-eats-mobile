@@ -368,27 +368,52 @@ class TalaModel extends ChangeNotifier {
   }
 
   Future<void> refreshAll() async {
+    final int sessionRevision = _orderSessionRevision;
     final int catalogEpoch = _marketCatalogEpoch;
     final String requestedMarket = marketCode;
     loading = true;
     lastError = '';
     notifyListeners();
+
+    // A temporary orders outage must not hide an otherwise healthy catalog.
+    // Auth failures remain fatal to the bootstrap; never treat 401/403 as empty.
+    Future<(List<dynamic>?, String?)> readOrdersForBootstrap() async {
+      try {
+        return (await api.orders(), null);
+      } on ApiException catch (e) {
+        if (e.statusCode == 401 || e.statusCode == 403) rethrow;
+        return (null, e.message.isNotEmpty
+            ? e.message : 'No pudimos actualizar tus pedidos. Revisa tu conexión.');
+      } catch (_) {
+        return (null, 'No pudimos actualizar tus pedidos. Revisa tu conexión.');
+      }
+    }
+
     try {
       final List<dynamic> core = await Future.wait<dynamic>(<Future<dynamic>>[
         api.bootstrap(),
         api.restaurantsForMarket(marketCode),
         api.addresses(),
-        api.orders(),
+        readOrdersForBootstrap(),
         api.favorites(),
         api.wallet(),
         api.notifications(),
       ]);
+      // Logout may have happened while requests were in flight.
+      if (sessionRevision != _orderSessionRevision) return;
       _applyBootstrap(Map<String, dynamic>.from(core[0] as Map));
       if (catalogEpoch == _marketCatalogEpoch && requestedMarket == marketCode) {
         _applyRestaurants(List<dynamic>.from(core[1] as List));
       }
       _applyAddresses(List<dynamic>.from(core[2] as List));
-      _applyOrders(List<dynamic>.from(core[3] as List));
+      final (List<dynamic>? latestOrders, String? ordersError) =
+          core[3] as (List<dynamic>?, String?);
+      if (latestOrders != null) {
+        _applyOrders(latestOrders);
+      } else {
+        // Preserve known orders: failure is not an authoritative empty list.
+        ordersLoadError = ordersError ?? 'No pudimos actualizar tus pedidos.';
+      }
       _applyFavorites(List<dynamic>.from(core[4] as List));
       _applyWallet(Map<String, dynamic>.from(core[5] as Map));
       _applyNotifications(List<dynamic>.from(core[6] as List));
@@ -409,6 +434,7 @@ class TalaModel extends ChangeNotifier {
       try { _applyLoyalty(Map<String, dynamic>.from((await api.get('/platform/loyalty')) as Map)); } catch (_) {}
       try { await refreshPaymentMethods(); } catch (_) {}
     } on ApiException catch (e) {
+      if (sessionRevision != _orderSessionRevision) return;
       online = e.statusCode != 0;
       lastError = e.message;
       if (e.statusCode == 401) {
@@ -417,8 +443,10 @@ class TalaModel extends ChangeNotifier {
         await NativeBridge.clearToken();
       }
     } finally {
-      loading = false;
-      notifyListeners();
+      if (sessionRevision == _orderSessionRevision) {
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -517,6 +545,7 @@ class TalaModel extends ChangeNotifier {
     api.token = null;
     signedIn = false;
     blockedRole = '';
+    loading = false;
     tabIndex = 0;
     restaurants.clear(); menu.clear(); cart.clear(); favorites.clear(); orders.clear(); addresses.clear(); notifications.clear(); _menusLoading.clear(); _menuLoadErrors.clear();
     ordersLoadError = '';
