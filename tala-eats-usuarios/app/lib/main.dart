@@ -1027,6 +1027,10 @@ class TalaModel extends ChangeNotifier {
           ? e.error.localizedMessage!.trim()
           : 'No pudimos completar el pago con Stripe.';
       throw ApiException(0, message);
+    } on ApiException {
+      // Preserve the actual (sanitized) backend reason: disabled payment,
+      // missing intent or invalid order. These are not native plugin errors.
+      rethrow;
     } on MissingPluginException {
       throw ApiException(503,
           'El módulo nativo de Stripe no está disponible en esta instalación. Reinstala la APK actualizada.');
