@@ -990,24 +990,37 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
   bool checking = false;
   bool cancelling = false;
   bool allowPop = false;
+  Timer? _paymentPollTimer;
   String error = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => openCheckout());
+    // Server/webhook is authoritative. Poll only while this screen is visible,
+    // rather than asking customers to repeatedly tap "Verificar pago".
+    _paymentPollTimer = Timer.periodic(const Duration(seconds: 8), (Timer _) {
+      if (mounted && !opening && !checking && !cancelling && !paid) {
+        unawaited(verify());
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(openCheckout());
+    });
   }
 
   @override
   void dispose() {
+    _paymentPollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) verify();
+    if (state == AppLifecycleState.resumed && !paid && !cancelling) {
+      unawaited(verify());
+    }
   }
 
   Future<void> openCheckout() async {
@@ -1074,7 +1087,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
   String get providerAction => widget.order.paymentMethod == 'stripe' ? 'Abrir pago seguro' : 'Abrir Mercado Pago';
 
   Future<void> verify() async {
-    if (checking) return;
+    if (!mounted || checking || cancelling || paid) return;
     setState(() {
       checking = true;
       error = '';
@@ -1086,7 +1099,10 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
     } finally {
       if (mounted) setState(() => checking = false);
     }
-    if (paid && mounted) HapticFeedback.mediumImpact();
+    if (paid && mounted) {
+      _paymentPollTimer?.cancel();
+      HapticFeedback.mediumImpact();
+    }
   }
 
   bool get paid => widget.order.paymentStatus == 'paid';
@@ -1196,13 +1212,26 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
                   icon: const Icon(Icons.open_in_new_rounded),
                   label: Text(opening ? 'Abriendo $providerName…' : providerAction),
                 ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: checking || cancelling ? null : verify,
-                  icon: checking
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.refresh_rounded),
-                  label: const Text('Verificar pago'),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    if (checking) ...<Widget>[
+                      const SizedBox(
+                        height: 14, width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                    ] else ...<Widget>[
+                      const Icon(Icons.sync_rounded, size: 17, color: kMuted),
+                      const SizedBox(width: 8),
+                    ],
+                    const Flexible(
+                      child: Text('El estado del pago se actualiza automáticamente.',
+                        textAlign: TextAlign.center,
+                        style: TalaText.caption),
+                    ),
+                  ],
                 ),
               ] else
                 FilledButton.icon(
