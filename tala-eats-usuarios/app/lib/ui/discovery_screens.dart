@@ -113,7 +113,14 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
       OrdersScreen(model: model),
       AccountScreen(model: model),
     ];
-    return Scaffold(
+    // Android Back returns from secondary tabs to Inicio before leaving the app.
+    // Detail, checkout and payment routes keep their own Navigator/PopScope.
+    return PopScope<Object?>(
+      canPop: index == 0,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop && model.tabIndex != 0) model.setTab(0);
+      },
+      child: Scaffold(
       extendBody: true,
       backgroundColor: kBackground,
       body: Stack(
@@ -138,7 +145,7 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
               left: 16,
               right: 16,
               top: top + 8,
-              child: Reveal(offset: -10, child: OfflineBanner(onRetry: model.refreshAll)),
+              child: Reveal(offset: -10, child: OfflineBanner(onRetry: model.refreshAll, busy: model.loading)),
             ),
         ],
       ),
@@ -146,14 +153,16 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: PremiumBottomDock(model: model),
       ),
+      ),
     );
   }
 }
 
 class OfflineBanner extends StatelessWidget {
-  const OfflineBanner({super.key, required this.onRetry});
+  const OfflineBanner({super.key, required this.onRetry, this.busy = false});
 
   final Future<void> Function() onRetry;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +191,10 @@ class OfflineBanner extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton(onPressed: onRetry, child: const Text('Reintentar')),
+              TextButton(
+                onPressed: busy ? null : () { onRetry(); },
+                child: Text(busy ? 'Reintentando…' : 'Reintentar'),
+              ),
             ],
           ),
         ),
