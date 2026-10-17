@@ -132,6 +132,31 @@ class _CustomerShellState extends State<CustomerShell> with SingleTickerProvider
               children: List<Widget>.generate(pages.length, (int i) => TickerMode(enabled: i == index, child: pages[i])),
             ),
           ),
+          // The basket stays reachable from Home, Buscar, Pedidos and Cuenta.
+          // A restaurant detail route retains its larger bottom basket bar.
+          Positioned(
+            right: 16,
+            bottom: 88,
+            child: AnimatedBuilder(
+              animation: model,
+              builder: (BuildContext context, Widget? child) {
+                if (model.cart.isEmpty) return const SizedBox.shrink();
+                final int count = cartItemCount(model);
+                return FloatingActionButton.extended(
+                  key: const ValueKey<String>('global-cart-fab'),
+                  heroTag: 'customer-global-cart',
+                  backgroundColor: kBrandDeep,
+                  foregroundColor: Colors.white,
+                  tooltip: 'Ver carrito con $count productos',
+                  onPressed: () => Navigator.of(context)
+                      .push(premiumRoute(CartScreen(model: model))),
+                  icon: const Icon(Icons.shopping_bag_outlined),
+                  label: Text('$count · ${money(model.subtotal)}',
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                );
+              },
+            ),
+          ),
           // Keeps scrolled content from colliding with the status bar icons.
           Positioned(
             left: 0,
