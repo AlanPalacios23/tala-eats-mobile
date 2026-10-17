@@ -113,10 +113,10 @@ jobs:
           (cd build/app/outputs/flutter-apk && sha256sum app-debug.apk > app-debug.apk.sha256)
           echo 'NATIVE_ANDROID_DEBUG_COMPILE_PASS; not a signed release and no deploy'
       - name: Compartir APK DEBUG solicitado (solo PR Usuarios y temporal)
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'qa/usuarios-orders-bootstrap-resilience-20261016' && github.event.pull_request.head.repo.full_name == 'AlanPalacios23/tala-eats-mobile' }}
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/usuarios-orders-bootstrap-resilience-20261016' || github.head_ref == 'fix/usuarios-login-2fa-single-splash-20261017') && github.event.pull_request.head.repo.full_name == 'AlanPalacios23/tala-eats-mobile' }}
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.30-PR32-Android-DEBUG
+          name: TALA-EATS-Usuarios-Android-DEBUG-${{ github.head_ref }}
           path: |
             tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
             tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk.sha256
