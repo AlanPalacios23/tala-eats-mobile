@@ -135,4 +135,35 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       model.dispose();
     });
+
+  testWidgets('Pago en segundo plano no consulta; reanudar consulta backend',
+    (tester) async {
+      final api = _PendingPaymentApi();
+      final model = TalaModel(apiClient: api);
+      model.restaurants.add(_shop);
+      final order = OrderEntry(
+        id: 124, restaurant: _shop, total: 333.20,
+        status: 'Pago pendiente', deliveryMode: 'delivery',
+        paymentStatus: 'pending', paymentMethod: 'mercadopago',
+        lines: <CartLine>[],
+      );
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTalaTheme(),
+        home: PaymentStatusScreen(model: model, order: order),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final beforePause = api.polls;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(seconds: 17));
+      expect(api.polls, beforePause, reason:
+          'No consultar pedidos continuamente con Android en segundo plano');
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(api.polls, greaterThan(beforePause),
+          reason: 'Al volver, consultar solo el backend autoritativo');
+      await tester.pumpWidget(const SizedBox.shrink());
+      model.dispose();
+    });
+
 }
