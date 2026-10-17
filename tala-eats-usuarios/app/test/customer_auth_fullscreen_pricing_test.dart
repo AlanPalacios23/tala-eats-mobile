@@ -74,7 +74,7 @@ void main() {
     model.dispose();
   });
 
-  testWidgets('Tarifa mercantil $15 nunca se anuncia como envio cliente',
+  testWidgets('Tarifa mercantil \$15 nunca se anuncia como envio cliente',
       (WidgetTester tester) async {
     const Restaurant restaurant = Restaurant(
       id: 42, name: 'Tienda QA', category: 'Hamburguesas',
@@ -96,7 +96,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('Envío según distancia'), findsOneWidget);
-    expect(find.textContaining('Envío $15'), findsNothing);
+    expect(find.textContaining('Envío \$15'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     model.dispose();
