@@ -831,7 +831,7 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
               TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order)),
               const SizedBox(height: 12),
               DriverPremiumCard(order: order),
-              if (order.pin.isNotEmpty) ...<Widget>[
+              if (!terminal && order.pin.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 12),
                 _PinBlock(pin: order.pin),
               ],
