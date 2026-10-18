@@ -99,17 +99,19 @@ void main() {
     tester.view.physicalSize = const Size(390, 920);
     tester.view.devicePixelRatio = 1;
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    final model = TalaModel()..restaurants.add(_shop);
+    final api = _LiveOrdersApi()..next = _live(status: 'received', pin: '7462');
+    final model = TalaModel(apiClient: api)..restaurants.add(_shop);
     final order = _order()..pin = '7462';
     await tester.pumpWidget(MaterialApp(
       theme: buildTalaTheme(),
       home: TrackingScreen(model: model, order: order),
     ));
     await tester.pump();
+    await tester.scrollUntilVisible(find.text('PIN de entrega'), 140,
+        scrollable: find.byType(Scrollable).last);
     expect(find.text('PIN de entrega'), findsOneWidget);
-    order.status = 'Entregado';
-    order.rawStatus = 'delivered';
-    model.notifyListeners();
+    api.next = _live(status: 'delivered', pin: '7462');
+    await model.refreshOrder(order);
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.text('PIN de entrega'), findsNothing);
     expect(find.text('Finalizado'), findsOneWidget);
