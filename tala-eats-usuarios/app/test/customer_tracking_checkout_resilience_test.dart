@@ -94,8 +94,11 @@ void main() {
         theme: buildTalaTheme(),
         home: MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
-          child: Scaffold(body: ListView(
-            children: <Widget>[SummaryCard(model: model)],
+          child: Scaffold(body: AnimatedBuilder(
+            animation: model,
+            builder: (context, _) => ListView(
+              children: <Widget>[SummaryCard(model: model)],
+            ),
           )),
         ),
       ));
