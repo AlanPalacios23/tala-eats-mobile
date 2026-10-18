@@ -722,6 +722,7 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
   Timer? _timer;
   bool refreshing = false;
   bool _foreground = true;
+  bool _lastCheckFailed = false;
 
   OrderEntry get order => widget.order;
   TalaModel get model => widget.model;
@@ -781,9 +782,16 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
     if (mounted) setState(() => refreshing = true);
     try {
       await model.refreshOrder(order);
+      if (mounted) setState(() => _lastCheckFailed = false);
       if (!silent && mounted) showMessage(context, 'Seguimiento actualizado.');
     } on ApiException catch (e) {
+      if (mounted) setState(() => _lastCheckFailed = true);
       if (!silent && mounted) showMessage(context, e.message);
+    } catch (_) {
+      if (mounted) setState(() => _lastCheckFailed = true);
+      if (!silent && mounted) {
+        showMessage(context, 'No pudimos comprobar el pedido. Inténtalo de nuevo.');
+      }
     } finally {
       if (terminal) {
         _timer?.cancel();
@@ -818,6 +826,49 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
                   ),
                 ],
               ),
+              if (_lastCheckFailed && !terminal) ...<Widget>[
+                const SizedBox(height: 12),
+                Semantics(
+                  liveRegion: true,
+                  child: TalaCard(
+                    color: kSoftPeach,
+                    borderColor: const Color(0xFFFFD9C7),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Icon(Icons.sync_problem_rounded, color: kBrandDeep, size: 22),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text('No pudimos actualizar el seguimiento',
+                                    style: TextStyle(color: kInk, fontWeight: FontWeight.w800)),
+                                  SizedBox(height: 4),
+                                  Text('Se muestra el último estado conocido. El pedido no se ha cancelado.',
+                                    style: TalaText.caption),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: refreshing ? null : () => _refresh(),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Reintentar actualización'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               AnimatedSwitcher(
                 duration: TalaMotion.of(context, TalaMotion.reveal),
