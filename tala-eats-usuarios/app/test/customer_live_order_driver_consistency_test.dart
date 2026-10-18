@@ -114,7 +114,8 @@ void main() {
     await model.refreshOrder(order);
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.text('PIN de entrega'), findsNothing);
-    expect(find.text('Finalizado'), findsOneWidget);
+    expect(order.status, 'Entregado');
+    expect(order.rawStatus, 'delivered');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     tester.view.resetPhysicalSize();
