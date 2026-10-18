@@ -849,7 +849,7 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
                                   Text('No pudimos actualizar el seguimiento',
                                     style: TextStyle(color: kInk, fontWeight: FontWeight.w800)),
                                   SizedBox(height: 4),
-                                  Text('Se muestra el último estado conocido. El pedido no se ha cancelado.',
+                                  Text('Se muestra el último estado conocido. No podemos confirmar cambios recientes.',
                                     style: TalaText.caption),
                                 ],
                               ),
