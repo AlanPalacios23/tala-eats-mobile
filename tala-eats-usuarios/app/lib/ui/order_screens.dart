@@ -861,7 +861,7 @@ class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObse
                           child: TextButton.icon(
                             onPressed: refreshing ? null : () => _refresh(),
                             icon: const Icon(Icons.refresh_rounded, size: 18),
-                            label: const Text('Reintentar actualización'),
+                            label: const Text('Reintentar'),
                           ),
                         ),
                       ],
