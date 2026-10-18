@@ -159,13 +159,13 @@ class OrderEntry {
   final String deliveryMode;
   final List<CartLine> lines;
   String eta;
-  final String pin;
+  String pin;
   String paymentStatus;
   final String paymentMethod;
   String rawStatus;
-  final String driverName;
-  final String driverVehicle;
-  final double driverRating;
+  String driverName;
+  String driverVehicle;
+  double driverRating;
 
   bool get isOnlinePayment => paymentMethod == 'stripe' || paymentMethod == 'mercadopago';
   bool get isAwaitingOnlinePayment => isOnlinePayment && paymentStatus != 'paid' && rawStatus != 'cancelled';
@@ -368,27 +368,52 @@ class TalaModel extends ChangeNotifier {
   }
 
   Future<void> refreshAll() async {
+    final int sessionRevision = _orderSessionRevision;
     final int catalogEpoch = _marketCatalogEpoch;
     final String requestedMarket = marketCode;
     loading = true;
     lastError = '';
     notifyListeners();
+
+    // A temporary orders outage must not hide an otherwise healthy catalog.
+    // Auth failures remain fatal to the bootstrap; never treat 401/403 as empty.
+    Future<(List<dynamic>?, String?)> readOrdersForBootstrap() async {
+      try {
+        return (await api.orders(), null);
+      } on ApiException catch (e) {
+        if (e.statusCode == 401 || e.statusCode == 403) rethrow;
+        return (null, e.message.isNotEmpty
+            ? e.message : 'No pudimos actualizar tus pedidos. Revisa tu conexión.');
+      } catch (_) {
+        return (null, 'No pudimos actualizar tus pedidos. Revisa tu conexión.');
+      }
+    }
+
     try {
       final List<dynamic> core = await Future.wait<dynamic>(<Future<dynamic>>[
         api.bootstrap(),
         api.restaurantsForMarket(marketCode),
         api.addresses(),
-        api.orders(),
+        readOrdersForBootstrap(),
         api.favorites(),
         api.wallet(),
         api.notifications(),
       ]);
+      // Logout may have happened while requests were in flight.
+      if (sessionRevision != _orderSessionRevision) return;
       _applyBootstrap(Map<String, dynamic>.from(core[0] as Map));
       if (catalogEpoch == _marketCatalogEpoch && requestedMarket == marketCode) {
         _applyRestaurants(List<dynamic>.from(core[1] as List));
       }
       _applyAddresses(List<dynamic>.from(core[2] as List));
-      _applyOrders(List<dynamic>.from(core[3] as List));
+      final (List<dynamic>? latestOrders, String? ordersError) =
+          core[3] as (List<dynamic>?, String?);
+      if (latestOrders != null) {
+        _applyOrders(latestOrders);
+      } else {
+        // Preserve known orders: failure is not an authoritative empty list.
+        ordersLoadError = ordersError ?? 'No pudimos actualizar tus pedidos.';
+      }
       _applyFavorites(List<dynamic>.from(core[4] as List));
       _applyWallet(Map<String, dynamic>.from(core[5] as Map));
       _applyNotifications(List<dynamic>.from(core[6] as List));
@@ -409,6 +434,7 @@ class TalaModel extends ChangeNotifier {
       try { _applyLoyalty(Map<String, dynamic>.from((await api.get('/platform/loyalty')) as Map)); } catch (_) {}
       try { await refreshPaymentMethods(); } catch (_) {}
     } on ApiException catch (e) {
+      if (sessionRevision != _orderSessionRevision) return;
       online = e.statusCode != 0;
       lastError = e.message;
       if (e.statusCode == 401) {
@@ -417,8 +443,10 @@ class TalaModel extends ChangeNotifier {
         await NativeBridge.clearToken();
       }
     } finally {
-      loading = false;
-      notifyListeners();
+      if (sessionRevision == _orderSessionRevision) {
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -517,6 +545,7 @@ class TalaModel extends ChangeNotifier {
     api.token = null;
     signedIn = false;
     blockedRole = '';
+    loading = false;
     tabIndex = 0;
     restaurants.clear(); menu.clear(); cart.clear(); favorites.clear(); orders.clear(); addresses.clear(); notifications.clear(); _menusLoading.clear(); _menuLoadErrors.clear();
     ordersLoadError = '';
@@ -704,6 +733,23 @@ class TalaModel extends ChangeNotifier {
     for (final CartLine line in cart) { if (line.item.id == item.id) { existing = line; break; } }
     if (existing == null) cart.add(CartLine(item: item, quantity: quantity, note: note));
     else { existing.quantity += quantity; if (note.trim().isNotEmpty) existing.note = note.trim(); }
+    notifyListeners();
+  }
+
+  // Treat the detail sheet as an editor when this product is already in
+  // the basket: do not add "2 more" when the user is reviewing 2 existing.
+  void setCartItemQuantity(FoodItem item, int quantity, {String? note}) {
+    if (cartRestaurantId != item.restaurantId || quantity < 0) return;
+    final int index = cart.indexWhere((CartLine line) =>
+        line.item.id == item.id && line.item.restaurantId == item.restaurantId);
+    if (index < 0) return;
+    if (quantity == 0) {
+      cart.removeAt(index);
+      if (cart.isEmpty) cartRestaurantId = null;
+    } else {
+      cart[index].quantity = quantity;
+      if (note != null) cart[index].note = note.trim();
+    }
     notifyListeners();
   }
 
@@ -981,14 +1027,46 @@ class TalaModel extends ChangeNotifier {
           ? e.error.localizedMessage!.trim()
           : 'No pudimos completar el pago con Stripe.';
       throw ApiException(0, message);
+    } on ApiException {
+      // Preserve the actual (sanitized) backend reason: disabled payment,
+      // missing intent or invalid order. These are not native plugin errors.
+      rethrow;
+    } on MissingPluginException {
+      throw ApiException(503,
+          'El módulo nativo de Stripe no está disponible en esta instalación. Reinstala la APK actualizada.');
+    } on PlatformException catch (e) {
+      throw ApiException(503,
+          'Android no pudo abrir el pago seguro con Stripe. ${e.message ?? 'Revisa el dispositivo y vuelve a intentar.'}');
+    } catch (_) {
+      // Do not swallow provider failures or pretend they mean "cancelled".
+      // Keep the pending order intact; users may retry safely.
+      throw ApiException(503,
+          'No pudimos mostrar la ventana segura de Stripe. Inténtalo de nuevo. Si continúa, contacta soporte.');
     }
   }
 
   Future<void> refreshOrder(OrderEntry order) async {
+    final int sessionRevision = _orderSessionRevision;
     final Map<String, dynamic> live = await api.liveOrder(order.id);
+    // Responses requested before logout must never change the old account's UI.
+    if (sessionRevision != _orderSessionRevision) return;
     final Map<String, dynamic> raw = Map<String, dynamic>.from(live['order'] as Map);
+    if (_asInt(raw['id']) != order.id) {
+      throw ApiException(502, 'El servidor devolvió un pedido distinto. Vuelve a intentarlo.');
+    }
     final OrderEntry fresh = _orderFromJson(raw);
-    order.status = fresh.status; order.rawStatus = fresh.rawStatus; order.paymentStatus = fresh.paymentStatus; order.eta = fresh.eta;
+    order.status = fresh.status;
+    order.rawStatus = fresh.rawStatus;
+    order.paymentStatus = fresh.paymentStatus;
+    order.eta = fresh.eta;
+    // /live may omit these optional fields. Only a field explicitly provided
+    // by the server may replace a previously known driver assignment or PIN.
+    if (raw.containsKey('driver_info')) {
+      order.driverName = fresh.driverName;
+      order.driverVehicle = fresh.driverVehicle;
+      order.driverRating = fresh.driverRating;
+    }
+    if (raw.containsKey('delivery_pin')) order.pin = fresh.pin;
     notifyListeners();
   }
 
@@ -1194,7 +1272,11 @@ class TalaModel extends ChangeNotifier {
   }
 
   void _applyOrders(List<dynamic> rows) {
-    orders..clear()..addAll(rows.map((dynamic raw) => _orderFromJson(Map<String, dynamic>.from(raw as Map))));
+    // Materialize incoming orders BEFORE discarding existing photo metadata.
+    // OrderPublic may only carry item names/prices, not catalogue image URLs.
+    final List<OrderEntry> fresh = rows.map((dynamic raw) =>
+        _orderFromJson(Map<String, dynamic>.from(raw as Map))).toList();
+    orders..clear()..addAll(fresh);
     ordersLoadError = '';
   }
   void _applyFavorites(List<dynamic> rows) { favorites..clear()..addAll(rows.map((dynamic raw) => _asInt((raw as Map)['id']))); }
@@ -1214,7 +1296,46 @@ class TalaModel extends ChangeNotifier {
     final List<CartLine> lines = <CartLine>[];
     for (final dynamic value in List<dynamic>.from((raw['items'] ?? const <dynamic>[]) as List)) {
       final Map<String, dynamic> i = Map<String, dynamic>.from(value as Map); final int itemId=_asInt(i['menu_item_id']);
-      final FoodItem item = FoodItem(id:itemId,restaurantId:restaurantId,name:(i['name_snapshot']??'Producto').toString(),description:'',price:_asDouble(i['unit_price']),image:_imageForRestaurant(restaurantId),category:'Pedido',imageUrl:_remoteImageUrl(i));
+      // A backend order snapshot is authoritative for price/quantity, but may
+      // omit the photo. Preserve the catalogue image across Stripe cancellation
+      // and cart restore, even after refreshOrder() replaces the order snapshot.
+      FoodItem? known;
+      for (final CartLine cartLine in cart) {
+        if (cartLine.item.id == itemId && cartLine.item.restaurantId == restaurantId) {
+          known = cartLine.item;
+          break;
+        }
+      }
+      if (known == null) {
+        for (final FoodItem menuItem in menu) {
+          if (menuItem.id == itemId && menuItem.restaurantId == restaurantId) {
+            known = menuItem;
+            break;
+          }
+        }
+      }
+      if (known == null) {
+        for (final OrderEntry previous in orders) {
+          if (previous.restaurant.id != restaurantId) continue;
+          for (final CartLine previousLine in previous.lines) {
+            if (previousLine.item.id == itemId && previousLine.item.imageUrl.isNotEmpty) {
+              known = previousLine.item;
+              break;
+            }
+          }
+          if (known != null) break;
+        }
+      }
+      final String orderImage = _remoteImageUrl(i);
+      final FoodItem item = FoodItem(
+        id: itemId, restaurantId: restaurantId,
+        name: (i['name_snapshot'] ?? 'Producto').toString(),
+        description: known?.description ?? '',
+        price: _asDouble(i['unit_price']),
+        image: known?.image ?? _imageForRestaurant(restaurantId),
+        category: known?.category ?? 'Pedido',
+        imageUrl: orderImage.isNotEmpty ? orderImage : (known?.imageUrl ?? ''),
+      );
       lines.add(CartLine(item:item,quantity:_asInt(i['quantity']),note:(i['options_snapshot']??'').toString()));
     }
     final String rawStatus=(raw['status']??'received').toString();
@@ -1309,11 +1430,11 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
       });
       return;
     }
-    // The brand moment lasts ~1.1 s and runs in parallel with the real
-    // bootstrap; it never delays a slower bootstrap any further.
+    // One gentle photographic intro for four seconds while restoring session.
+    // Never insert a second loading screen or wait beyond the existing dwell.
     Future.wait<void>(<Future<void>>[
       model.initialize(),
-      Future<void>.delayed(const Duration(milliseconds: 1100)),
+      Future<void>.delayed(const Duration(seconds: 4)),
     ]).whenComplete(() {
       if (mounted) setState(() => booted = true);
     });
@@ -1346,10 +1467,23 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
             screen = CustomerShell(model: model);
           }
           return AnimatedSwitcher(
-            duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
-            switchInCurve: TalaMotion.ease,
+            duration: TalaMotion.of(context, const Duration(milliseconds: 620)),
+            switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (Widget child, Animation<double> animation) => FadeTransition(opacity: animation, child: child),
+            // Crossfade plus a subtle 1.5% easing makes the first real page
+            // arrive naturally instead of cutting directly from a still photo.
+            transitionBuilder: (Widget child, Animation<double> animation) =>
+                FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.985, end: 1.0)
+                        .animate(CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        )),
+                    child: child,
+                  ),
+                ),
             child: KeyedSubtree(key: ValueKey<String>(stage), child: screen),
           );
         },
@@ -1379,89 +1513,39 @@ class TalaLogoMark extends StatelessWidget {
   }
 }
 
-/// Splash: centered brand, one elegant entrance, a quiet loader.
-class LaunchScreen extends StatefulWidget {
+/// Single photographic introduction using the approved, original artwork.
+/// A non-looping, minimal Ken Burns motion runs inside the existing four-second
+/// dwell. Reduced-motion devices get the finished still frame immediately.
+class LaunchScreen extends StatelessWidget {
   const LaunchScreen({super.key});
-
-  @override
-  State<LaunchScreen> createState() => _LaunchScreenState();
-}
-
-class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
-  late final Animation<double> _mark = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.62, curve: Curves.easeOutCubic));
-  late final Animation<double> _word = CurvedAnimation(parent: _controller, curve: const Interval(0.22, 0.85, curve: Curves.easeOutCubic));
-  late final Animation<double> _loader = CurvedAnimation(parent: _controller, curve: const Interval(0.6, 1, curve: Curves.easeOut));
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (TalaMotion.reduced(context)) {
-      _controller.value = 1;
-    } else if (_controller.value == 0 && !_controller.isAnimating) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF6),
-      body: Stack(
-        children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                FadeTransition(
-                  opacity: _mark,
-                  child: ScaleTransition(
-                    scale: Tween<double>(begin: 0.86, end: 1).animate(_mark),
-                    child: const TalaLogoMark(size: 88),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                FadeTransition(
-                  opacity: _word,
-                  child: SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero).animate(_word),
-                    child: const Column(
-                      children: <Widget>[
-                        Text('Tala Eats', style: TextStyle(color: kInk, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1.1)),
-                        SizedBox(height: 6),
-                        Text('Tu comida favorita, más cerca.', style: TextStyle(color: kMuted, fontSize: 15, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.paddingOf(context).bottom + 56,
-            child: FadeTransition(
-              opacity: _loader,
-              child: Center(
-                child: SizedBox(
-                  width: 64,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: const LinearProgressIndicator(minHeight: 3, backgroundColor: kSoftOrange, color: kBrand),
-                  ),
-                ),
+      backgroundColor: Colors.white,
+      body: SizedBox.expand(
+        child: TweenAnimationBuilder<double>(
+          key: const ValueKey<String>('tala-intro-motion'),
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: TalaMotion.of(context, const Duration(milliseconds: 3400)),
+          curve: Curves.easeInOutCubic,
+          builder: (BuildContext context, double progress, Widget? child) {
+            return Transform.scale(
+              key: const ValueKey<String>('tala-intro-photo-transform'),
+              scale: 1.0 + progress * 0.038,
+              child: Opacity(
+                opacity: 0.94 + progress * 0.06,
+                child: child,
               ),
-            ),
+            );
+          },
+          child: Image.asset(
+            'assets/branding/tala_intro.png',
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            semanticLabel: 'Tala Eats',
           ),
-        ],
+        ),
       ),
     );
   }

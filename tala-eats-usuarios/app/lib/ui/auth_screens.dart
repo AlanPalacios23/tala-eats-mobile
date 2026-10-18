@@ -29,23 +29,42 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> submit() async {
+    if (loading) return;
     FocusScope.of(context).unfocus();
+    final String address = email.text.trim();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(address)) {
+      setState(() => error = 'Escribe un correo electrónico válido.');
+      return;
+    }
+    if (password.text.isEmpty) {
+      setState(() => error = 'Escribe tu contraseña.');
+      return;
+    }
     setState(() {
       loading = true;
       error = '';
     });
-    final bool ok = await widget.model.login(email.text, password.text);
+    final bool ok = await widget.model.login(address, password.text);
     if (!mounted) return;
     if (ok) {
       HapticFeedback.lightImpact();
       return;
     }
     HapticFeedback.mediumImpact();
+    final String message = widget.model.blockedRole.isNotEmpty
+        ? 'Esta cuenta pertenece a otra aplicación de Tala Eats.'
+        : (widget.model.lastError.isNotEmpty
+            ? widget.model.lastError
+            : 'Revisa tu correo y contraseña e inténtalo de nuevo.');
+    // The customer login has no OTP field. Never suppress backend MFA
+    // requirements: affected legacy accounts need a secure support recovery.
+    final String safeMessage = RegExp(r'(2fa|otp|autenticador)', caseSensitive: false)
+            .hasMatch(message)
+        ? 'Tu cuenta requiere verificación adicional. Comunícate con soporte para recuperar el acceso.'
+        : message;
     setState(() {
       loading = false;
-      error = widget.model.blockedRole.isNotEmpty
-          ? 'Esta cuenta pertenece a otra aplicación de Tala Eats.'
-          : (widget.model.lastError.isNotEmpty ? widget.model.lastError : 'Revisa tu correo y contraseña e inténtalo de nuevo.');
+      error = safeMessage;
     });
   }
 
@@ -53,7 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Bienvenido de vuelta',
-      subtitle: 'Pide lo que se te antoje y sigue tu pedido en tiempo real.',
+      subtitle: 'Tu comida favorita, más cerca.',
+      showFoodImage: true,
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -71,10 +91,8 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: password,
               obscureText: hidePassword,
               textInputAction: TextInputAction.done,
-              onSubmitted: (_) {
-                if (!loading) submit();
-              },
               autofillHints: const <String>[AutofillHints.password],
+              onSubmitted: (_) { if (!loading) submit(); },
               decoration: InputDecoration(
                 labelText: 'Contraseña',
                 prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -85,6 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -113,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
               spacing: 2,
               runSpacing: 0,
               children: <Widget>[
-                const Text('¿Aún no tienes cuenta?', style: TalaText.muted),
+                const Text('¿Aún no tienes cuenta?', style: TextStyle(color: Color(0xFF171717), fontWeight: FontWeight.w800, fontSize: 13)),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(premiumRoute(SignUpScreen(model: widget.model))),
                   child: const Text('Crear cuenta'),
@@ -168,7 +187,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     String next = '';
     if (name.text.trim().length < 2) {
       next = 'Escribe tu nombre.';
-    } else if (!email.text.trim().contains('@')) {
+    } else if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.text.trim())) {
       next = 'Escribe un correo válido.';
     } else if (!passwordStrong) {
       next = 'Tu contraseña todavía no cumple los requisitos.';
@@ -200,6 +219,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: 'Crea tu cuenta',
+      showSecondaryImage: true,
       subtitle: 'Un minuto y quedas listo para pedir en Tala Eats.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -342,6 +362,7 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: 'Confirma tus datos',
+      showSecondaryImage: true,
       subtitle: 'Revisa que tu correo sea correcto. Lo usarás para entrar y recuperar tu cuenta.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -406,12 +427,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> submit() async {
+    if (loading) return;
     FocusScope.of(context).unfocus();
+    final String address = email.text.trim();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(address)) {
+      setState(() => error = 'Escribe un correo electrónico válido.');
+      return;
+    }
     setState(() {
       loading = true;
       error = '';
     });
-    final bool ok = await widget.model.requestPasswordReset(email.text);
+    final bool ok = await widget.model.requestPasswordReset(address);
     if (!mounted) return;
     if (ok) HapticFeedback.lightImpact();
     setState(() {
@@ -426,9 +453,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return PremiumAuthScaffold(
       showBack: true,
       title: sent ? 'Revisa tu correo' : 'Recupera tu contraseña',
+      showSecondaryImage: true,
       subtitle: sent
-          ? 'Si la cuenta existe, recibirás un enlace seguro. Ábrelo en este teléfono para crear tu nueva contraseña.'
-          : 'Te enviaremos un enlace seguro para crear una nueva contraseña.',
+          ? 'Recibimos tu solicitud. Si la cuenta existe y el servicio de correo está disponible, recibirás un enlace seguro.'
+          : 'Solicita un enlace seguro para crear una nueva contraseña.',
       child: AnimatedSwitcher(
         duration: TalaMotion.of(context, TalaMotion.reveal),
         child: sent
@@ -451,6 +479,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     controller: email,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
+                    autofillHints: const <String>[AutofillHints.email],
                     autocorrect: false,
                     onSubmitted: (_) {
                       if (!loading) submit();
@@ -531,6 +560,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Crea una nueva contraseña',
+      showSecondaryImage: true,
       subtitle: 'Elige una contraseña segura que no uses en otros servicios.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -588,6 +618,7 @@ class PasswordUpdatedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       title: 'Contraseña actualizada',
+      showSecondaryImage: true,
       subtitle: 'Ya puedes iniciar sesión con tu nueva contraseña.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -635,13 +666,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cambiar contraseña')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+    return PremiumAuthScaffold(
+      showBack: true,
+      showSecondaryImage: true,
+      title: 'Cambiar contraseña',
+      subtitle: 'Te enviaremos un enlace seguro a tu correo para definir una nueva contraseña.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const Text('Te enviaremos un enlace seguro a tu correo para que definas una nueva contraseña.', style: TalaText.body),
-          const SizedBox(height: 18),
           TalaCard(
             child: Row(
               children: <Widget>[
@@ -657,17 +689,25 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ],
           if (sent) ...<Widget>[
             const SizedBox(height: 12),
-            const AuthNotice(icon: Icons.mark_email_read_rounded, text: 'Listo. Revisa tu correo y abre el enlace para crear la nueva contraseña.'),
+            const AuthNotice(
+              icon: Icons.mark_email_read_rounded,
+              text: 'Listo. Revisa tu correo y abre el enlace para crear la nueva contraseña.',
+            ),
           ],
           const SizedBox(height: 18),
-          FilledButton(onPressed: loading ? null : submit, child: BusyLabel(busy: loading, label: sent ? 'Reenviar enlace' : 'Enviar enlace seguro')),
+          FilledButton(
+            onPressed: loading ? null : submit,
+            child: BusyLabel(busy: loading, label: sent ? 'Reenviar enlace' : 'Enviar enlace seguro'),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Shared auth layout: brand lockup, strong title, calm form area.
+/// Premium auth layout: vivid photo hero + one clean solid form surface.
+/// The photo remains original; a local dark gradient only protects white hero
+/// typography. All forms share identical spacing, keyboard and reading rules.
 class PremiumAuthScaffold extends StatelessWidget {
   const PremiumAuthScaffold({
     super.key,
@@ -676,6 +716,8 @@ class PremiumAuthScaffold extends StatelessWidget {
     required this.child,
     this.eyebrow = '',
     this.showBack = false,
+    this.showFoodImage = false,
+    this.showSecondaryImage = false,
   });
 
   final String eyebrow;
@@ -683,56 +725,206 @@ class PremiumAuthScaffold extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final bool showBack;
+  final bool showFoodImage;
+  final bool showSecondaryImage;
 
   @override
   Widget build(BuildContext context) {
+    final String? background = showFoodImage
+        ? 'assets/branding/login_food.png'
+        : showSecondaryImage
+            ? 'assets/branding/auth_secondary.jpg'
+            : null;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF6),
+      backgroundColor: Colors.white,
       body: Stack(
         children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
-          SafeArea(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      SizedBox(
-                        height: 48,
-                        child: Row(
-                          children: <Widget>[
-                            if (showBack)
-                              TalaCircleButton(icon: Icons.arrow_back_rounded, tooltip: 'Regresar', onPressed: () => Navigator.of(context).maybePop())
-                            else
-                              const AuthBrandMark(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 26),
-                      Reveal(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            if (eyebrow.isNotEmpty) ...<Widget>[
-                              Text(eyebrow, style: TalaText.overline),
-                              const SizedBox(height: 8),
-                            ],
-                            Text(title, style: TalaText.display),
-                            const SizedBox(height: 8),
-                            Text(subtitle, style: TalaText.muted.copyWith(fontSize: 15)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Reveal(index: 2, child: Material(type: MaterialType.transparency, child: child)),
-                    ],
-                  ),
-                ),
+          if (background != null)
+            Positioned.fill(
+              child: Image.asset(
+                background,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                semanticLabel: 'Fotografía de comida de Tala Eats',
               ),
+            )
+          else
+            const Positioned.fill(child: AuthBackdrop()),
+          // Keep the same hero scrim behind Android's status-bar inset.
+          // The hero's gradient below starts at this exact opacity; without
+          // this strip a bright band appears above both auth photographs.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.paddingOf(context).top,
+            child: const ColoredBox(
+              key: ValueKey<String>('auth-status-bar-scrim'),
+              color: Color(0x59000000),
+            ),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints area) {
+                final bool keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+                final double heroHeight = keyboardOpen
+                    ? 110
+                    : math.min(238.0, math.max(158.0, area.maxHeight * 0.29));
+                return SingleChildScrollView(
+                  key: const ValueKey<String>('auth-scroll'),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: area.maxHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        SizedBox(
+                          height: heroHeight,
+                          child: Stack(
+                            children: <Widget>[
+                              // Gradient stays in the hero, not over the photo
+                              // behind the entire viewport or form.
+                              const Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: <Color>[
+                                        Color(0x59000000),
+                                        Color(0x96000000),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (showBack)
+                                Positioned(
+                                  top: 12,
+                                  left: 20,
+                                  child: TalaCircleButton(
+                                    icon: Icons.arrow_back_rounded,
+                                    tooltip: 'Regresar',
+                                    onPressed: () => Navigator.of(context).maybePop(),
+                                  ),
+                                ),
+                              Positioned(
+                                left: 24,
+                                right: 24,
+                                bottom: keyboardOpen ? 12 : 25,
+                                child: Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 460),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        if (eyebrow.isNotEmpty) ...<Widget>[
+                                          Text(eyebrow,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              letterSpacing: 1.1,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                        ],
+                                        Text(
+                                          title,
+                                          key: const ValueKey<String>('auth-hero-title'),
+                                          style: TextStyle(
+                                            fontSize: keyboardOpen ? 24 : 32,
+                                            height: 1.08,
+                                            letterSpacing: -0.7,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        if (!keyboardOpen) ...<Widget>[
+                                          const SizedBox(height: 7),
+                                          Text(subtitle,
+                                            style: const TextStyle(
+                                              color: Color(0xFFF7F7F7),
+                                              fontSize: 14,
+                                              height: 1.4,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          key: const ValueKey<String>('auth-surface'),
+                          constraints: BoxConstraints(
+                            minHeight: math.max(0.0, area.maxHeight - heroHeight),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(24, 27, 24, 30),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(28),
+                              topRight: Radius.circular(28),
+                            ),
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 440),
+                              child: Theme(
+                                data: Theme.of(context).copyWith(
+                                  inputDecorationTheme: Theme.of(context)
+                                      .inputDecorationTheme.copyWith(
+                                    fillColor: const Color(0xFFF7F7F7),
+                                    labelStyle: const TextStyle(
+                                      color: Color(0xFF393939),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                    floatingLabelStyle: const TextStyle(
+                                      color: Color(0xFFAB3308),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    prefixIconColor: const Color(0xFF616161),
+                                    suffixIconColor: const Color(0xFF616161),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(color: Color(0xFFE1E1E1)),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(color: kBrandDeep, width: 1.8),
+                                    ),
+                                  ),
+                                  textButtonTheme: TextButtonThemeData(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF9D2B00),
+                                      textStyle: const TextStyle(
+                                        fontSize: 13, fontWeight: FontWeight.w700,
+                                      ),
+                                      minimumSize: const Size(44, 42),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                                    ),
+                                  ),
+                                ),
+                                child: Material(
+                                  type: MaterialType.transparency,
+                                  child: child,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -943,10 +1135,9 @@ class SuccessOrb extends StatelessWidget {
   }
 }
 
-/// Legal acknowledgement under the login form (links open the real documents).
+/// Discreet, clickable legal links; no translucent cards or fake buttons.
 class LegalLoginNotice extends StatelessWidget {
   const LegalLoginNotice({super.key, required this.model});
-
   final TalaModel model;
 
   @override
@@ -954,21 +1145,23 @@ class LegalLoginNotice extends StatelessWidget {
     return Column(
       children: <Widget>[
         const Text(
-          'Al iniciar sesión aceptas los Términos y Condiciones de Uso y reconoces el Aviso de Privacidad de Tala Eats. Precios, disponibilidad y cargos se confirman antes de finalizar cada pedido.',
+          'Al iniciar sesión aceptas los Términos y Condiciones y reconoces el Aviso de Privacidad.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
+          style: TextStyle(color: Color(0xFF757575), fontSize: 11, height: 1.5),
         ),
         const SizedBox(height: 2),
         Wrap(
           alignment: WrapAlignment.center,
-          spacing: 2,
+          spacing: 12,
           children: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).push(premiumRoute(const TermsAndConditionsScreen())),
+              onPressed: () => Navigator.of(context).push(
+                premiumRoute(const TermsAndConditionsScreen())),
               child: const Text('Términos y Condiciones'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).push(premiumRoute(PrivacyNoticeScreen(supportEmail: model.supportEmail))),
+              onPressed: () => Navigator.of(context).push(
+                premiumRoute(PrivacyNoticeScreen(supportEmail: model.supportEmail))),
               child: const Text('Aviso de Privacidad'),
             ),
           ],

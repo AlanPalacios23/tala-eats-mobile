@@ -1059,6 +1059,15 @@ class DishThumb extends StatelessWidget {
 
   static IconData iconFor(String text) {
     final String t = _fold(text);
+    // Generic merchandise must not look like a fake restaurant dish when
+    // the merchant has not uploaded a real product photograph.
+    if (t.contains('ferreter') || t.contains('tornillo') || t.contains('herramienta')) return Icons.handyman_rounded;
+    if (t.contains('papeler') || t.contains('cuaderno') || t.contains('lapiz')) return Icons.edit_note_rounded;
+    if (t.contains('florer') || t.contains('flores') || t.contains('ramo')) return Icons.local_florist_rounded;
+    if (t.contains('regalo') || t.contains('obsequio')) return Icons.card_giftcard_rounded;
+    if (t.contains('verdura') || t.contains('fruta') || t.contains('vegetal')) return Icons.eco_rounded;
+    if (t.contains('carnicer') || t.contains('carne de')) return Icons.outdoor_grill_rounded;
+    if (t.contains('abarrote') || t.contains('despensa')) return Icons.local_grocery_store_rounded;
     if (t.contains('bebida') || t.contains('refresco') || t.contains('agua') || t.contains('jugo') || t.contains('cafe')) return Icons.local_cafe_rounded;
     if (t.contains('postre') || t.contains('helado') || t.contains('pastel') || t.contains('dulce')) return Icons.icecream_rounded;
     if (t.contains('sushi') || t.contains('ramen') || t.contains('rollo')) return Icons.ramen_dining_rounded;

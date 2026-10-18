@@ -42,23 +42,55 @@ class CartScreen extends StatelessWidget {
               if (restaurant != null) ...<Widget>[
                 Reveal(
                   child: TalaCard(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
-                    child: Row(
-                      children: <Widget>[
-                        RestaurantMedia(assetPath: restaurant.image, imageUrl: restaurant.imageUrl, width: 52, height: 52, radius: 14),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title),
-                              const SizedBox(height: 2),
-                              Text('$itemCount ${itemCount == 1 ? 'producto' : 'productos'} · ${restaurant.eta}', style: TalaText.caption),
-                            ],
-                          ),
-                        ),
-                        TextButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Agregar más')),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                    child: LayoutBuilder(
+                      builder: (BuildContext context, BoxConstraints bounds) {
+                        // Leave room for real merchant names and large text.
+                        // The secondary action moves below instead of squeezing
+                        // the title against the photo on compact phones.
+                        final bool compactHeader = bounds.maxWidth < 340 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 17;
+                        final Widget addMore = TextButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          child: const Text('Agregar más'),
+                        );
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            Row(
+                              children: <Widget>[
+                                RestaurantMedia(
+                                  assetPath: restaurant.image,
+                                  imageUrl: restaurant.imageUrl,
+                                  width: 52, height: 52, radius: 14,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(restaurant.name,
+                                        maxLines: compactHeader ? 2 : 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TalaText.title),
+                                      const SizedBox(height: 2),
+                                      Text('$itemCount ${itemCount == 1 ? 'producto' : 'productos'} · ${restaurant.eta}',
+                                        maxLines: 2, overflow: TextOverflow.ellipsis,
+                                        style: TalaText.caption),
+                                    ],
+                                  ),
+                                ),
+                                if (!compactHeader) ...<Widget>[
+                                  const SizedBox(width: 6),
+                                  addMore,
+                                ],
+                              ],
+                            ),
+                            if (compactHeader)
+                              Align(alignment: Alignment.centerRight, child: addMore),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -330,7 +362,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           // Full-width choices prevent compressed text and
                           // inaccessible taps on 320dp/textScale 1.3 devices.
                           if (deliveryOption != null && pickupOption != null) {
-                            if (bounds.maxWidth < 320) {
+                            if (bounds.maxWidth < 375 || MediaQuery.textScalerOf(context).scale(14) > 17) {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: <Widget>[
@@ -642,7 +674,7 @@ class DeliveryModeCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
                   const SizedBox(height: 2),
-                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.caption),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TalaText.caption),
                 ],
               ),
             ),
@@ -710,9 +742,9 @@ class PaymentUnavailableCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Pago en línea no disponible por ahora', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
+                    Text('No hay métodos de pago disponibles', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
                     SizedBox(height: 4),
-                    Text('No se hará ningún cargo. Intenta de nuevo cuando el servidor vuelva a ofrecer un método disponible.', style: TextStyle(color: kInkSoft, fontSize: 13, height: 1.4)),
+                    Text('No podemos confirmar tu pedido por ahora, ni en efectivo ni en línea. No se hará ningún cargo. Revisa de nuevo antes de continuar.', style: TextStyle(color: kInkSoft, fontSize: 13, height: 1.4)),
                   ],
                 ),
               ),
@@ -807,7 +839,7 @@ class _CustomerAmountRow extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints bounds) {
-        if (bounds.maxWidth < 310) {
+        if (bounds.maxWidth < 345) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
@@ -843,15 +875,50 @@ class SummaryCard extends StatelessWidget {
         children: <Widget>[
           for (final CartLine line in model.cart)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  SizedBox(width: 30, child: Text('${line.quantity}×', style: const TextStyle(color: kBrandDeep, fontWeight: FontWeight.w800))),
-                  Expanded(child: Text(line.item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w500))),
-                  const SizedBox(width: 8),
-                  Text(money(line.total), style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w600)),
-                ],
+              padding: const EdgeInsets.only(bottom: 10),
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints bounds) {
+                  final bool compact = bounds.maxWidth < 365 ||
+                      MediaQuery.textScalerOf(context).scale(14) > 17;
+                  final Widget product = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(line.item.name, maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w500)),
+                      if (line.note.trim().isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text('Nota: ${line.note.trim()}',
+                          style: TalaText.caption),
+                      ],
+                    ],
+                  );
+                  final Widget price = Text(money(line.total),
+                    style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.right);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          SizedBox(width: 30,
+                            child: Text('${line.quantity}×',
+                              style: const TextStyle(color: kBrandDeep, fontWeight: FontWeight.w800))),
+                          Expanded(child: product),
+                          if (!compact) ...<Widget>[
+                            const SizedBox(width: 8),
+                            price,
+                          ],
+                        ],
+                      ),
+                      if (compact) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Align(alignment: Alignment.centerRight, child: price),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
           const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
@@ -990,24 +1057,43 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
   bool checking = false;
   bool cancelling = false;
   bool allowPop = false;
+  Timer? _paymentPollTimer;
+  bool _isForeground = true;
   String error = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => openCheckout());
+    // Server/webhook is authoritative. Poll only while this screen is visible,
+    // rather than asking customers to repeatedly tap "Verificar pago".
+    _paymentPollTimer = Timer.periodic(const Duration(seconds: 8), (Timer _) {
+      // Native Stripe/MP may move Android to background. Do not poll an
+      // invisible payment page; on resume the server state is read once.
+      if (mounted && _isForeground &&
+          (ModalRoute.of(context)?.isCurrent ?? false) &&
+          !opening && !checking && !cancelling && !paid) {
+        unawaited(verify());
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(openCheckout());
+    });
   }
 
   @override
   void dispose() {
+    _paymentPollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) verify();
+    _isForeground = state == AppLifecycleState.resumed;
+    if (_isForeground && mounted && !paid && !cancelling) {
+      unawaited(verify());
+    }
   }
 
   Future<void> openCheckout() async {
@@ -1074,7 +1160,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
   String get providerAction => widget.order.paymentMethod == 'stripe' ? 'Abrir pago seguro' : 'Abrir Mercado Pago';
 
   Future<void> verify() async {
-    if (checking) return;
+    if (!mounted || checking || cancelling || paid) return;
     setState(() {
       checking = true;
       error = '';
@@ -1086,7 +1172,10 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
     } finally {
       if (mounted) setState(() => checking = false);
     }
-    if (paid && mounted) HapticFeedback.mediumImpact();
+    if (paid && mounted) {
+      _paymentPollTimer?.cancel();
+      HapticFeedback.mediumImpact();
+    }
   }
 
   bool get paid => widget.order.paymentStatus == 'paid';
@@ -1196,13 +1285,26 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> with WidgetsB
                   icon: const Icon(Icons.open_in_new_rounded),
                   label: Text(opening ? 'Abriendo $providerName…' : providerAction),
                 ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: checking || cancelling ? null : verify,
-                  icon: checking
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.refresh_rounded),
-                  label: const Text('Verificar pago'),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    if (checking) ...<Widget>[
+                      const SizedBox(
+                        height: 14, width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                    ] else ...<Widget>[
+                      const Icon(Icons.sync_rounded, size: 17, color: kMuted),
+                      const SizedBox(width: 8),
+                    ],
+                    const Flexible(
+                      child: Text('El estado del pago se actualiza automáticamente.',
+                        textAlign: TextAlign.center,
+                        style: TalaText.caption),
+                    ),
+                  ],
                 ),
               ] else
                 FilledButton.icon(

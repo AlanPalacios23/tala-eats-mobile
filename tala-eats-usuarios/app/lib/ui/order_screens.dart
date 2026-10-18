@@ -140,7 +140,8 @@ class ActiveOrderCard extends StatelessWidget {
         children: <Widget>[
           LayoutBuilder(
             builder: (BuildContext context, BoxConstraints bounds) {
-              final bool compact = bounds.maxWidth < 310;
+              final bool compact = bounds.maxWidth < 345 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 17;
               final Widget merchant = Row(
                 children: <Widget>[
                   RestaurantMedia(
@@ -153,7 +154,7 @@ class ActiveOrderCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(order.restaurant.name, maxLines: 1,
+                        Text(order.restaurant.name, maxLines: compact ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
                             style: TalaText.title),
                         const SizedBox(height: 2),
@@ -186,13 +187,25 @@ class ActiveOrderCard extends StatelessWidget {
             },
           ),
           const SizedBox(height: 14),
-          _SegmentedProgress(total: steps.length, current: current),
+          Semantics(
+            label: 'Progreso del pedido: etapa ${current + 1} de ${steps.length}, ${steps[current].$1}',
+            child: _SegmentedProgress(total: steps.length, current: current),
+          ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10,
+            runSpacing: 6,
             children: <Widget>[
-              Expanded(child: Text('Pedido #${order.id} · ${money(order.total)}', style: TalaText.caption)),
-              const Text('Ver pedido', style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13)),
-              const Icon(Icons.chevron_right_rounded, color: kBrandDeep, size: 20),
+              Text('Pedido #${order.id} · ${money(order.total)}', style: TalaText.caption),
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text('Ver pedido', style: TextStyle(color: kBrandDeep, fontWeight: FontWeight.w700, fontSize: 13)),
+                  Icon(Icons.chevron_right_rounded, color: kBrandDeep, size: 20),
+                ],
+              ),
             ],
           ),
         ],
@@ -211,31 +224,60 @@ class PastOrderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool cancelled = order.status == 'Cancelado';
     final int items = order.lines.fold<int>(0, (int total, CartLine line) => total + line.quantity);
+    final Widget status = StatusPill(
+      label: order.status,
+      color: cancelled ? kDanger : kGreen,
+      background: cancelled ? kDangerSoft : kSoftGreen,
+    );
     return TalaCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       onTap: onTap,
-      child: Row(
-        children: <Widget>[
-          RestaurantMedia(assetPath: order.restaurant.image, imageUrl: order.restaurant.imageUrl, width: 48, height: 48, radius: 14, desaturate: cancelled),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(order.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title.copyWith(fontSize: 15)),
-                const SizedBox(height: 2),
-                Text('#${order.id} · ${money(order.total)} · $items ${items == 1 ? 'producto' : 'productos'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.caption),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints bounds) {
+          final bool compact = bounds.maxWidth < 345 ||
+              MediaQuery.textScalerOf(context).scale(14) > 17;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  RestaurantMedia(
+                    assetPath: order.restaurant.image,
+                    imageUrl: order.restaurant.imageUrl,
+                    width: 48, height: 48, radius: 14,
+                    desaturate: cancelled,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(order.restaurant.name,
+                          maxLines: compact ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TalaText.title.copyWith(fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text('#${order.id} · ${money(order.total)} · $items ${items == 1 ? 'producto' : 'productos'}',
+                          maxLines: compact ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TalaText.caption),
+                      ],
+                    ),
+                  ),
+                  if (!compact) ...<Widget>[
+                    const SizedBox(width: 8),
+                    status,
+                  ],
+                ],
+              ),
+              if (compact) ...<Widget>[
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: status),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          StatusPill(
-            label: order.status,
-            color: cancelled ? kDanger : kGreen,
-            background: cancelled ? kDangerSoft : kSoftGreen,
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -338,22 +380,25 @@ class OrderStatusTimeline extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Row(
+                child: Wrap(
+                  alignment: WrapAlignment.start,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: <Widget>[
-                    Flexible(
-                      child: Text(
-                        steps[i].$1,
-                        style: TextStyle(
-                          color: now ? kInk : (done ? kInkSoft : kSubtle),
-                          fontWeight: now ? FontWeight.w800 : FontWeight.w600,
-                          fontSize: now ? 15 : 14,
-                        ),
+                    Text(
+                      steps[i].$1,
+                      style: TextStyle(
+                        color: now ? kInk : (done ? kInkSoft : kSubtle),
+                        fontWeight: now ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: now ? 15 : 14,
                       ),
                     ),
-                    if (now && !last) ...<Widget>[
-                      const SizedBox(width: 8),
-                      const StatusPill(label: 'Ahora', color: kBrandDeep, background: kSoftOrange, dot: false),
-                    ],
+                    if (now && !last)
+                      const StatusPill(
+                        label: 'Ahora', color: kBrandDeep,
+                        background: kSoftOrange, dot: false,
+                      ),
                   ],
                 ),
               ),
@@ -453,17 +498,45 @@ class OrderDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          RestaurantMedia(assetPath: order.restaurant.image, imageUrl: order.restaurant.imageUrl, width: 44, height: 44, radius: 12),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(order.restaurant.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TalaText.title)),
-                          StatusPill(
+                      LayoutBuilder(
+                        builder: (BuildContext context, BoxConstraints bounds) {
+                          final bool compact = bounds.maxWidth < 345 ||
+                              MediaQuery.textScalerOf(context).scale(14) > 17;
+                          final Widget payment = StatusPill(
                             label: paymentStatusLabel(order.paymentStatus),
                             color: order.paymentStatus == 'paid' ? kGreen : kInkSoft,
                             background: order.paymentStatus == 'paid' ? kSoftGreen : kSunken,
-                          ),
-                        ],
+                          );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Row(
+                                children: <Widget>[
+                                  RestaurantMedia(
+                                    assetPath: order.restaurant.image,
+                                    imageUrl: order.restaurant.imageUrl,
+                                    width: 44, height: 44, radius: 12,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(order.restaurant.name,
+                                      maxLines: compact ? 2 : 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TalaText.title),
+                                  ),
+                                  if (!compact) ...<Widget>[
+                                    const SizedBox(width: 8),
+                                    payment,
+                                  ],
+                                ],
+                              ),
+                              if (compact) ...<Widget>[
+                                const SizedBox(height: 10),
+                                Align(alignment: Alignment.centerRight, child: payment),
+                              ],
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       Text(order.status, style: TalaText.h1.copyWith(color: cancelled ? kDanger : kInk)),
@@ -648,9 +721,11 @@ class TrackingScreen extends StatefulWidget {
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen> {
+class _TrackingScreenState extends State<TrackingScreen> with WidgetsBindingObserver {
   Timer? _timer;
   bool refreshing = false;
+  bool _foreground = true;
+  bool _lastCheckFailed = false;
 
   OrderEntry get order => widget.order;
   TalaModel get model => widget.model;
@@ -667,27 +742,64 @@ class _TrackingScreenState extends State<TrackingScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(silent: true));
+    WidgetsBinding.instance.addObserver(this);
+    final AppLifecycleState? lifecycle = WidgetsBinding.instance.lifecycleState;
+    _foreground = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _foreground) _refresh(silent: true);
+    });
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _timer?.cancel();
+    if (!_foreground || !mounted || terminal) return;
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!terminal) _refresh(silent: true);
+      if (_foreground && mounted && !terminal) _refresh(silent: true);
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final bool nextForeground = state == AppLifecycleState.resumed;
+    if (_foreground == nextForeground) return;
+    _foreground = nextForeground;
+    if (_foreground) {
+      _startPolling();
+      if (!terminal) _refresh(silent: true);
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
   Future<void> _refresh({bool silent = false}) async {
-    if (refreshing || terminal) return;
+    if (!mounted || !_foreground || refreshing || terminal) return;
     if (mounted) setState(() => refreshing = true);
     try {
       await model.refreshOrder(order);
+      if (mounted) setState(() => _lastCheckFailed = false);
       if (!silent && mounted) showMessage(context, 'Seguimiento actualizado.');
     } on ApiException catch (e) {
+      if (mounted) setState(() => _lastCheckFailed = true);
       if (!silent && mounted) showMessage(context, e.message);
+    } catch (_) {
+      if (mounted) setState(() => _lastCheckFailed = true);
+      if (!silent && mounted) {
+        showMessage(context, 'No pudimos comprobar el pedido. Inténtalo de nuevo.');
+      }
     } finally {
+      if (terminal) {
+        _timer?.cancel();
+        _timer = null;
+      }
       if (mounted) setState(() => refreshing = false);
     }
   }
@@ -702,18 +814,64 @@ class _TrackingScreenState extends State<TrackingScreen> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
             children: <Widget>[
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: <Widget>[
                   if (!terminal) const LiveBadge() else const StatusPill(label: 'Finalizado', color: kGreen, background: kSoftGreen),
-                  const Spacer(),
                   AnimatedSwitcher(
                     duration: TalaMotion.of(context, TalaMotion.select),
                     child: refreshing
                         ? const SizedBox(key: ValueKey<String>('r'), width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Estimado ${order.eta}', key: ValueKey<String>(order.eta), style: TalaText.caption),
+                        : Text('Estimado ${order.eta}', key: ValueKey<String>(order.eta), maxLines: 2, style: TalaText.caption),
                   ),
                 ],
               ),
+              if (_lastCheckFailed && !terminal) ...<Widget>[
+                const SizedBox(height: 12),
+                Semantics(
+                  liveRegion: true,
+                  child: TalaCard(
+                    color: kSoftPeach,
+                    borderColor: const Color(0xFFFFD9C7),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Icon(Icons.sync_problem_rounded, color: kBrandDeep, size: 22),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text('No pudimos actualizar el seguimiento',
+                                    style: TextStyle(color: kInk, fontWeight: FontWeight.w800)),
+                                  SizedBox(height: 4),
+                                  Text('Se muestra el último estado conocido. No podemos confirmar cambios recientes.',
+                                    style: TalaText.caption),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: refreshing ? null : () => _refresh(),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Reintentar'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               AnimatedSwitcher(
                 duration: TalaMotion.of(context, TalaMotion.reveal),
@@ -727,7 +885,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               TalaCard(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), child: OrderStatusTimeline(order: order)),
               const SizedBox(height: 12),
               DriverPremiumCard(order: order),
-              if (order.pin.isNotEmpty) ...<Widget>[
+              if (!terminal && order.pin.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 12),
                 _PinBlock(pin: order.pin),
               ],
@@ -744,7 +902,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 label: const Text('Actualizar ahora'),
               ),
               const SizedBox(height: 14),
-              const QuietNote(icon: Icons.sync_rounded, text: 'Esta pantalla se actualiza sola mientras la tienes abierta.'),
+              const QuietNote(icon: Icons.sync_rounded, text: 'El estado se consulta cuando la app está activa. Esta línea representa etapas, no ubicación GPS en tiempo real.'),
             ],
           ),
         );
@@ -889,7 +1047,11 @@ class LiveBadge extends StatelessWidget {
         children: <Widget>[
           SkeletonPulse(child: Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle))),
           const SizedBox(width: 6),
-          const Text('En vivo', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          const Flexible(
+            child: Text('Estado automático',
+              softWrap: true,
+              style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          ),
         ],
       ),
     );
