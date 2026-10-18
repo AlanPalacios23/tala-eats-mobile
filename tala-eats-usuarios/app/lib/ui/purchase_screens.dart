@@ -875,15 +875,50 @@ class SummaryCard extends StatelessWidget {
         children: <Widget>[
           for (final CartLine line in model.cart)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  SizedBox(width: 30, child: Text('${line.quantity}×', style: const TextStyle(color: kBrandDeep, fontWeight: FontWeight.w800))),
-                  Expanded(child: Text(line.item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w500))),
-                  const SizedBox(width: 8),
-                  Text(money(line.total), style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w600)),
-                ],
+              padding: const EdgeInsets.only(bottom: 10),
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints bounds) {
+                  final bool compact = bounds.maxWidth < 365 ||
+                      MediaQuery.textScalerOf(context).scale(14) > 17;
+                  final Widget product = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(line.item.name, maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w500)),
+                      if (line.note.trim().isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text('Nota: ${line.note.trim()}',
+                          style: TalaText.caption),
+                      ],
+                    ],
+                  );
+                  final Widget price = Text(money(line.total),
+                    style: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.right);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          SizedBox(width: 30,
+                            child: Text('${line.quantity}×',
+                              style: const TextStyle(color: kBrandDeep, fontWeight: FontWeight.w800))),
+                          Expanded(child: product),
+                          if (!compact) ...<Widget>[
+                            const SizedBox(width: 8),
+                            price,
+                          ],
+                        ],
+                      ),
+                      if (compact) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Align(alignment: Alignment.centerRight, child: price),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
           const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
