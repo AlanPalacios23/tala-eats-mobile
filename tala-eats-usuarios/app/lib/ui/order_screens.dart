@@ -1047,7 +1047,11 @@ class LiveBadge extends StatelessWidget {
         children: <Widget>[
           SkeletonPulse(child: Container(width: 7, height: 7, decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle))),
           const SizedBox(width: 6),
-          const Text('Estado automático', style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          const Flexible(
+            child: Text('Estado automático',
+              softWrap: true,
+              style: TextStyle(color: kGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+          ),
         ],
       ),
     );
