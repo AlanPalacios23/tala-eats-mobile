@@ -17,7 +17,7 @@ OrderEntry _order() => OrderEntry(
 
 Map<String, dynamic> _live({
   int id = 1701,
-  String status = 'picked_up',
+  String status = 'on_the_way',
   bool includeDriver = true,
   bool? assigned = true,
   bool includePin = true,
