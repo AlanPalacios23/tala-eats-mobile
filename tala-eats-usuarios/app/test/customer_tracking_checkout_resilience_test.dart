@@ -62,12 +62,12 @@ void main() {
     expect(api.reads, greaterThanOrEqualTo(1));
     expect(find.text('No pudimos actualizar el seguimiento'), findsOneWidget);
     expect(find.textContaining('último estado conocido'), findsOneWidget);
-    expect(find.text('Reintentar actualización'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
     expect(order.status, 'Recibido',
       reason: 'Fallo de red no significa cancelación ni estado nuevo');
     expect(tester.takeException(), isNull);
     api.unavailable = false;
-    await tester.tap(find.text('Reintentar actualización'));
+    await tester.tap(find.text('Reintentar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(api.reads, greaterThanOrEqualTo(2));
