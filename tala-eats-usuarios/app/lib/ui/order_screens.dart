@@ -380,22 +380,25 @@ class OrderStatusTimeline extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Row(
+                child: Wrap(
+                  alignment: WrapAlignment.start,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: <Widget>[
-                    Flexible(
-                      child: Text(
-                        steps[i].$1,
-                        style: TextStyle(
-                          color: now ? kInk : (done ? kInkSoft : kSubtle),
-                          fontWeight: now ? FontWeight.w800 : FontWeight.w600,
-                          fontSize: now ? 15 : 14,
-                        ),
+                    Text(
+                      steps[i].$1,
+                      style: TextStyle(
+                        color: now ? kInk : (done ? kInkSoft : kSubtle),
+                        fontWeight: now ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: now ? 15 : 14,
                       ),
                     ),
-                    if (now && !last) ...<Widget>[
-                      const SizedBox(width: 8),
-                      const StatusPill(label: 'Ahora', color: kBrandDeep, background: kSoftOrange, dot: false),
-                    ],
+                    if (now && !last)
+                      const StatusPill(
+                        label: 'Ahora', color: kBrandDeep,
+                        background: kSoftOrange, dot: false,
+                      ),
                   ],
                 ),
               ),
