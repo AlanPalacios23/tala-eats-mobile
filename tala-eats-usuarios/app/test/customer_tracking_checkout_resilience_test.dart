@@ -50,14 +50,6 @@ void main() {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(320, 800);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    final previousHandler = FlutterError.onError;
-    FlutterError.onError = (FlutterErrorDetails details) {
-      // Temporary CI diagnostic: prints widget/constraints causing overflow.
-      // Remove after fixing the actual layout.
-      // ignore: avoid_print
-      print('TRACKING_LAYOUT_DIAGNOSTIC: ${details.toString()}');
-      previousHandler?.call(details);
-    };
     await tester.pumpWidget(MaterialApp(
       theme: buildTalaTheme(),
       home: MediaQuery(
@@ -73,9 +65,7 @@ void main() {
     expect(find.text('Reintentar'), findsOneWidget);
     expect(order.status, 'Recibido',
       reason: 'Fallo de red no significa cancelación ni estado nuevo');
-    final Object? renderException = tester.takeException();
-    FlutterError.onError = previousHandler;
-    expect(renderException, isNull);
+    expect(tester.takeException(), isNull);
     api.unavailable = false;
     await tester.tap(find.text('Reintentar'));
     await tester.pump();
