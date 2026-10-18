@@ -159,13 +159,13 @@ class OrderEntry {
   final String deliveryMode;
   final List<CartLine> lines;
   String eta;
-  final String pin;
+  String pin;
   String paymentStatus;
   final String paymentMethod;
   String rawStatus;
-  final String driverName;
-  final String driverVehicle;
-  final double driverRating;
+  String driverName;
+  String driverVehicle;
+  double driverRating;
 
   bool get isOnlinePayment => paymentMethod == 'stripe' || paymentMethod == 'mercadopago';
   bool get isAwaitingOnlinePayment => isOnlinePayment && paymentStatus != 'paid' && rawStatus != 'cancelled';
@@ -1046,10 +1046,27 @@ class TalaModel extends ChangeNotifier {
   }
 
   Future<void> refreshOrder(OrderEntry order) async {
+    final int sessionRevision = _orderSessionRevision;
     final Map<String, dynamic> live = await api.liveOrder(order.id);
+    // Responses requested before logout must never change the old account's UI.
+    if (sessionRevision != _orderSessionRevision) return;
     final Map<String, dynamic> raw = Map<String, dynamic>.from(live['order'] as Map);
+    if (_asInt(raw['id']) != order.id) {
+      throw ApiException(502, 'El servidor devolvió un pedido distinto. Vuelve a intentarlo.');
+    }
     final OrderEntry fresh = _orderFromJson(raw);
-    order.status = fresh.status; order.rawStatus = fresh.rawStatus; order.paymentStatus = fresh.paymentStatus; order.eta = fresh.eta;
+    order.status = fresh.status;
+    order.rawStatus = fresh.rawStatus;
+    order.paymentStatus = fresh.paymentStatus;
+    order.eta = fresh.eta;
+    // /live may omit these optional fields. Only a field explicitly provided
+    // by the server may replace a previously known driver assignment or PIN.
+    if (raw.containsKey('driver_info')) {
+      order.driverName = fresh.driverName;
+      order.driverVehicle = fresh.driverVehicle;
+      order.driverRating = fresh.driverRating;
+    }
+    if (raw.containsKey('delivery_pin')) order.pin = fresh.pin;
     notifyListeners();
   }
 
