@@ -50,7 +50,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(320, 800);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    final FlutterExceptionHandler? previousHandler = FlutterError.onError;
+    final previousHandler = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails details) {
       // Temporary CI diagnostic: prints widget/constraints causing overflow.
       // Remove after fixing the actual layout.
