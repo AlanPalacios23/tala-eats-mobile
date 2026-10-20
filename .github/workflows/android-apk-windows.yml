@@ -14,6 +14,14 @@ on:
           - restaurante
           - repartidor
           - todas
+      backend:
+        description: 'API para las APK debug'
+        required: true
+        default: node-staging
+        type: choice
+        options:
+          - node-staging
+          - python-production
 
 permissions:
   contents: read
@@ -114,12 +122,21 @@ jobs:
         working-directory: tala-eats-${{ matrix.rol }}/app
         run: |
           $rol = '${{ matrix.rol }}'
-          if ($rol -eq 'usuarios') {
-            flutter build apk --debug --dart-define=TALAEATS_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1
-          } elseif ($rol -eq 'restaurante') {
-            flutter build apk --debug --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1
+          $backend = '${{ inputs.backend }}'
+          if ($backend -eq 'node-staging') {
+            $apiBase = 'https://api-stage-talaeats.alan-palacios-dev.com/api/v1'
+          } elseif ($backend -eq 'python-production') {
+            $apiBase = 'https://talaeats.alan-palacios-dev.com/api/v1'
           } else {
-            flutter build apk --debug
+            throw 'Backend desconocido'
+          }
+          Write-Host "API debug: $backend ($apiBase)"
+          if ($rol -eq 'usuarios') {
+            flutter build apk --debug "--dart-define=TALAEATS_API_BASE_URL=$apiBase"
+          } elseif ($rol -eq 'restaurante' -or $rol -eq 'repartidor') {
+            flutter build apk --debug "--dart-define=TALA_EATS_API_BASE=$apiBase"
+          } else {
+            throw "Rol desconocido: $rol"
           }
           if ($LASTEXITCODE -ne 0) { throw 'Fallo compilacion APK' }
           if (-not (Test-Path 'build/app/outputs/flutter-apk/app-debug.apk')) { throw 'No se genero APK debug' }
@@ -127,7 +144,7 @@ jobs:
       - name: Publicar APK si todos los gates aprobaron
         uses: actions/upload-artifact@v4
         with:
-          name: TalaEats-Windows-${{ matrix.rol }}-debug-${{ github.run_number }}
+          name: TalaEats-Windows-${{ matrix.rol }}-${{ inputs.backend }}-debug-${{ github.run_number }}
           path: tala-eats-${{ matrix.rol }}/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
