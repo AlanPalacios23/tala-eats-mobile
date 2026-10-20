@@ -35,6 +35,8 @@ flutter run --dart-define=TALA_EATS_API_BASE=https://api-stage-talaeats.alan-pal
 
 Si se usan comandos de instalación/compilación locales en Windows, comprobar que también reciban el `--dart-define` correspondiente. Si no, siguen usando los valores predeterminados de Python producción.
 
+**Sesiones de prueba:** usa un teléfono/emulador exclusivo o borra los datos de cada app antes de instalar una APK dirigida a Node.js. Las tres apps tienen almacenamiento persistente de sesión; no reutilices tokens de cuentas de producción contra staging. No instales una APK de prueba sobre una app de uso real sin respaldo.
+
 ## QA necesario antes de considerar la integración completa
 
 - Usuarios: registro/login de prueba, `auth/me`, lista/detalle de restaurantes, productos, carrito, precios, pedidos.
