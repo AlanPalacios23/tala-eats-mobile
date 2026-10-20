@@ -3,13 +3,6 @@ name: Tala Eats | APK Android (solo manual)
 # Ahorro de minutos: NUNCA compilar por push o PR.
 # Lanzar solo al agrupar cambios y seleccionar la app deseada.
 on:
-  # Disparo excepcional para generar las tres APK de prueba solicitadas.
-  # Solo esta rama y este archivo marcador pueden iniciar el workflow.
-  push:
-    branches:
-      - feat/node-staging-flutter-3apps-20261020
-    paths:
-      - ci/trigger-node-staging-apks-20261020.txt
   workflow_dispatch:
     inputs:
       app:
@@ -46,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rol: ${{ fromJSON((github.event_name == 'push' || inputs.app == 'todas') && '["usuarios","restaurante","repartidor"]' || format('["{0}"]', inputs.app)) }}
+        rol: ${{ fromJSON(inputs.app == 'todas' && '["usuarios","restaurante","repartidor"]' || format('["{0}"]', inputs.app)) }}
     steps:
       - name: Obtener rama elegida manualmente
         uses: actions/checkout@v4
@@ -126,12 +119,12 @@ jobs:
         working-directory: tala-eats-${{ matrix.rol }}/app
         run: |
           set -euo pipefail
-          case '${{ inputs.backend || 'node-staging' }}' in
+          case '${{ inputs.backend }}' in
             node-staging) api_base='https://api-stage-talaeats.alan-palacios-dev.com/api/v1' ;;
             python-production) api_base='https://talaeats.alan-palacios-dev.com/api/v1' ;;
             *) echo "::error::Backend desconocido"; exit 1 ;;
           esac
-          echo "API debug: ${{ inputs.backend || 'node-staging' }} ($api_base)"
+          echo "API debug: ${{ inputs.backend }} ($api_base)"
           case '${{ matrix.rol }}' in
             usuarios) flutter build apk --debug "--dart-define=TALAEATS_API_BASE_URL=$api_base" 2>&1 | tee ci-logs/build.log ;;
             restaurante) flutter build apk --debug "--dart-define=TALA_EATS_API_BASE=$api_base" 2>&1 | tee ci-logs/build.log ;;
@@ -141,7 +134,7 @@ jobs:
       - name: Adjuntar APK (solo con pruebas y compilación PASS)
         uses: actions/upload-artifact@v4
         with:
-          name: TalaEats-${{ matrix.rol }}-${{ inputs.backend || 'node-staging' }}-debug-${{ github.run_number }}
+          name: TalaEats-${{ matrix.rol }}-${{ inputs.backend }}-debug-${{ github.run_number }}
           path: tala-eats-${{ matrix.rol }}/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
