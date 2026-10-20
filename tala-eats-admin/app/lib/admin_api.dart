@@ -132,6 +132,36 @@ class AdminApi {
     }).toList();
   }
 
+  Future<void> respondSupport(int id, String status, String reply) async {
+    if (!kAdminWritesEnabled) {
+      throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas.');
+    }
+    if (id <= 0 || !{'in_progress', 'resolved'}.contains(status) ||
+        (status == 'resolved' && reply.trim().length < 10)) {
+      throw const AdminApiException(422, 'Respuesta de soporte inválida.');
+    }
+    await request('PATCH', '/admin/support/$id',
+        data: {'status': status, if (status == 'resolved') 'reply': reply.trim()});
+  }
+
+  Future<void> archiveRestaurant(int id, String name, String reason) async {
+    if (!kAdminWritesEnabled) {
+      throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas.');
+    }
+    if (id <= 0 || name.trim().isEmpty || reason.trim().length < 10) {
+      throw const AdminApiException(422, 'Confirmación de archivo inválida.');
+    }
+    await request('PATCH', '/admin/restaurants/$id/archive',
+      data: {'confirm_name': name, 'reason': reason.trim()});
+  }
+
+  Future<void> suspendRestaurant(int id) async {
+    if (!kAdminWritesEnabled || id <= 0) {
+      throw const AdminApiException(403, 'Suspensión no autorizada en este build.');
+    }
+    await request('PATCH', '/admin/restaurants/$id/verification?status=suspended');
+  }
+
   Future<void> decideOnboarding(int id, String status, String notes) async {
     if (!kAdminWritesEnabled) {
       throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas en este build.');

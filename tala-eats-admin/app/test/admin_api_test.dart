@@ -5,6 +5,15 @@ import 'package:http/testing.dart';
 import 'package:talaeats_admin/admin_api.dart';
 
 void main() {
+  test('Soporte y archivado requieren habilitación de escrituras', () async {
+    expect(kAdminWritesEnabled, isFalse);
+    final api = AdminApi(baseUrl: 'https://stage.example/api/v1');
+    await expectLater(api.respondSupport(1, 'resolved', 'Respuesta para cliente'),
+        throwsA(isA<AdminApiException>()));
+    await expectLater(api.archiveRestaurant(2, 'Comercio', 'Inactivo definitivamente'),
+        throwsA(isA<AdminApiException>()));
+    api.dispose();
+  });
   test('Las mutaciones de ADMIN están apagadas por defecto', () async {
     expect(kAdminWritesEnabled, isFalse);
     final api = AdminApi(baseUrl: 'https://stage.example/api/v1');

@@ -32,3 +32,10 @@ El inicio de sesión de Node hoy retorna token Bearer para mobile. En Flutter se
 Desde GitHub, ejecutar manualmente `Actions → Tala Eats ADMIN Android QA → Run workflow` sobre la rama propuesta. CI genera Android, ejecuta analyze/test y compila APK debug. No hay despliegue ni firma para Play Store y no modifica Kali.
 
 **Gate de mutaciones:** el APK generado por CI es **solo consulta**. Para probar aprobaciones en STAGING, compilar explícitamente con `--dart-define=TALAEATS_ADMIN_WRITES_ENABLED=true` y revisar la solicitud y documentos desde la consola segura antes de decidir. Nunca activar esta bandera apuntando accidentalmente a LIVE.
+
+## Soporte y restaurantes (extensión del MVP)
+- El cliente de Usuarios ya genera tickets mediante `POST /platform/support`.
+- La bandeja Soporte llama `GET /admin/support` y presenta cliente, correo, pedido, texto y estado. La respuesta requiere confirmación y se guarda en `PATCH /admin/support/{id}`; el backend la envía a notificaciones del cliente y la devuelve en `GET /platform/support`.
+- Restaurantes consulta `GET /admin/restaurants`, permite **suspender** un comercio y **archivar** uno cerrado sin pedidos activos; jamás se borran pedidos o registros financieros. El backend lo excluye del catálogo y bloquea operaciones de propietario.
+- Todas las mutaciones requieren `TALAEATS_ADMIN_WRITES_ENABLED=true` activado expresamente en QA de staging. Las APK estándar y GitHub CI son de solo lectura.
+- La respuesta de soporte requiere la migración aditiva `20261020_admin_helpdesk_reply` en la DB aislada Node. Nunca aplicarla a producción Python sin plan de promoción.

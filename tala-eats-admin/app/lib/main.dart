@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'admin_api.dart';
+import 'admin_support.dart';
+import 'admin_restaurants.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +27,8 @@ class AdminController extends ChangeNotifier {
   List<Map<String, dynamic>> orders = [];
   List<Map<String, dynamic>> applications = [];
   List<Map<String, dynamic>> users = [];
+  List<Map<String, dynamic>> tickets = [];
+  List<Map<String, dynamic>> restaurants = [];
   int tab = 0;
   bool busy = false;
   String? error;
@@ -68,6 +72,8 @@ class AdminController extends ChangeNotifier {
     orders = [];
     applications = [];
     users = [];
+    tickets = [];
+    restaurants = [];
     try {
       await storage.delete(key: _key);
     } catch (_) {
@@ -164,8 +170,11 @@ class AdminController extends ChangeNotifier {
       } else if (tab == 1) {
         orders = await api.collection('/admin/orders?limit=50&offset=0');
       } else if (tab == 2) {
-        applications = await api.collection('/operations/admin/onboarding');
+        tickets = await api.collection('/admin/support?status=all&limit=200');
+      } else if (tab == 3) {
+        restaurants = await api.collection('/admin/restaurants?filter=all&limit=100');
       } else {
+        applications = await api.collection('/operations/admin/onboarding');
         users = await api.collection('/admin/users?limit=50&offset=0');
       }
     } on AdminApiException catch (e) {
@@ -194,6 +203,65 @@ class AdminController extends ChangeNotifier {
       return stage == AdminStage.signedIn && error == null;
     } on AdminApiException catch (e) {
       if (e.status == 401 || e.status == 403) {
+        await _forget();
+        stage = AdminStage.signedOut;
+      }
+      error = e.message;
+      return false;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      busy = false;
+      _signal();
+    }
+  }
+
+  Future<bool> supportAction(int id, String status, String reply) async {
+    if (busy || stage != AdminStage.signedIn) return false;
+    busy = true;
+    error = null;
+    _signal();
+    try {
+      await api.respondSupport(id, status, reply);
+      busy = false;
+      await refresh();
+      return stage == AdminStage.signedIn && error == null;
+    } on AdminApiException catch (e) {
+      if (e.status == 401) {
+        await _forget();
+        stage = AdminStage.signedOut;
+      }
+      error = e.message;
+      return false;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      busy = false;
+      _signal();
+    }
+  }
+
+  Future<bool> restaurantAction(int id, String operation,
+      {String confirmName = '', String reason = ''}) async {
+    if (busy || stage != AdminStage.signedIn) return false;
+    busy = true;
+    error = null;
+    _signal();
+    try {
+      if (operation == 'archive') {
+        await api.archiveRestaurant(id, confirmName, reason);
+      } else if (operation == 'suspend') {
+        await api.suspendRestaurant(id);
+      } else {
+        throw const AdminApiException(422, 'Acción no soportada.');
+      }
+      busy = false;
+      await refresh();
+      return stage == AdminStage.signedIn && error == null;
+    } on AdminApiException catch (e) {
+      if (e.status == 401) {
         await _forget();
         stage = AdminStage.signedOut;
       }
@@ -559,7 +627,8 @@ class _AdminShell extends StatelessWidget {
   const _AdminShell({required this.control});
   final AdminController control;
   static const titles = [
-    'Resumen general', 'Pedidos recientes', 'Solicitudes', 'Usuarios',
+    'Resumen general', 'Pedidos recientes', 'Soporte al cliente',
+    'Restaurantes', 'Gestión de cuentas',
   ];
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -609,8 +678,24 @@ class _AdminShell extends StatelessWidget {
                     const SizedBox(height: 18),
                     if (control.tab == 0) _StatsGrid(data: control.stats),
                     if (control.tab == 1) _OrdersList(orders: control.orders),
-                    if (control.tab == 2) _OnboardingList(control: control),
-                    if (control.tab == 3) _UsersList(users: control.users),
+                    if (control.tab == 2) AdminSupportPanel(
+                      tickets: control.tickets, busy: control.busy,
+                      onRespond: control.supportAction,
+                      error: control.error),
+                    if (control.tab == 3) AdminRestaurantsPanel(
+                      restaurants: control.restaurants, busy: control.busy,
+                      onAction: control.restaurantAction, error: control.error),
+                    if (control.tab == 4) ...[
+                      const Text('Solicitudes de alta', style: TextStyle(
+                        fontSize: 19, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 12),
+                      _OnboardingList(control: control),
+                      const SizedBox(height: 24),
+                      const Text('Usuarios registrados', style: TextStyle(
+                        fontSize: 19, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 12),
+                      _UsersList(users: control.users),
+                    ],
                     const SizedBox(height: 26),
                     const Text('Operaciones administrativas sujetas a permisos del servidor y auditoría. '
                         'Pagos y retiros no están habilitados en esta app.',
@@ -631,10 +716,12 @@ class _AdminShell extends StatelessWidget {
                 selectedIcon: Icon(Icons.dashboard_rounded), label: 'Inicio'),
             NavigationDestination(icon: Icon(Icons.receipt_long_outlined),
                 selectedIcon: Icon(Icons.receipt_long_rounded), label: 'Pedidos'),
-            NavigationDestination(icon: Icon(Icons.fact_check_outlined),
-                selectedIcon: Icon(Icons.fact_check_rounded), label: 'Altas'),
-            NavigationDestination(icon: Icon(Icons.people_outline_rounded),
-                selectedIcon: Icon(Icons.people_rounded), label: 'Usuarios'),
+            NavigationDestination(icon: Icon(Icons.support_agent_outlined),
+                selectedIcon: Icon(Icons.support_agent_rounded), label: 'Soporte'),
+            NavigationDestination(icon: Icon(Icons.store_outlined),
+                selectedIcon: Icon(Icons.store_rounded), label: 'Tiendas'),
+            NavigationDestination(icon: Icon(Icons.admin_panel_settings_outlined),
+                selectedIcon: Icon(Icons.admin_panel_settings_rounded), label: 'Gestión'),
           ],
         ),
       );
