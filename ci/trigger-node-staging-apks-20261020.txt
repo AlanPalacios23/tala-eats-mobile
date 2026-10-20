@@ -1,0 +1,1 @@
+One-shot Android debug builds: usuarios, restaurante, repartidor. Backend: https://api-stage-talaeats.alan-palacios-dev.com/api/v1. User requested 2026-10-20. No production payments.
