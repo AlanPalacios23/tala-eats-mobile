@@ -1339,6 +1339,31 @@ class SupportScreen extends StatefulWidget {
 class _SupportScreenState extends State<SupportScreen> {
   final TextEditingController message = TextEditingController();
   bool sending = false;
+  bool loadingTickets = true;
+  String? ticketsError;
+  List<Map<String, dynamic>> tickets = <Map<String, dynamic>>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTickets();
+  }
+
+  Future<void> _loadTickets() async {
+    if (mounted) setState(() { loadingTickets = true; ticketsError = null; });
+    try {
+      final dynamic result = await widget.model.api.get('/platform/support');
+      if (result is! List) throw const FormatException('Lista de soporte inválida');
+      final rows = result.map((dynamic value) =>
+          Map<String, dynamic>.from(value as Map)).toList();
+      if (mounted) setState(() => tickets = rows);
+    } catch (_) {
+      if (mounted) setState(() => ticketsError =
+          'No se pudo cargar el historial de soporte.');
+    } finally {
+      if (mounted) setState(() => loadingTickets = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -1361,14 +1386,19 @@ class _SupportScreenState extends State<SupportScreen> {
       return;
     }
     HapticFeedback.mediumImpact();
-    showMessage(context, 'Mensaje enviado. Soporte te responderá pronto.');
+    showMessage(context, 'Ticket enviado. Consulta aquí su estado y respuesta.');
     message.clear();
+    await _loadTickets();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ayuda y soporte')),
+      appBar: AppBar(title: const Text('Ayuda y soporte'), actions: <Widget>[
+        IconButton(tooltip: 'Actualizar tickets',
+            onPressed: loadingTickets ? null : _loadTickets,
+            icon: const Icon(Icons.refresh_rounded)),
+      ]),
       body: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
@@ -1404,6 +1434,44 @@ class _SupportScreenState extends State<SupportScreen> {
             icon: const Icon(Icons.send_rounded, size: 18),
             label: BusyLabel(busy: sending, label: 'Enviar mensaje'),
           ),
+          const SizedBox(height: 26),
+          const Text('Mis solicitudes', style: TalaText.h2),
+          const SizedBox(height: 6),
+          const Text('Solo tú puedes consultar estos tickets. '
+              'Actualiza para ver nuevas respuestas.', style: TalaText.muted),
+          const SizedBox(height: 12),
+          if (loadingTickets) const LinearProgressIndicator(),
+          if (ticketsError != null) QuietNote(
+              icon: Icons.info_outline_rounded, text: ticketsError!),
+          if (!loadingTickets && ticketsError == null && tickets.isEmpty)
+            const QuietNote(icon: Icons.inbox_outlined,
+                text: 'Aún no has enviado solicitudes de soporte.'),
+          for (final Map<String, dynamic> ticket in tickets) ...<Widget>[
+            TalaGroup(children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Ticket #${ticket['id']} · ${ticket['status'] == 'resolved' ? 'Resuelto' : ticket['status'] == 'in_progress' ? 'En atención' : 'Abierto'}',
+                        style: TalaText.h2),
+                    const SizedBox(height: 7),
+                    if (ticket['order_id'] != null) Text(
+                        'Pedido #${ticket['order_id']}', style: TalaText.muted),
+                    const SizedBox(height: 7),
+                    Text('${ticket['message'] ?? ''}'),
+                    if ((ticket['admin_reply'] ?? '').toString().isNotEmpty) ...<Widget>[
+                      const Divider(height: 26),
+                      const Text('Respuesta de Tala Eats',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 7),
+                      Text('${ticket['admin_reply']}'),
+                    ],
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 10),
+          ],
           if (widget.model.supportEmail.isNotEmpty) ...<Widget>[
             const SizedBox(height: 16),
             QuietNote(icon: Icons.mail_outline_rounded, text: 'También puedes escribirnos a ${widget.model.supportEmail}'),
