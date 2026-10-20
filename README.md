@@ -1,5 +1,17 @@
 # TALA EATS · Apps Flutter Android
 
+## Ecosistema · 4 apps independientes
+
+1. **Usuarios** — `tala-eats-usuarios/app` (v1.0.30).
+2. **Restaurante** — `tala-eats-restaurante/app` (v0.7.6).
+3. **Repartidor** — `tala-eats-repartidor/app` (v1.2.7).
+4. **ADMIN** — `tala-eats-admin/app` (MVP v0.1.0, en revisión).
+
+La app ADMIN es Flutter independiente y **comparte la API existente**; no reemplaza al portal ADMIN web ni agrega otro backend. Implementa acceso con rol+TOTP y consulta estadísticas, pedidos, usuarios y solicitudes. Las decisiones administrativas están bloqueadas en builds estándar hasta activar explícitamente el gate de STAGING. Guía: [Tala Eats ADMIN](tala-eats-admin/README.md).
+
+La compilación de ADMIN se ejecuta manualmente con [ADMIN Android QA](.github/workflows/admin-android-qa.yml), separada de la matriz histórica de las otras tres apps. La rama Node de staging todavía no sustituye la producción Python; ningún PR despliega Kali ni habilita Stripe LIVE.
+
+
 ## Prioridad actual · Android-first (13 oct 2026)
 
 ✅ **Android CI:** las tres APK debug compilaron y pasaron análisis/tests en [ejecución #3](https://github.com/AlanPalacios23/tala-eats-mobile/actions/runs/38451662979).
