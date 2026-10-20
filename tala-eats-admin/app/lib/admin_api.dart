@@ -9,6 +9,10 @@ const String kAdminApiBase = String.fromEnvironment(
   defaultValue: '',
 );
 
+/// Las escrituras se activan solo en builds deliberados para STAGING.
+const bool kAdminWritesEnabled = bool.fromEnvironment(
+  'TALAEATS_ADMIN_WRITES_ENABLED', defaultValue: false);
+
 class AdminApiException implements Exception {
   const AdminApiException(this.status, this.message);
   final int status;
@@ -129,6 +133,9 @@ class AdminApi {
   }
 
   Future<void> decideOnboarding(int id, String status, String notes) async {
+    if (!kAdminWritesEnabled) {
+      throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas en este build.');
+    }
     if (!{'approved', 'rejected', 'needs_info'}.contains(status) || id <= 0) {
       throw const AdminApiException(0, 'Decisión inválida.');
     }

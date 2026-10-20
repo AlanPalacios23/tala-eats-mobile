@@ -8,7 +8,7 @@ Cuarta app del monorepo, separada de Usuarios / Restaurante / Repartidor y del p
 - Alta de TOTP existente en el backend (`/api/v1/v9/security/2fa/setup` + `confirm`) cuando falta configuración.
 - Panel con KPIs reales de `GET /admin/stats`.
 - Pedidos, usuarios y solicitudes de restaurante/repartidor en modo consulta (50 resultados recientes).
-- Decisiones **explícitas y confirmadas** para onboarding: aprobar, rechazar y pedir información mediante `PATCH /operations/admin/onboarding/{id}`.
+- Decisiones **explícitas y confirmadas** para onboarding, desactivadas por defecto. Solo habilitar en staging revisado con `--dart-define=TALAEATS_ADMIN_WRITES_ENABLED=true`: aprobar, rechazar y pedir información mediante `PATCH /operations/admin/onboarding/{id}`.
 
 No habilita pagos, reembolsos, cambios de precios, ajustes Wallet, verificación bancaria ni modificaciones del estado de pedidos. Esos flujos requieren QA adicional y nunca deben fingirse operativos.
 
@@ -30,3 +30,5 @@ El inicio de sesión de Node hoy retorna token Bearer para mobile. En Flutter se
 
 ## Publicar APK de pruebas
 Desde GitHub, ejecutar manualmente `Actions → Tala Eats ADMIN Android QA → Run workflow` sobre la rama propuesta. CI genera Android, ejecuta analyze/test y compila APK debug. No hay despliegue ni firma para Play Store y no modifica Kali.
+
+**Gate de mutaciones:** el APK generado por CI es **solo consulta**. Para probar aprobaciones en STAGING, compilar explícitamente con `--dart-define=TALAEATS_ADMIN_WRITES_ENABLED=true` y revisar la solicitud y documentos desde la consola segura antes de decidir. Nunca activar esta bandera apuntando accidentalmente a LIVE.

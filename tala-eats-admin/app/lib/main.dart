@@ -829,7 +829,7 @@ class _OnboardingList extends StatelessWidget {
               const SizedBox(height: 8),
               Text('${item['notes']}', style: const TextStyle(fontSize: 13)),
             ],
-            if (pending && id > 0) ...[
+            if (pending && id > 0 && kAdminWritesEnabled) ...[
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 FilledButton.tonal(
@@ -848,6 +848,11 @@ class _OnboardingList extends StatelessWidget {
                   child: const Text('Rechazar'),
                 ),
               ]),
+            ],
+            if (pending && !kAdminWritesEnabled) ...[
+              const SizedBox(height: 10),
+              const Text('Decisiones desactivadas en esta compilación de consulta.',
+                style: TextStyle(fontSize: 12, color: Colors.black54)),
             ],
           ]),
         ),

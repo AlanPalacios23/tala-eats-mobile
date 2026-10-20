@@ -5,6 +5,13 @@ import 'package:http/testing.dart';
 import 'package:talaeats_admin/admin_api.dart';
 
 void main() {
+  test('Las mutaciones de ADMIN están apagadas por defecto', () async {
+    expect(kAdminWritesEnabled, isFalse);
+    final api = AdminApi(baseUrl: 'https://stage.example/api/v1');
+    await expectLater(api.decideOnboarding(10, 'approved', ''),
+      throwsA(isA<AdminApiException>()));
+    api.dispose();
+  });
   test('Rechaza acceso de restaurante y nunca conserva token', () async {
     final api = AdminApi(baseUrl: 'https://stage.example/api/v1',
       client: MockClient((request) async => http.Response(jsonEncode({
