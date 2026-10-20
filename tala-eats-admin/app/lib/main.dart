@@ -684,7 +684,10 @@ class _AdminShell extends StatelessWidget {
                       error: control.error),
                     if (control.tab == 3) AdminRestaurantsPanel(
                       restaurants: control.restaurants, busy: control.busy,
-                      onAction: control.restaurantAction, error: control.error),
+                      onAction: (id, action, name, reason) =>
+                          control.restaurantAction(id, action,
+                            confirmName: name, reason: reason),
+                      error: control.error),
                     if (control.tab == 4) ...[
                       const Text('Solicitudes de alta', style: TextStyle(
                         fontSize: 19, fontWeight: FontWeight.w800)),

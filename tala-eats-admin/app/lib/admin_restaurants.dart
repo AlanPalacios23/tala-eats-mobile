@@ -9,7 +9,7 @@ class AdminRestaurantsPanel extends StatefulWidget {
   final bool busy;
   final String? error;
   final Future<bool> Function(int id, String action,
-      {String confirmName, String reason}) onAction;
+      String confirmName, String reason) onAction;
 
   @override
   State<AdminRestaurantsPanel> createState() => _AdminRestaurantsPanelState();
@@ -36,7 +36,7 @@ class _AdminRestaurantsPanelState extends State<AdminRestaurantsPanel> {
       ),
     );
     if (yes != true || !mounted) return;
-    final ok = await widget.onAction(id, 'suspend');
+    final ok = await widget.onAction(id, 'suspend', '', '');
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok ? 'Restaurante suspendido.'
@@ -95,8 +95,7 @@ class _AdminRestaurantsPanelState extends State<AdminRestaurantsPanel> {
         ),
       );
       if (confirmed != true || !mounted) return;
-      final ok = await widget.onAction(id, 'archive',
-          confirmName: name, reason: reason.text);
+      final ok = await widget.onAction(id, 'archive', name, reason.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(ok ? 'Restaurante archivado. Historial conservado.'
