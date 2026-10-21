@@ -50,11 +50,17 @@ void main() {
     final FilledButton btnBefore = tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('legalAccept')));
     expect(btnBefore.onPressed, isNull);
-    await tester.tap(find.byKey(const ValueKey<String>('consentTerms')));
+    await tester.tap(find.descendant(
+      of: find.byKey(const ValueKey<String>('consentTerms')),
+      matching: find.byType(Checkbox),
+    ));
     await tester.pumpAndSettle();
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('legalAccept'))).onPressed, isNull);
-    await tester.tap(find.byKey(const ValueKey<String>('consentPrivacy')));
+    await tester.tap(find.descendant(
+      of: find.byKey(const ValueKey<String>('consentPrivacy')),
+      matching: find.byType(Checkbox),
+    ));
     await tester.pumpAndSettle();
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('legalAccept'))).onPressed, isNotNull);
@@ -74,6 +80,7 @@ void main() {
     expect(find.text('Ingresa tu correo\npara iniciar sesión'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput0')),
       'maria@example.com');
+    await tester.pump();
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
       reason: 'El dato escrito debe habilitar la flecha');
