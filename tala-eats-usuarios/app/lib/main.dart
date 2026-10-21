@@ -1311,6 +1311,27 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
   bool welcomeDismissed = false;
   bool emailLoginSelected = false;
   bool registrationSelected = false;
+  bool _landingImagesCached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.testMode || _landingImagesCached) return;
+    _landingImagesCached = true;
+    // Assets are packed into the APK by the release gate; cache before
+    // leaving the 5-second brand screen to avoid a blank photo frame.
+    for (final String asset in <String>[
+      'assets/landing/food_tala.webp',
+      'assets/landing/food_fiesta.webp',
+      'assets/landing/tala_eats_wordmark_transparent.png',
+    ]) {
+      precacheImage(AssetImage(asset), context,
+        onError: (Object error, StackTrace? stack) {
+          debugPrint('TALA LANDING MISSING ASSET: $asset: $error');
+        },
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -1322,11 +1343,12 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
       });
       return;
     }
-    // The brand moment lasts ~1.1 s and runs in parallel with the real
-    // bootstrap; it never delays a slower bootstrap any further.
+    // Preserve the official white Tala Eats splash for at least five seconds.
+    // Startup data initialization runs in parallel; the exit animation is
+    // controlled by AnimatedSwitcher after this minimum hold.
     Future.wait<void>(<Future<void>>[
       model.initialize(),
-      Future<void>.delayed(const Duration(milliseconds: 1100)),
+      Future<void>.delayed(const Duration(seconds: 5)),
     ]).whenComplete(() {
       if (mounted) setState(() => booted = true);
     });
@@ -1384,7 +1406,8 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
             screen = CustomerShell(model: model);
           }
           return AnimatedSwitcher(
-            duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
+            duration: TalaMotion.of(context,
+              const Duration(milliseconds: 620)),
             switchInCurve: TalaMotion.ease,
             switchOutCurve: Curves.easeInCubic,
             transitionBuilder: (Widget child, Animation<double> animation) {
@@ -1529,24 +1552,19 @@ class _LaunchScreenState extends State<LaunchScreen>
       padding: const EdgeInsets.symmetric(horizontal: 28),
       child: SizedBox(
         width: 350,
-        height: 156,
-        child: ClipRect(
-          // The user-provided image contains a white poster and a slogan.
-          // Center-cropping it displays only the ORIGINAL orange/pink
-          // lettering, keeping the bottom tagline as separate readable text.
-          child: Image.asset(
-        'assets/landing/tala_eats_original_wordmark.png',
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        width: 350,
-        height: 156,
-        semanticLabel: 'Tala Eats',
+        height: 136,
+        child: Image.asset(
+          'assets/landing/tala_eats_original_wordmark.png',
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          width: 350,
+          height: 136,
+          semanticLabel: 'Tala Eats',
         errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
           return const Text('Tala Eats',
               style: TextStyle(color: kBrandDeep, fontSize: 36,
                   fontWeight: FontWeight.w800));
         },
-          ),
         ),
       ),
     );
