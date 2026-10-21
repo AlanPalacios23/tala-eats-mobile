@@ -6,9 +6,10 @@ part of '../main.dart';
 // ---------------------------------------------------------------------------
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.model});
+  const LoginScreen({super.key, required this.model, this.onBackToWelcome});
 
   final TalaModel model;
+  final VoidCallback? onBackToWelcome;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -53,6 +54,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       liquidGlass: true,
+      showBack: widget.onBackToWelcome != null,
+      onBack: widget.onBackToWelcome,
       title: 'Bienvenido de vuelta',
       subtitle: 'Pide lo que se te antoje y sigue tu pedido en tiempo real.',
       child: AutofillGroup(
@@ -680,6 +683,7 @@ class PremiumAuthScaffold extends StatelessWidget {
     this.eyebrow = '',
     this.showBack = false,
     this.liquidGlass = false,
+    this.onBack,
   });
 
   final String eyebrow;
@@ -688,6 +692,7 @@ class PremiumAuthScaffold extends StatelessWidget {
   final Widget child;
   final bool showBack;
   final bool liquidGlass;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -774,13 +779,13 @@ class PremiumAuthScaffold extends StatelessWidget {
                                       child: IconButton(
                                         icon: const Icon(Icons.arrow_back_rounded),
                                         tooltip: 'Regresar',
-                                        onPressed: () => Navigator.of(context).maybePop(),
+                                        onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                                       ),
                                     )
                                   : TalaCircleButton(
                                       icon: Icons.arrow_back_rounded,
                                       tooltip: 'Regresar',
-                                      onPressed: () => Navigator.of(context).maybePop(),
+                                      onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                                     )
                             else
                               liquidGlass
