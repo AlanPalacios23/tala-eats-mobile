@@ -58,71 +58,76 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
               ),
             )),
             SafeArea(
-              child: LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  final bool compact = constraints.maxHeight < 700;
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(26, 12, 26, 24),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: math.max(0, constraints.maxHeight - 36),
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            SizedBox(height: compact ? 84 : constraints.maxHeight * .17),
-                            // Exact brand letter artwork (transparent crop);
-                            // never place it in a pill, card or shadowed box.
-                            Image.asset(
-                              'assets/landing/tala_eats_wordmark_transparent.png',
-                              key: const ValueKey<String>('welcomeWordmark'),
-                              width: compact ? 250 : 288,
-                              height: compact ? 78 : 102,
-                              alignment: Alignment.centerLeft,
-                              fit: BoxFit.contain,
-                              semanticLabel: 'Tala Eats',
-                              errorBuilder: (_, __, ___) => const Text(
-                                'Tala Eats',
-                                style: TextStyle(
-                                  fontSize: 38, fontWeight: FontWeight.w800,
-                                  color: Color(0xFFFF5A1F),
-                                ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(25, 10, 25, 24),
+                child: LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints area) {
+                    final bool compact = area.maxWidth < 350 ||
+                        area.maxHeight < 680;
+                    final double titleSize = compact ? 33 : 40;
+                    return Column(
+                      children: <Widget>[
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: <Widget>[
+                                  // Original transparent lettering: NO tile,
+                                  // border, shadow, outline or glow.
+                                  Image.asset(
+                                    'assets/landing/tala_eats_wordmark_transparent.png',
+                                    key: const ValueKey<String>('welcomeWordmark'),
+                                    width: compact ? 250 : 290,
+                                    height: compact ? 75 : 92,
+                                    filterQuality: FilterQuality.high,
+                                    fit: BoxFit.contain,
+                                    semanticLabel: 'Tala Eats',
+                                    errorBuilder: (_, __, ___) => const Text(
+                                      'Tala Eats',
+                                      style: TextStyle(
+                                        fontSize: 35,
+                                        color: Color(0xFFFF5A1F),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: compact ? 20 : 28),
+                                  Text(
+                                    'Bienvenido\\na Tala Eats',
+                                    key: const ValueKey<String>('welcomeTitle'),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: titleSize,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.08,
+                                      letterSpacing: -1.1,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'Tus platillos favoritos,\\nmás cerca de ti.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: compact ? 17 : 19,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 17),
-                            Text(
-                              'Bienvenido\na Tala Eats',
-                              key: const ValueKey<String>('welcomeTitle'),
-                              textAlign: TextAlign.left,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: compact ? 35 : 41,
-                                fontWeight: FontWeight.w800,
-                                height: 1.08,
-                                letterSpacing: -1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 13),
-                            Text(
-                              'Tus platillos favoritos,\nmás cerca de ti.',
-                              textAlign: TextAlign.left,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: compact ? 17 : 19,
-                                fontWeight: FontWeight.w500,
-                                height: 1.4,
-                              ),
-                            ),
-                            const Spacer(),
-                            const SizedBox(height: 26),
-                            _WelcomeGlassContinue(onPressed: _continue),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                },
+                        const SizedBox(height: 20),
+                        _WelcomeGlassContinue(onPressed: _continue),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ],
