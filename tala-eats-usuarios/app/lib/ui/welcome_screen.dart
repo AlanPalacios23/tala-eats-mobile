@@ -168,7 +168,11 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                         'assets/landing/tala_eats_original_wordmark.png',
                         width: 202,
                         height: 76,
-                        fit: BoxFit.contain,
+                        // The supplied PNG is a tall splash illustration.
+                        // Cover crops around its exact central wordmark instead
+                        // of reducing the entire vertical sheet to a tiny icon.
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
                         semanticLabel: 'Tala Eats',
                         errorBuilder: (BuildContext context, Object error,
                                 StackTrace? stack) =>
