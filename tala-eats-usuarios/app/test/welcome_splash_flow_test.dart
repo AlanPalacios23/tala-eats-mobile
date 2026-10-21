@@ -46,7 +46,7 @@ void main() {
     tester.view.resetDevicePixelRatio();
   });
 
-  testWidgets('Metodos usa solo foto A y tres opciones sin logo central',
+  testWidgets('Acceso usa foto A y solo el correo funcional',
       (WidgetTester tester) async {
     int emailRequests = 0;
     int backRequests = 0;
@@ -66,11 +66,11 @@ void main() {
     expect(find.byKey(const ValueKey<String>('loginPhotoA')), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('welcomePhotoB')), findsNothing);
     expect(find.byKey(const ValueKey<String>('welcomeWordmark')), findsNothing);
-    expect(find.byKey(const ValueKey<String>('signInGoogle')), findsOneWidget);
-    expect(find.byKey(const ValueKey<String>('signInPhone')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('signInGoogle')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('signInPhone')), findsNothing);
     expect(find.byKey(const ValueKey<String>('signInEmail')), findsOneWidget);
-    expect(find.text('Continuar con Google'), findsOneWidget);
-    expect(find.text('Continuar con tu celular'), findsOneWidget);
+    expect(find.text('Continuar con Google'), findsNothing);
+    expect(find.text('Continuar con tu celular'), findsNothing);
     expect(find.text('Continuar con tu correo'), findsOneWidget);
     expect(find.textContaining('Tala Eats'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -83,30 +83,20 @@ void main() {
     tester.view.resetDevicePixelRatio();
   });
 
-  testWidgets('Google ofrece opciones honestas: registro propio o correo',
+  testWidgets('No presenta metodos de Google ni celular hasta habilitarlos',
       (WidgetTester tester) async {
     int emails = 0;
-    int registrations = 0;
     await tester.pumpWidget(MaterialApp(
       home: TalaLoginMethodsScreen(
         onEmail: () => emails++,
-        onRegister: () => registrations++,
         onBack: () {},
       ),
     ));
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey<String>('signInGoogle')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Google todavía no está conectado'), findsOneWidget);
-    expect(emails, 0);
-    await tester.tap(find.byKey(const ValueKey<String>('createTalaAccount')));
-    await tester.pumpAndSettle();
-    expect(registrations, 1);
-    expect(emails, 0);
-    await tester.tap(find.byKey(const ValueKey<String>('signInGoogle')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey<String>('existingTalaAccount')));
-    await tester.pumpAndSettle();
+    expect(find.text('Continuar con Google'), findsNothing);
+    expect(find.text('Continuar con tu celular'), findsNothing);
+    expect(find.text('Continuar con tu correo'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey<String>('signInEmail')));
     expect(emails, 1);
     await tester.pumpWidget(const SizedBox.shrink());
   });
