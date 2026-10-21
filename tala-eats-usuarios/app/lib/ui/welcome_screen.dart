@@ -202,19 +202,26 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                               ),
                               borderRadius: BorderRadius.circular(22),
                             ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: <Widget>[
-                                Text('Continuar',
-                                    style: TextStyle(
-                                      color: kInk,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                    )),
-                                SizedBox(width: 10),
-                                Icon(Icons.arrow_forward_rounded,
-                                    color: kBrandDeep, size: 23),
-                              ],
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: <Widget>[
+                                  Text('Continuar',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: kInk,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      )),
+                                  SizedBox(width: 10),
+                                  Icon(Icons.arrow_forward_rounded,
+                                      color: kBrandDeep, size: 23),
+                                ],
+                              ),
                             ),
                           ),
                         ),
