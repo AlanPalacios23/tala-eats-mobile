@@ -247,6 +247,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
     try {
       final String selectedMethod = model.paymentMethod;
+      // A delayed or changed backend capability must not convert Stripe
+      // into cash implicitly, or authorize a previously disabled method.
+      await model.verifyCheckoutPaymentMethod(selectedMethod);
       final OrderEntry order = await model.placeOrder();
       if (!mounted) return;
       if (selectedMethod == 'cash') {
