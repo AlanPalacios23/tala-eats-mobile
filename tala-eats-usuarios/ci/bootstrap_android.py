@@ -128,13 +128,13 @@ dependencies {
                 st=style_path.read_text(encoding='utf-8')
                 st=re.sub(
                     r'(<style name="LaunchTheme" parent=")[^"]+(")',
-                    r'\\1Theme.AppCompat.Light.NoActionBar\\2',st,count=1)
+                    r'\1Theme.AppCompat.Light.NoActionBar\2',st,count=1)
                 if '<style name="LaunchTheme"' not in st:
                     raise RuntimeError(f'Android31 native splash theme not found: {style_path}')
                 extra='''<item name="android:windowSplashScreenBackground">@android:color/white</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_splash_blank</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item>'''
-                st=re.sub(r'(<style name="LaunchTheme"[^>]*>)',r'\\1\\n        '+extra,
+                st=re.sub(r'(<style name="LaunchTheme"[^>]*>)',r'\1\n        '+extra,
                           st,count=1)
             else:
                 st='''<?xml version="1.0" encoding="utf-8"?>
