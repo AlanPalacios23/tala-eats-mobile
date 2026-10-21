@@ -19,19 +19,49 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
   Timer? _rotation;
   int _current = 0;
   bool _reduceMotion = false;
+  bool _continuing = false;
+
+  // Allow the owner-provided images to be browsed with a short horizontal
+  // swipe. We only restart auto-rotation when motion is permitted.
+  void _showPhoto(int index) {
+    final int next = (index + _photographs.length) % _photographs.length;
+    if (_current != next && mounted) {
+      setState(() => _current = next);
+      HapticFeedback.selectionClick();
+    }
+    _startRotation();
+  }
+
+  void _startRotation() {
+    _rotation?.cancel();
+    _rotation = null;
+    if (_reduceMotion || _continuing) return;
+    _rotation = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted && !_continuing) {
+        setState(() => _current = (_current + 1) % _photographs.length);
+      }
+    });
+  }
+
+  void _continueToSignIn() {
+    if (_continuing) return; // Avoid duplicate navigation from double taps.
+    _continuing = true;
+    _rotation?.cancel();
+    HapticFeedback.selectionClick();
+    widget.onContinue();
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final bool reduce = TalaMotion.reduced(context);
-    if (reduce == _reduceMotion && _rotation != null) return;
+    if (reduce == _reduceMotion && (_rotation != null || reduce)) return;
     _reduceMotion = reduce;
-    _rotation?.cancel();
-    _rotation = null;
-    if (!reduce) {
-      _rotation = Timer.periodic(const Duration(seconds: 6), (_) {
-        if (mounted) setState(() => _current = (_current + 1) % _photographs.length);
-      });
+    _startRotation();
+    // Warm the second owner-provided image so the crossfade never flashes
+    // after the first six seconds; the asset contract is checked separately.
+    for (final String path in _photographs) {
+      precacheImage(AssetImage(path), context, onError: (Object _, StackTrace? __) {});
     }
   }
 
@@ -58,7 +88,15 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
         fit: StackFit.expand,
         children: <Widget>[
           // Cover fills the entire screen, including behind the status bar.
-          AnimatedSwitcher(
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragEnd: (DragEndDetails details) {
+              final double velocity = details.primaryVelocity ?? 0;
+              if (velocity.abs() > 140) {
+                _showPhoto(_current + (velocity < 0 ? 1 : -1));
+              }
+            },
+            child: AnimatedSwitcher(
             duration: _reduceMotion
                 ? Duration.zero
                 : const Duration(milliseconds: 1200),
@@ -85,6 +123,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                 ),
               ),
             ),
+          ),
           ),
           // Text contrast holds for either colorful or dark food photograph.
           const IgnorePointer(
@@ -193,10 +232,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                         color: const Color(0xDDFDFBF9),
                         child: InkWell(
                           key: const ValueKey<String>('talaWelcomeContinue'),
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            widget.onContinue();
-                          },
+                          onTap: _continueToSignIn,
                           child: Container(
                             constraints: const BoxConstraints(minHeight: 64),
                             padding: const EdgeInsets.symmetric(
