@@ -818,6 +818,21 @@ class TalaModel extends ChangeNotifier {
       rethrow;
     }
   }
+  /// Recheck just before order creation; a server policy update may have
+  /// disabled the method since the Checkout screen was opened. Never silently
+  /// switch a Stripe order to cash (or vice versa) during this verification.
+  Future<void> verifyCheckoutPaymentMethod(String selectedMethod) async {
+    if (!isPaymentMethodEnabled(selectedMethod)) {
+      throw ApiException(409, 'Selecciona un método de pago disponible.');
+    }
+    await refreshPaymentMethods();
+    if (!isPaymentMethodEnabled(selectedMethod) ||
+        paymentMethod != selectedMethod) {
+      throw ApiException(409,
+        'El método de pago seleccionado cambió. Revísalo antes de confirmar.');
+    }
+  }
+
   void setAddress(int index) { if (index >= 0 && index < addresses.length) { selectedAddress = index; notifyListeners(); } }
 
   Future<bool> setDefaultAddressRemote(int index) async {
