@@ -43,6 +43,23 @@ class _DelayedPaymentApi extends TalaApi {
   }
 }
 
+class _PolicyChangedApi extends TalaApi {
+  Map<String, dynamic> response = _paymentConfig(cash: false, stripe: true);
+  int orderPosts = 0;
+
+  @override
+  Future<dynamic> get(String path) async {
+    expect(path, '/orders/payment-methods');
+    return response;
+  }
+
+  @override
+  Future<dynamic> post(String path, [Object? body]) async {
+    if (path == '/orders') orderPosts++;
+    throw StateError('La prueba nunca debe hacer POST');
+  }
+}
+
 class _MalformedPaymentApi extends TalaApi {
   @override
   Future<dynamic> get(String path) async {
@@ -101,6 +118,40 @@ void main() {
     expect(model.cashPayments, false);
     expect(model.hasAvailablePaymentMethod, false);
     expect(model.paymentMethod, isEmpty);
+    model.dispose();
+  });
+
+  test('RC1: verificar antes de POST nunca cambia Stripe a efectivo en silencio',
+      () async {
+    final api = _PolicyChangedApi();
+    final model = TalaModel(apiClient: api);
+    await model.refreshPaymentMethods();
+    expect(model.paymentMethod, 'stripe');
+
+    // The server disabled Stripe between opening Checkout and confirming.
+    api.response = _paymentConfig(cash: true, stripe: false);
+    await expectLater(model.verifyCheckoutPaymentMethod('stripe'),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)));
+    expect(model.paymentMethod, 'cash');
+    expect(api.orderPosts, 0);
+
+    // The customer now has to actively confirm the available method.
+    await model.verifyCheckoutPaymentMethod('cash');
+    expect(model.isPaymentMethodEnabled('cash'), true);
+    expect(api.orderPosts, 0);
+    model.dispose();
+  });
+
+  test('RC1: al confirmar revalida y bloqueo offline no genera POST', () async {
+    final api = _FlakyPaymentApi();
+    final model = TalaModel(apiClient: api);
+    await model.refreshPaymentMethods();
+    model.setPaymentMethod('stripe');
+    api.unavailable = true;
+    await expectLater(model.verifyCheckoutPaymentMethod('stripe'),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 503)));
+    expect(model.hasAvailablePaymentMethod, false);
+    expect(api.posts, 0);
     model.dispose();
   });
 
