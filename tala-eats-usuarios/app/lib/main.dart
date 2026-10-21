@@ -14,6 +14,7 @@ import 'customer_native_push.dart';
 part 'ui/design_system.dart';
 part 'ui/auth_screens.dart';
 part 'ui/welcome_screen.dart';
+part 'ui/login_methods_screen.dart';
 part 'ui/discovery_screens.dart';
 part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
@@ -1304,6 +1305,7 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
   // A welcome-first journey is production only. Widget smoke tests can still
   // exercise the existing authentication screens without a network backend.
   bool welcomeDismissed = false;
+  bool emailLoginSelected = false;
 
   @override
   void initState() {
@@ -1348,13 +1350,19 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
               screen = TalaWelcomeScreen(
                 onContinue: () => setState(() => welcomeDismissed = true),
               );
+            } else if (!widget.testMode && !emailLoginSelected) {
+              stage = 'methods';
+              screen = TalaLoginMethodsScreen(
+                onBack: () => setState(() => welcomeDismissed = false),
+                onEmail: () => setState(() => emailLoginSelected = true),
+              );
             } else {
               stage = 'login';
               screen = LoginScreen(
                 model: model,
                 onBackToWelcome: widget.testMode
                     ? null
-                    : () => setState(() => welcomeDismissed = false),
+                    : () => setState(() => emailLoginSelected = false),
               );
             }
           } else {
