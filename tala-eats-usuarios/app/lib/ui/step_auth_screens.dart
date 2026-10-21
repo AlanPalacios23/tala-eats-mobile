@@ -23,6 +23,7 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
   int step = 0;
   bool visiblePassword = false;
   bool busy = false;
+  bool _consentOpen = false;
   String error = '';
 
   @override
@@ -88,7 +89,7 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
   }
 
   Future<void> next() async {
-    if (busy || !valid) return;
+    if (busy || _consentOpen || !valid) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (step < finalStep) {
       setState(() { step++; error = ''; });
@@ -103,6 +104,7 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
   }
 
   Future<void> signIn() async {
+    if (busy) return;
     setState(() { busy = true; error = ''; });
     final bool ok = await widget.model.login(email.text, password.text);
     if (!mounted) return;
@@ -135,6 +137,9 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
   }
 
   Future<void> showConsent() async {
+    if (_consentOpen) return;
+    _consentOpen = true;
+    try {
     bool acceptedTerms = false, acceptedPrivacy = false;
     final bool? approved = await showModalBottomSheet<bool>(
       context: context, useSafeArea: true, isScrollControlled: true,
@@ -198,6 +203,9 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
     // Marketing preferences are intentionally absent until the backend
     // can persist consent separately from mandatory terms and privacy.
     await register();
+    } finally {
+      _consentOpen = false;
+    }
   }
 
   @override
