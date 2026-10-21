@@ -181,7 +181,29 @@ Future<String> readBoundedUtf8Response(Stream<List<int>> source, {int maxBytes =
     }
     bytes.addAll(chunk);
   }
-  return utf8.decode(bytes);
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    throw ApiException(502,
+      'Recibimos una respuesta dañada del servidor. Intenta nuevamente.');
+  }
+}
+
+/// Decode only JSON from the API. Never leak Cloudflare HTML or raw
+/// infrastructure error responses into the customer UI.
+dynamic decodeTalaApiResponse(String raw, {required int statusCode}) {
+  if (raw.isEmpty) return null;
+  try {
+    return jsonDecode(raw);
+  } on FormatException {
+    if (statusCode >= 200 && statusCode < 300) {
+      throw ApiException(502,
+        'Recibimos una respuesta inesperada del servidor de TALA EATS. '
+        'Intenta nuevamente más tarde.');
+    }
+    // HTTP failures retain their status and get a safe generic message.
+    return null;
+  }
 }
 
 /// Only checkout orders carry an HTTP Idempotency-Key matching the body.
@@ -250,10 +272,8 @@ class TalaApi {
     } on SocketException {
       throw ApiException(0, 'Se interrumpió la respuesta. Verifica el pedido antes de reintentar.');
     }
-    dynamic decoded;
-    if (raw.isNotEmpty) {
-      try { decoded = jsonDecode(raw); } catch (_) { decoded = raw; }
-    }
+    final dynamic decoded = decodeTalaApiResponse(
+      raw, statusCode: res.statusCode);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       // Cloudflare 52x responses are upstream failures, not invalid passwords.
       // Never render provider HTML or English origin-error prose to users.
@@ -276,22 +296,23 @@ class TalaApi {
       }
       throw ApiException(res.statusCode, message);
     }
-    if (decoded is String && raw.trimLeft().startsWith('<')) {
-      throw ApiException(502,
-        'Recibimos una respuesta inesperada del servidor de TALA EATS. '
-        'Intenta nuevamente más tarde.');
-    }
     return decoded;
   }
 
   Future<Map<String, dynamic>> login(String email, String password, {String otp = ''}) async {
     final dynamic data = await post('/auth/login', <String, dynamic>{'email': email, 'password': password, 'otp': otp});
-    return Map<String, dynamic>.from(data as Map);
+    if (data is! Map || data['user'] is! Map) {
+      throw ApiException(502, 'La respuesta de inicio de sesión no es válida. Intenta nuevamente.');
+    }
+    return Map<String, dynamic>.from(data);
   }
 
   Future<Map<String, dynamic>> register(String name, String email, String password) async {
     final dynamic data = await post('/auth/register', <String, dynamic>{'name': name, 'email': email, 'password': password});
-    return Map<String, dynamic>.from(data as Map);
+    if (data is! Map || data['user'] is! Map) {
+      throw ApiException(502, 'La respuesta del registro no es válida. Intenta nuevamente.');
+    }
+    return Map<String, dynamic>.from(data);
   }
 
   Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await get('/auth/me')) as Map);
