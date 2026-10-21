@@ -66,6 +66,10 @@ jobs:
         run: flutter pub get
       - name: Analisis estatico (sin APK)
         run: flutter analyze --no-fatal-infos
+      - name: Release Play preflight 1.0.38+49 (sin secretos ni publicacion)
+        run: |
+          python3 ../ci/build_signed_play_bundle.py --check
+          python3 -m unittest discover -s ../ci -p 'test_signed_release_gate.py' -v
       - name: QA de doble toque y llave persistente durante reintentos
         run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart test/backend_customer_contracts_test.dart test/customer_markets_contract_test.dart test/customer_native_push_contract_test.dart test/customer_model_full_integration_test.dart test/customer_ui_full_integration_widget_test.dart
       - name: "UX premium: Home y Buscar responsive (320-430 dp)"
@@ -129,7 +133,7 @@ jobs:
       - name: Adjuntar APK DEBUG privada para instalar y probar
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.36-APK-DEBUG-PRUEBAS
+          name: TALA-EATS-Usuarios-v1.0.38-RC0-APK-DEBUG-PRUEBAS
           path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
