@@ -22,11 +22,11 @@ EXPECTED = {
         100_000,
     ),
     "tala_eats_original_wordmark.png": (
-        "9c4468e976b0660fd56177d7f2e49b9d3f4ea294018a6501a5dd42c42300f17d",
+        "45c04843f88d4b8bd353020e7397192bb57faa693d19c9a261dac75ff8e03b8c",
         50_000,
     ),
     "tala_eats_wordmark_transparent.png": (
-        "b8255a65439392074172c0d934fcfcd455c556d82da5854deb04f6686b7327a2",
+        "2220c61bd3cf7403c4c23c5ec7b1c500d6b366aa1d3f3a68eea43d12a5782a0a",
         70_000,
     ),
 }
