@@ -106,7 +106,7 @@ class TalaLoginMethodsScreen extends StatelessWidget {
                     label: 'Continuar con tu celular',
                     leading: const Icon(Icons.phone_in_talk_rounded,
                         size: 25, color: Colors.white),
-                    color: const Color(0xFF19BF64),
+                    color: const Color(0xFF15803D),
                     onPressed: () => _unsupported(context, 'celular'),
                   ),
                   const SizedBox(height: 12),
@@ -115,7 +115,7 @@ class TalaLoginMethodsScreen extends StatelessWidget {
                     label: 'Continuar con tu correo',
                     leading: const Icon(Icons.mail_outline_rounded,
                         size: 26, color: Colors.white),
-                    color: const Color(0xFF929BAB),
+                    color: const Color(0xFF64748B),
                     onPressed: () {
                       HapticFeedback.selectionClick();
                       onEmail();
