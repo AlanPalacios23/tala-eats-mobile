@@ -1365,7 +1365,23 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
             duration: TalaMotion.of(context, const Duration(milliseconds: 420)),
             switchInCurve: TalaMotion.ease,
             switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (Widget child, Animation<double> animation) => FadeTransition(opacity: animation, child: child),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              // Fade out the original white wordmark while gently shrinking it,
+              // then reveal the full-screen photos. Other navigation retains
+              // the familiar short fade; system Reduce Motion is respected.
+              if (child.key == const ValueKey<String>('launch') &&
+                  !TalaMotion.reduced(context)) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.94, end: 1)
+                        .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                    child: child,
+                  ),
+                );
+              }
+              return FadeTransition(opacity: animation, child: child);
+            },
             child: KeyedSubtree(key: ValueKey<String>(stage), child: screen),
           );
         },
