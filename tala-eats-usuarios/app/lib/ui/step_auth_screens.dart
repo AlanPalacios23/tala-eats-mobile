@@ -221,8 +221,34 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
                 color: Colors.black, size: 31),
               onPressed: goBack,
             )),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(25, 22, 25, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  signup ? 'CREAR CUENTA · PASO ${step + 1} DE 4'
+                    : 'INICIAR SESIÓN · PASO ${step + 1} DE 2',
+                  style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B7280), letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    value: (step + 1) / (signup ? 4 : 2),
+                    backgroundColor: const Color(0xFFEDEDED),
+                    valueColor: const AlwaysStoppedAnimation<Color>(kBrandDeep),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Expanded(child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(25, 32, 25, 20),
+            padding: const EdgeInsets.fromLTRB(25, 30, 25, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
