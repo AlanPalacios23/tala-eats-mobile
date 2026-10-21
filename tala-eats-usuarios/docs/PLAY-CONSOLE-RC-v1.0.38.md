@@ -62,6 +62,10 @@ El AAB esperado es `app/build/app/outputs/bundle/release/app-release.aab`, firma
 
 Mantener evidencias por pantalla, hash de build, SHA exacto del PR, id de run CI y resultados de servidor STAGING; sin datos personales ni medios de pago reales.
 
+## Observación de seguridad antes del merge
+
+La candidata RC0 no convierte el backend Node en producción. Se debe ejecutar el conjunto de pruebas con un build `--dart-define=TALAEATS_API_BASE_URL=https://api-stage-talaeats.alan-palacios-dev.com/api/v1` y perfiles/cuentas ficticias distintos de producción. Nunca usar Stripe LIVE en pruebas. El historial legado Mercado Pago se sigue mostrando, pero nuevos pedidos solo se aceptan con Stripe/efectivo.
+
 ## E. Decisión de release
 
 **GO** solo cuando los bloqueos A–D estén cerrados, un revisor confirme los contratos del backend destino, la suite CI dé PASS incluido media 4/4 y la Play Console valide el AAB. Mientras tanto **NO-GO** y PR en draft.
