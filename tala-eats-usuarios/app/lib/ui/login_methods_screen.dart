@@ -34,6 +34,7 @@ class TalaLoginMethodsScreen extends StatelessWidget {
               'assets/landing/food_fiesta.webp',
               key: const ValueKey<String>('loginPhotoA'),
               fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
               alignment: Alignment.center,
               excludeFromSemantics: true,
               errorBuilder: (_, __, ___) =>
@@ -46,10 +47,10 @@ class TalaLoginMethodsScreen extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: <Color>[
-                      Color(0x16000000),
+                      Color(0x0A000000),
                       Color(0x00000000),
-                      Color(0x64000000),
-                      Color(0xBF000000),
+                      Color(0x26000000),
+                      Color(0x66000000),
                     ],
                     stops: <double>[0, .32, .70, 1],
                   ),
