@@ -70,6 +70,8 @@ jobs:
         run: |
           python3 ../ci/build_signed_play_bundle.py --check
           python3 -m unittest discover -s ../ci -p 'test_signed_release_gate.py' -v
+      - name: RC1 seguridad checkout (red, carreras y método antes del POST)
+        run: flutter test --reporter=compact test/payment_availability_fail_closed_test.dart
       - name: QA de doble toque y llave persistente durante reintentos
         run: flutter test --reporter=compact test/order_submission_guard_test.dart test/priority_p0_order_contract_test.dart test/priority_p0_network_resilience_test.dart test/backend_customer_contracts_test.dart test/customer_markets_contract_test.dart test/customer_native_push_contract_test.dart test/customer_model_full_integration_test.dart test/customer_ui_full_integration_widget_test.dart
       - name: "UX premium: Home y Buscar responsive (320-430 dp)"
