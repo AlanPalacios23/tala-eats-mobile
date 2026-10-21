@@ -57,6 +57,51 @@ class TalaLoginMethodsScreen extends StatelessWidget {
                 ),
               ),
             ),
+            // Keep the single functional email button, but balance the open
+            // center of the photograph with a compact editorial message.
+            // No branding, extra actions or opaque containers.
+            SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 0, 28, 116),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        'Un antojo,\nmil posibilidades.',
+                        key: const ValueKey<String>('loginEditorialTitle'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: MediaQuery.sizeOf(context).width < 350
+                              ? 29 : 34,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
+                          shadows: const <Shadow>[
+                            Shadow(color: Color(0x77000000), blurRadius: 14),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Tus sabores favoritos están más cerca.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                          shadows: <Shadow>[
+                            Shadow(color: Color(0x88000000), blurRadius: 12),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               top: MediaQuery.paddingOf(context).top + 12,
               left: 18,
