@@ -17,6 +17,14 @@ Este RC0 es una *candidata de integración*, no una versión autorizada para pro
 - [x] El **build firmado** verifica obligatoriamente las cuatro imágenes originales HD de la portada por SHA256 antes de compilar: no se pueden publicar fallbacks.
 - [x] Tests de integridad de firma, identidad Firebase y Stripe/efectivo añadidos al pipeline.
 
+## RC1 — Endurecimiento del checkout antes de producción (PR apilada)
+
+- [x] **Fail closed al refrescar métodos de pago**: antes de cada GET `/orders/payment-methods`, se invalidan opciones previas; si falla conexión, datos inválidos o backend no responde, no se habilita botón de compra ni se envía `POST /orders`.
+- [x] Respuestas fuera de orden (dos GET concurrentes) no restauran métodos caducos. Un `logout` también invalida las consultas pendientes.
+- [x] No permitir confirmar pedido mientras la pantalla está actualizando métodos; reintentos sin métodos válidos muestran aviso y no cobran.
+- [x] Pruebas sin backend real para 503, respuesta inválida, recuperación y carrera de solicitudes.
+- [ ] Repetir suite Flutter, seguridad Android y compilación APK debug de esta rama; conservar el bloqueo de imágenes originales.
+
 ## B. Bloqueos estrictos hasta producción
 
 | Bloqueo | Estado / evidencia necesaria |
