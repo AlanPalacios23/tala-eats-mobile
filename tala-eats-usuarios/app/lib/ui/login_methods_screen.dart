@@ -30,11 +30,11 @@ class TalaLoginMethodsScreen extends StatelessWidget {
     // Critical security boundary: never imitate Google OAuth. The existing
     // backend accepts only an independent Tala Eats password.
     showModalBottomSheet<void>(
-      context: context, useSafeArea: true,
+      context: context, useSafeArea: true, isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (BuildContext sheet) => Padding(
+      builder: (BuildContext sheet) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
         child: Column(mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
