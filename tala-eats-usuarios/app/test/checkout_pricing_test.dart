@@ -84,6 +84,50 @@ void main() {
     expect(model.checkoutPreview.estimatedReferenceTotal, 253);
     model.dispose();
   });
+  test('RC0: nunca ofrece Mercado Pago para pedidos nuevos aunque lo habilite backend', () async {
+    final cfg = <String, dynamic>{
+      'methods': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 'mercadopago', 'enabled': true},
+        <String, dynamic>{'id': 'stripe', 'enabled': true},
+        <String, dynamic>{'id': 'cash', 'enabled': true},
+      ],
+    };
+    final model = TalaModel(apiClient: _BackendPolicyApi(cfg));
+    await model.refreshPaymentMethods();
+    expect(model.hasAvailablePaymentMethod, true);
+    expect(model.mercadoPagoPayments, false);
+    expect(model.onlinePayments, true);
+    expect(model.isPaymentMethodEnabled('mercadopago'), false);
+    expect(model.isPaymentMethodEnabled('stripe'), true);
+    model.setPaymentMethod('mercadopago');
+    expect(model.paymentMethod, isNot('mercadopago'));
+    model.dispose();
+  });
+
+  test('RC0: backend con solo Mercado Pago deja checkout bloqueado', () async {
+    final model = TalaModel(apiClient: _BackendPolicyApi(<String, dynamic>{
+      'methods': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 'mercadopago', 'enabled': true},
+      ],
+    }));
+    await model.refreshPaymentMethods();
+    expect(model.hasAvailablePaymentMethod, false);
+    expect(model.paymentMethod, isEmpty);
+    await expectLater(model.placeOrder(),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)));
+    model.dispose();
+  });
+
+  testWidgets('sin métodos disponibles no se indica erróneamente que efectivo funciona',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: PaymentUnavailableCard(onRetry: () {}, loading: false)),
+    ));
+    expect(find.text('No hay métodos de pago disponibles'), findsOneWidget);
+    expect(find.textContaining('Stripe o efectivo'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('resumen del checkout muestra tarifa, envio y total transparente', (tester) async {
     final model = TalaModel(apiClient: _BackendPolicyApi(policy()));
     model.restaurants.add(const Restaurant(id: 1, name: 'Tienda', category: '', rating: 5, eta: '20 min', deliveryFee: 20, image: '', description: ''));
