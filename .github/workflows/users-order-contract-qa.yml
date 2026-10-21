@@ -129,7 +129,7 @@ jobs:
       - name: Adjuntar APK DEBUG privada para instalar y probar
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.35-APK-DEBUG-PRUEBAS
+          name: TALA-EATS-Usuarios-v1.0.36-APK-DEBUG-PRUEBAS
           path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
