@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "app"
@@ -35,15 +36,15 @@ PRIVATE_SIGNING = (
 
 def check_source() -> None:
     pubspec = (APP / "pubspec.yaml").read_text(encoding="utf-8")
-    assert re.search(r"^version: 1\.0\.38\+49$", pubspec, re.MULTILINE), (
-        "La versión de Play RC debe ser 1.0.38+49")
+    assert re.search(r"^version: 1\.0\.39\+50$", pubspec, re.MULTILINE), (
+        "La versión de Play RC debe ser 1.0.39+50")
     bootstrap = (ROOT / "ci/bootstrap_android.py").read_text(encoding="utf-8")
     assert "'package':'com.talaeats.app'" in bootstrap, "Paquete Android inesperado"
     assert (APP / "tools/native/MainActivity.java").is_file()
     assert (APP / "lib/customer_native_push.dart").is_file()
     assert not list(ROOT.rglob("*.jks")), "No guardar claves en el repositorio"
     assert not list(ROOT.rglob("*.keystore")), "No guardar claves en el repositorio"
-    print("RELEASE_SOURCE_GATE_PASS: v1.0.38+49, paquete com.talaeats.app, sin llaves")
+    print("RELEASE_SOURCE_GATE_PASS: v1.0.39+50, paquete com.talaeats.app, sin llaves")
 
 
 def require_local_configuration() -> Path:
@@ -115,6 +116,30 @@ def configure_ephemeral_gradle() -> None:
     print("ANDROID_RELEASE_GATE_PASS: API 36, firma upload obligatoria")
 
 
+def verify_aab_structure(path: Path) -> None:
+    """Reject misnamed ZIP/APK or incomplete bundles before reporting signature PASS.
+
+    Structural checks do not replace bundletool, Google Play Console, or
+    physical testing on devices with 16 KB memory pages.
+    """
+    try:
+        with zipfile.ZipFile(path, "r") as bundle:
+            entries = set(bundle.namelist())
+            if bundle.testzip() is not None:
+                raise RuntimeError("AAB ZIP dañado (CRC inválido)")
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise RuntimeError("El archivo no es un AAB ZIP válido") from exc
+    expected = {"BundleConfig.pb", "base/manifest/AndroidManifest.xml"}
+    if not expected.issubset(entries):
+        raise RuntimeError("AAB incompleto: faltan manifest o BundleConfig.pb")
+    if not any(name.startswith("base/lib/arm64-v8a/") and name.endswith(".so")
+               for name in entries):
+        raise RuntimeError("AAB sin librerías Android ARM64; revisar Flutter release")
+    if not any(name.startswith("base/assets/flutter_assets/") for name in entries):
+        raise RuntimeError("AAB sin recursos Flutter; revisar el empaquetado")
+    print("ANDROID_APP_BUNDLE_STRUCTURE_PASS: base, manifest, Flutter assets y ARM64")
+
+
 def build() -> None:
     check_source()
     require_local_configuration()
@@ -123,11 +148,15 @@ def build() -> None:
       cwd=APP, check=True)
     subprocess.run(["flutter", "pub", "get"], cwd=APP, check=True)
     configure_ephemeral_gradle()
+    # Prevent a previously signed/stale bundle from being reported as a new RC.
+    if BUNDLE.exists():
+        BUNDLE.unlink()
     cmd = ["flutter", "build", "appbundle", "--release", "--no-pub"]
     cmd.extend("--dart-define=" + k + "=" + os.environ[k] for k in PUBLIC_FIREBASE)
     subprocess.run(cmd, cwd=APP, check=True)
     if not BUNDLE.is_file() or BUNDLE.stat().st_size < 10000:
         raise RuntimeError("No se generó el AAB de release")
+    verify_aab_structure(BUNDLE)
     verification = subprocess.run(
         ["jarsigner", "-verify", str(BUNDLE)],
         capture_output=True, text=True, check=False,
