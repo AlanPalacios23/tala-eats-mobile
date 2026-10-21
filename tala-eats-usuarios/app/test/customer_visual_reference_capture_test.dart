@@ -156,7 +156,7 @@ Future<void> snapshot(WidgetTester tester, Widget page,
 }
 
 void main() {
-  testWidgets('Reference images — seven key screens, isolated mock data',
+  testWidgets('Reference images — customer + auth screens, isolated mock data',
       (WidgetTester tester) async {
     // Run outside FakeAsync so the engine can complete font registration.
     await tester.runAsync(loadVisualFonts);
@@ -170,6 +170,13 @@ void main() {
       '05_checkout_mock_390.png': CheckoutScreen(model: m),
       '06_orders_mock_390.png': OrdersScreen(model: m),
       '07_account_mock_390.png': AccountScreen(model: m),
+      '10_login_mock_390.png': LoginScreen(model: m),
+      '11_signup_mock_390.png': SignUpScreen(model: m),
+      '12_welcome_mock_390.png': TalaWelcomeScreen(onContinue: () {}),
+      '13_splash_mock_390.png': const LaunchScreen(),
+      '14_login_methods_mock_390.png': TalaLoginMethodsScreen(
+        onEmail: () {}, onBack: () {},
+      ),
     };
     for (final MapEntry<String, Widget> page in pages.entries) {
       await snapshot(tester, page.value, page.key);

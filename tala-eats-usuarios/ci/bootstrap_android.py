@@ -107,6 +107,55 @@ dependencies {
             s,c2=re.subn(r'(<style name="NormalTheme" parent=")[^"]+("[^>]*>)',r'\1Theme.MaterialComponents.DayNight.NoActionBar\2',s)
             if c1!=1 or c2!=1: raise RuntimeError(f'Unexpected native theme format: {file}')
             write(file,s)
+        # Android 12+ always draws a system splash before the first Flutter
+        # frame. Explicitly hide its placeholder launcher T; the branded full
+        # screen splash is then rendered in Flutter for five seconds.
+        # We keep the installed launcher icon unchanged; this only affects
+        # the automatic Android 12 splash overlay shown when launching.
+        res=target/'app/src/main/res'
+        blank=res/'drawable/tala_splash_blank.xml'
+        blank.parent.mkdir(parents=True,exist_ok=True)
+        write(blank,'''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <size android:width="1dp" android:height="1dp" />
+    <solid android:color="@android:color/transparent" />
+</shape>
+''')
+        for style_path in (res/'values-v31/styles.xml',res/'values-night-v31/styles.xml'):
+            style_path.parent.mkdir(parents=True,exist_ok=True)
+            # API31 attrs are not valid in values/styles.xml used by Android 11.
+            if style_path.exists():
+                st=style_path.read_text(encoding='utf-8')
+                st=re.sub(
+                    r'(<style name="LaunchTheme" parent=")[^"]+(")',
+                    r'\1Theme.AppCompat.Light.NoActionBar\2',st,count=1)
+                if '<style name="LaunchTheme"' not in st:
+                    raise RuntimeError(f'Android31 native splash theme not found: {style_path}')
+                extra='''<item name="android:windowSplashScreenBackground">@android:color/white</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_splash_blank</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item>'''
+                st=re.sub(r'(<style name="LaunchTheme"[^>]*>)',r'\1\n        '+extra,
+                          st,count=1)
+            else:
+                st='''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@android:color/white</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tala_splash_blank</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item>
+    </style>
+</resources>
+'''
+            write(style_path,st)
+        for folder in ('drawable','drawable-v21'):
+            dest=res/folder
+            dest.mkdir(parents=True,exist_ok=True)
+            write(dest/'launch_background.xml','''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+</layer-list>
+''')
         write(target/'app/proguard-rules.pro','''-dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivity$g
 -dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Args
 -dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Error

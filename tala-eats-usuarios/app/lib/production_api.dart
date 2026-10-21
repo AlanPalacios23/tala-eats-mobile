@@ -215,7 +215,11 @@ class TalaApi {
     } on TimeoutException {
       throw ApiException(0, 'El servidor tardó demasiado en responder.');
     } on SocketException {
-      throw ApiException(0, 'No pudimos conectar con Tala Eats. Revisa tu internet.');
+      throw ApiException(0, 'No hay conexión con el servicio de TALA EATS. Comprueba tu internet e inténtalo de nuevo.');
+    } on HandshakeException {
+      throw ApiException(0, 'No se pudo establecer una conexión segura con TALA EATS.');
+    } on HttpException {
+      throw ApiException(503, 'El servidor de TALA EATS no está disponible temporalmente.');
     }
     req.headers.set(HttpHeaders.acceptHeader, 'application/json');
     req.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
@@ -231,6 +235,12 @@ class TalaApi {
       res = await req.close().timeout(const Duration(seconds: 20));
     } on TimeoutException {
       throw ApiException(0, 'La operación tardó demasiado. Inténtalo otra vez.');
+    } on SocketException {
+      throw ApiException(0, 'Se perdió la conexión con el servidor de TALA EATS.');
+    } on HandshakeException {
+      throw ApiException(0, 'No se pudo establecer una conexión segura con TALA EATS.');
+    } on HttpException {
+      throw ApiException(503, 'El servidor de TALA EATS no está disponible temporalmente.');
     }
     String raw;
     try {
@@ -245,9 +255,31 @@ class TalaApi {
       try { decoded = jsonDecode(raw); } catch (_) { decoded = raw; }
     }
     if (res.statusCode < 200 || res.statusCode >= 300) {
+      // Cloudflare 52x responses are upstream failures, not invalid passwords.
+      // Never render provider HTML or English origin-error prose to users.
+      if (res.statusCode >= 500) {
+        throw ApiException(res.statusCode,
+          'No logramos comunicarnos con el servidor de TALA EATS. '
+          'El servicio está temporalmente no disponible; intenta nuevamente en unos minutos.');
+      }
       String message = 'No pudimos completar la operación.';
-      if (decoded is Map && decoded['detail'] != null) message = decoded['detail'].toString();
-      throw ApiException(res.statusCode, message, decoded);
+      if (res.statusCode == 429) {
+        message = 'Demasiados intentos. Espera un momento antes de continuar.';
+      } else if (decoded is Map && decoded['detail'] != null) {
+        final String detail = decoded['detail'].toString();
+        // Avoid showing long untrusted infrastructure traces or HTML.
+        if (detail.length <= 240 &&
+            !RegExp(r'<[^>]+>|cloudflare|origin web server',
+                caseSensitive: false).hasMatch(detail)) {
+          message = detail;
+        }
+      }
+      throw ApiException(res.statusCode, message);
+    }
+    if (decoded is String && raw.trimLeft().startsWith('<')) {
+      throw ApiException(502,
+        'Recibimos una respuesta inesperada del servidor de TALA EATS. '
+        'Intenta nuevamente más tarde.');
     }
     return decoded;
   }

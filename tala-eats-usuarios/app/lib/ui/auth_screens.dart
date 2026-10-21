@@ -6,9 +6,10 @@ part of '../main.dart';
 // ---------------------------------------------------------------------------
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.model});
+  const LoginScreen({super.key, required this.model, this.onBackToWelcome});
 
   final TalaModel model;
+  final VoidCallback? onBackToWelcome;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -52,6 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
+      liquidGlass: true,
+      showBack: widget.onBackToWelcome != null,
+      onBack: widget.onBackToWelcome,
       title: 'Bienvenido de vuelta',
       subtitle: 'Pide lo que se te antoje y sigue tu pedido en tiempo real.',
       child: AutofillGroup(
@@ -199,6 +203,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return PremiumAuthScaffold(
       showBack: true,
+      liquidGlass: true,
       title: 'Crea tu cuenta',
       subtitle: 'Un minuto y quedas listo para pedir en Tala Eats.',
       child: Column(
@@ -667,7 +672,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 }
 
-/// Shared auth layout: brand lockup, strong title, calm form area.
+/// Shared auth layout. Liquid Glass is opt-in for customer login/signup only:
+/// verification, recovery and reset retain their existing proven presentation.
 class PremiumAuthScaffold extends StatelessWidget {
   const PremiumAuthScaffold({
     super.key,
@@ -676,6 +682,8 @@ class PremiumAuthScaffold extends StatelessWidget {
     required this.child,
     this.eyebrow = '',
     this.showBack = false,
+    this.liquidGlass = false,
+    this.onBack,
   });
 
   final String eyebrow;
@@ -683,18 +691,76 @@ class PremiumAuthScaffold extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final bool showBack;
+  final bool liquidGlass;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData baseTheme = Theme.of(context);
+    final BorderRadius fieldRadius = BorderRadius.circular(18);
+    final ThemeData glassTheme = baseTheme.copyWith(
+      inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
+        filled: true,
+        fillColor: const Color(0xE6FFFFFF),
+        labelStyle: const TextStyle(color: kInkSoft, fontWeight: FontWeight.w600),
+        prefixIconColor: kInkSoft,
+        suffixIconColor: kInkSoft,
+        border: OutlineInputBorder(
+          borderRadius: fieldRadius,
+          borderSide: const BorderSide(color: Color(0xFFD8D1CB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: fieldRadius,
+          borderSide: const BorderSide(color: Color(0xFFD8D1CB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: fieldRadius,
+          borderSide: const BorderSide(color: kBrandDeep, width: 1.8),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(54),
+          backgroundColor: kBrandDeep,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: const Color(0xFFF2D6CB),
+          disabledForegroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          textStyle: const TextStyle(
+            fontFamily: 'Roboto', fontWeight: FontWeight.w700, fontSize: 16,
+          ),
+        ),
+      ),
+    );
+
+    final Widget heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (eyebrow.isNotEmpty) ...<Widget>[
+          Text(eyebrow, style: TalaText.overline),
+          const SizedBox(height: 8),
+        ],
+        Text(title, style: TalaText.display),
+        const SizedBox(height: 8),
+        Text(subtitle, style: TalaText.muted.copyWith(fontSize: 15)),
+      ],
+    );
+    final Widget form = Material(type: MaterialType.transparency, child: child);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF6),
+      backgroundColor: liquidGlass ? Colors.white : const Color(0xFFFFFAF6),
       body: Stack(
         children: <Widget>[
-          const Positioned.fill(child: AuthBackdrop()),
+          Positioned.fill(
+            child: liquidGlass ? const AuthLiquidBackdrop() : const AuthBackdrop(),
+          ),
           SafeArea(
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+              padding: liquidGlass
+                  ? const EdgeInsets.fromLTRB(14, 8, 14, 28)
+                  : const EdgeInsets.fromLTRB(20, 8, 20, 28),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 460),
@@ -702,38 +768,142 @@ class PremiumAuthScaffold extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       SizedBox(
-                        height: 48,
+                        height: liquidGlass ? 54 : 48,
                         child: Row(
                           children: <Widget>[
                             if (showBack)
-                              TalaCircleButton(icon: Icons.arrow_back_rounded, tooltip: 'Regresar', onPressed: () => Navigator.of(context).maybePop())
+                              liquidGlass
+                                  ? AuthGlassCard(
+                                      radius: 18,
+                                      padding: EdgeInsets.zero,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.arrow_back_rounded),
+                                        tooltip: 'Regresar',
+                                        onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                                      ),
+                                    )
+                                  : TalaCircleButton(
+                                      icon: Icons.arrow_back_rounded,
+                                      tooltip: 'Regresar',
+                                      onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                                    )
                             else
-                              const AuthBrandMark(),
+                              liquidGlass
+                                  ? const AuthGlassCard(
+                                      radius: 18,
+                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      child: AuthBrandMark(),
+                                    )
+                                  : const AuthBrandMark(),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 26),
+                      SizedBox(height: liquidGlass ? 20 : 26),
                       Reveal(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            if (eyebrow.isNotEmpty) ...<Widget>[
-                              Text(eyebrow, style: TalaText.overline),
-                              const SizedBox(height: 8),
-                            ],
-                            Text(title, style: TalaText.display),
-                            const SizedBox(height: 8),
-                            Text(subtitle, style: TalaText.muted.copyWith(fontSize: 15)),
-                          ],
-                        ),
+                        child: liquidGlass
+                            ? AuthGlassCard(
+                                padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                                child: heading,
+                              )
+                            : heading,
                       ),
-                      const SizedBox(height: 24),
-                      Reveal(index: 2, child: Material(type: MaterialType.transparency, child: child)),
+                      SizedBox(height: liquidGlass ? 16 : 24),
+                      Reveal(
+                        index: 2,
+                        child: liquidGlass
+                            ? Theme(
+                                data: glassTheme,
+                                child: AuthGlassCard(
+                                  padding: const EdgeInsets.fromLTRB(14, 22, 14, 22),
+                                  child: form,
+                                ),
+                              )
+                            : form,
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Frosted surfaces stay bright and legible. Blur is clipped to the actual
+/// rounded card to avoid a costly full-screen backdrop filter on Android.
+class AuthGlassCard extends StatelessWidget {
+  const AuthGlassCard({
+    super.key,
+    required this.child,
+    this.radius = 26,
+    this.padding = const EdgeInsets.all(18),
+  });
+
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final BorderRadius rounded = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: rounded,
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x122E2019),
+            blurRadius: 26,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: rounded,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: rounded,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[Color(0xF5FFFFFF), Color(0xDBFFFFFF)],
+              ),
+              border: Border.all(color: const Color(0xF5FFFFFF), width: 1.3),
+            ),
+            child: Padding(padding: padding, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// White-first, static background with soft brand reflections. No textures,
+/// external images, animated shaders, or API dependencies.
+class AuthLiquidBackdrop extends StatelessWidget {
+  const AuthLiquidBackdrop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.white,
+      child: Stack(
+        children: <Widget>[
+          Positioned(
+            right: -126, top: -150,
+            child: _GlowOrb(size: 350, color: Color(0x48FFA477)),
+          ),
+          Positioned(
+            left: -170, top: 270,
+            child: _GlowOrb(size: 340, color: Color(0x22FFBC9F)),
+          ),
+          Positioned(
+            right: -135, bottom: -160,
+            child: _GlowOrb(size: 350, color: Color(0x20FF9C69)),
           ),
         ],
       ),

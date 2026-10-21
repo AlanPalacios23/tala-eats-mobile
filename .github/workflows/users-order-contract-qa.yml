@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'tala-eats-usuarios/app/lib/**'
+      - 'tala-eats-usuarios/app/assets/landing/**'
+      - 'tala-eats-usuarios/ci/verify_landing_assets.py'
       - 'tala-eats-usuarios/app/pubspec.yaml'
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'tala-eats-usuarios/app/lib/**'
+      - 'tala-eats-usuarios/app/assets/landing/**'
+      - 'tala-eats-usuarios/ci/verify_landing_assets.py'
       - 'tala-eats-usuarios/app/pubspec.yaml'
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
@@ -28,9 +32,20 @@ concurrency:
   group: users-order-contract-${{ github.ref }}
   cancel-in-progress: true
 
-# No release signing, distributed APK, runtime deployment, live PSP, token, Android device,
-# Firebase or user data. The GitHub Actions app is Flutter-only QA.
+# Debug APK artifact for owner-only pre-release device testing. Never sign release,
+# publish to Play Store, expose tokens or alter production backend/payment state.
 jobs:
+  # Keep functional QA independent from the owner-provided media check.
+  # The overall PR remains blocked until both the app and real assets pass.
+  usuarios-original-media:
+    name: Fotos y lettering originales (bloqueante para publicacion)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Exigir tres recursos originales y SHA256
+        run: python3 tala-eats-usuarios/ci/verify_landing_assets.py
+
   users-order-contract:
     name: Flutter analyze + tests + compilacion Android debug efimera
     runs-on: ubuntu-24.04
@@ -106,8 +121,16 @@ jobs:
       - name: Compilar Java nativo y Flutter Android debug (efímero, sin publicar)
         timeout-minutes: 12
         run: flutter build apk --debug --no-pub
-      - name: No subir ni distribuir APK
+      - name: Comprobar paquete Android para pruebas locales
         run: |
-          test -f build/app/outputs/flutter-apk/app-debug.apk
-          echo 'NATIVE_ANDROID_DEBUG_COMPILE_PASS no signing release, no APK artifact, no deploy'
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          echo 'ANDROID_DEBUG_TEST_ONLY no release signing, no publication'
+      - name: Adjuntar APK DEBUG privada para instalar y probar
+        uses: actions/upload-artifact@v4
+        with:
+          name: TALA-EATS-Usuarios-v1.0.36-APK-DEBUG-PRUEBAS
+          path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
 
