@@ -399,7 +399,7 @@ void main() {
   });
 
 
-  testWidgets('Checkout muestra Stripe y wallet de plataforma cuando backend lo habilita', (WidgetTester tester) async {
+  testWidgets('RC0 Checkout ofrece Stripe y oculta Mercado Pago aunque backend lo anuncie', (WidgetTester tester) async {
     final _CheckoutPaymentMethodsQaApi api = _CheckoutPaymentMethodsQaApi(cash: false, mercadoPago: true, stripe: true);
     final TalaModel model = TalaModel(apiClient: api);
     model.paymentMethod = 'stripe';
@@ -427,11 +427,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.refreshCalls, greaterThanOrEqualTo(1));
     expect(model.cashPayments, isFalse);
-    expect(model.mercadoPagoPayments, isTrue);
+    expect(model.mercadoPagoPayments, isFalse);
     expect(model.stripePayments, isTrue);
-    await tester.scrollUntilVisible(find.text('Mercado Pago'), 170, scrollable: find.byType(Scrollable).first);
-    await tester.pumpAndSettle();
-    expect(find.text('Mercado Pago'), findsOneWidget);
+    expect(model.isPaymentMethodEnabled('mercadopago'), isFalse);
+    expect(find.text('Mercado Pago'), findsNothing);
     await tester.scrollUntilVisible(find.text('Tarjeta y Google Pay'), 120, scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
 
