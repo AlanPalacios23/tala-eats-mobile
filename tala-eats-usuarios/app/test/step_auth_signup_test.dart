@@ -18,17 +18,26 @@ void main() {
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNull);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput0')), 'María');
+    expect(tester.widget<FilledButton>(
+      find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
+      reason: 'El dato escrito debe habilitar la flecha');
     await tester.tap(find.byKey(const ValueKey<String>('stepNext')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('¿Cuál es tu apellido?'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput1')), 'López');
+    expect(tester.widget<FilledButton>(
+      find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
+      reason: 'El dato escrito debe habilitar la flecha');
     await tester.tap(find.byKey(const ValueKey<String>('stepNext')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Por último, agrega tu\ncorreo electrónico'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput2')),
       'maria@example.com');
+    expect(tester.widget<FilledButton>(
+      find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
+      reason: 'El dato escrito debe habilitar la flecha');
     await tester.tap(find.byKey(const ValueKey<String>('stepNext')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Crea tu contraseña\nde TALA EATS'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput3')), 'Segura123');
     await tester.tap(find.byKey(const ValueKey<String>('stepNext')));
@@ -61,8 +70,11 @@ void main() {
     expect(find.text('Ingresa tu correo\npara iniciar sesión'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput0')),
       'maria@example.com');
+    expect(tester.widget<FilledButton>(
+      find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
+      reason: 'El dato escrito debe habilitar la flecha');
     await tester.tap(find.byKey(const ValueKey<String>('stepNext')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Ingresa tu contraseña\npara iniciar sesión'),
       findsOneWidget);
     expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
