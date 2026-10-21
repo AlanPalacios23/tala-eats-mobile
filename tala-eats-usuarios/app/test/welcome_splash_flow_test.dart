@@ -31,6 +31,58 @@ void main() {
     tester.view.resetDevicePixelRatio();
   });
 
+  testWidgets('Continuar es idempotente ante un doble toque rapido',
+      (WidgetTester tester) async {
+    int navigations = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: const MediaQuery(
+        data: MediaQueryData(disableAnimations: true, accessibleNavigation: true),
+        child: SizedBox.shrink(),
+      ),
+    ));
+    await tester.pumpWidget(MaterialApp(
+      home: MediaQuery(
+        data: const MediaQueryData(
+          disableAnimations: true,
+          accessibleNavigation: true,
+        ),
+        child: TalaWelcomeScreen(onContinue: () => navigations++),
+      ),
+    ));
+    await tester.pump();
+    final Finder cta = find.byKey(const ValueKey<String>('talaWelcomeContinue'));
+    await tester.tap(cta);
+    await tester.tap(cta);
+    expect(navigations, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Fotografias se pueden recorrer deslizando sin abrir el login',
+      (WidgetTester tester) async {
+    int navigations = 0;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    await tester.pumpWidget(MaterialApp(
+      home: MediaQuery(
+        data: const MediaQueryData(
+          disableAnimations: true,
+          accessibleNavigation: true,
+        ),
+        child: TalaWelcomeScreen(onContinue: () => navigations++),
+      ),
+    ));
+    await tester.pump();
+    expect(find.byKey(const ValueKey<int>(0)), findsOneWidget);
+    await tester.fling(find.byType(TalaWelcomeScreen), const Offset(-240, 0), 1200);
+    await tester.pump();
+    expect(find.byKey(const ValueKey<int>(1)), findsOneWidget);
+    expect(navigations, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
   testWidgets('Splash usa logo local y slogan de la referencia',
       (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
