@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'tala-eats-usuarios/app/lib/**'
+      - 'tala-eats-usuarios/app/assets/landing/**'
+      - 'tala-eats-usuarios/ci/verify_landing_assets.py'
       - 'tala-eats-usuarios/app/pubspec.yaml'
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'tala-eats-usuarios/app/lib/**'
+      - 'tala-eats-usuarios/app/assets/landing/**'
+      - 'tala-eats-usuarios/ci/verify_landing_assets.py'
       - 'tala-eats-usuarios/app/pubspec.yaml'
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
@@ -31,6 +35,17 @@ concurrency:
 # No release signing, distributed APK, runtime deployment, live PSP, token, Android device,
 # Firebase or user data. The GitHub Actions app is Flutter-only QA.
 jobs:
+  # Keep functional QA independent from the owner-provided media check.
+  # The overall PR remains blocked until both the app and real assets pass.
+  usuarios-original-media:
+    name: Fotos y lettering originales (bloqueante para publicacion)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Exigir tres recursos originales y SHA256
+        run: python3 tala-eats-usuarios/ci/verify_landing_assets.py
+
   users-order-contract:
     name: Flutter analyze + tests + compilacion Android debug efimera
     runs-on: ubuntu-24.04
