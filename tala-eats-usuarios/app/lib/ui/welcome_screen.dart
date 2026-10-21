@@ -37,6 +37,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
               'assets/landing/food_tala.webp',
               key: const ValueKey<String>('welcomePhotoB'),
               fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
               alignment: Alignment.center,
               excludeFromSemantics: true,
               errorBuilder: (_, __, ___) => const ColoredBox(
@@ -49,8 +50,8 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: <Color>[
-                    Color(0x12000000), Color(0x33000000),
-                    Color(0x3D000000), Color(0x85000000),
+                    Color(0x0A000000), Color(0x22000000),
+                    Color(0x34000000), Color(0x60000000),
                   ],
                   stops: <double>[0, .27, .65, 1],
                 ),
@@ -70,14 +71,14 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            SizedBox(height: compact ? 88 : constraints.maxHeight * .18),
+                            SizedBox(height: compact ? 84 : constraints.maxHeight * .17),
                             // Exact brand letter artwork (transparent crop);
                             // never place it in a pill, card or shadowed box.
                             Image.asset(
                               'assets/landing/tala_eats_wordmark_transparent.png',
                               key: const ValueKey<String>('welcomeWordmark'),
-                              width: compact ? 224 : 275,
-                              height: compact ? 76 : 93,
+                              width: compact ? 250 : 288,
+                              height: compact ? 78 : 102,
                               alignment: Alignment.centerLeft,
                               fit: BoxFit.contain,
                               semanticLabel: 'Tala Eats',
@@ -89,7 +90,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 17),
                             Text(
                               'Bienvenido\na Tala Eats',
                               key: const ValueKey<String>('welcomeTitle'),
@@ -142,7 +143,7 @@ class _WelcomeGlassContinue extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Material(
-          color: const Color(0xB8FFFFFF),
+          color: const Color(0x88FFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
             side: const BorderSide(color: Color(0xE6FFFFFF), width: 1.2),
