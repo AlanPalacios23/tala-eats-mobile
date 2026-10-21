@@ -11,6 +11,9 @@ on:
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
       - 'tala-eats-usuarios/ci/bootstrap_android.py'
+      - 'tala-eats-usuarios/ci/build_signed_play_bundle.py'
+      - 'tala-eats-usuarios/ci/test_signed_release_gate.py'
+      - 'tala-eats-usuarios/ci/GENERAR-AAB-PLAY-WINDOWS.ps1'
       - '.github/workflows/users-order-contract-qa.yml'
   push:
     branches: [main]
@@ -22,6 +25,9 @@ on:
       - 'tala-eats-usuarios/app/test/**'
       - 'tala-eats-usuarios/app/tools/native/MainActivity.java'
       - 'tala-eats-usuarios/ci/bootstrap_android.py'
+      - 'tala-eats-usuarios/ci/build_signed_play_bundle.py'
+      - 'tala-eats-usuarios/ci/test_signed_release_gate.py'
+      - 'tala-eats-usuarios/ci/GENERAR-AAB-PLAY-WINDOWS.ps1'
       - '.github/workflows/users-order-contract-qa.yml'
   workflow_dispatch:
 
@@ -43,7 +49,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Exigir tres recursos originales y SHA256
+      - name: Exigir cuatro recursos originales HD y SHA256
         run: python3 tala-eats-usuarios/ci/verify_landing_assets.py
 
   users-order-contract:
@@ -66,7 +72,7 @@ jobs:
         run: flutter pub get
       - name: Analisis estatico (sin APK)
         run: flutter analyze --no-fatal-infos
-      - name: Release Play preflight 1.0.38+49 (sin secretos ni publicacion)
+      - name: Release Play preflight 1.0.39+50 (sin secretos ni publicacion)
         run: |
           python3 ../ci/build_signed_play_bundle.py --check
           python3 -m unittest discover -s ../ci -p 'test_signed_release_gate.py' -v
@@ -78,6 +84,8 @@ jobs:
         run: flutter test --reporter=compact test/premium_discovery_polish_test.dart
       - name: Contraste AA de marca y botones (sin APK)
         run: flutter test --reporter=compact test/premium_brand_contrast_test.dart
+      - name: "RC2 Checkout: estados visuales y seleccion accesible"
+        run: flutter test --reporter=compact test/checkout_rc2_visual_test.dart
       - name: "UX compra: producto, carrito, checkout y pedidos 320-430 dp"
         run: flutter test --reporter=compact test/premium_purchase_responsive_test.dart
       - name: Android Back, offline y fallback de imagenes
@@ -135,7 +143,7 @@ jobs:
       - name: Adjuntar APK DEBUG privada para instalar y probar
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.38-RC0-APK-DEBUG-PRUEBAS
+          name: TALA-EATS-Usuarios-v1.0.39-RC2-APK-DEBUG-PRUEBAS
           path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7

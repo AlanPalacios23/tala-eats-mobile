@@ -494,7 +494,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   title: 'Pago',
                   child: AnimatedSwitcher(
                     duration: TalaMotion.of(context, TalaMotion.reveal),
-                    child: model.hasAvailablePaymentMethod
+                    child: refreshingPayment
+                        ? const PaymentCheckingCard(key: ValueKey<String>('checking'))
+                        : model.hasAvailablePaymentMethod
                         ? Column(
                             key: const ValueKey<String>('methods'),
                             children: <Widget>[
@@ -515,6 +517,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   selected: model.paymentMethod == 'stripe',
                                   onTap: () => model.setPaymentMethod('stripe'),
                                 ),
+                              const SizedBox(height: 12),
+                              const Row(
+                                children: <Widget>[
+                                  Icon(Icons.lock_outline_rounded, color: kGreen, size: 16),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'El total y el estado del pago los confirma el servidor.',
+                                      style: TextStyle(fontSize: 12, color: kInkSoft, height: 1.35),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           )
                         : PaymentUnavailableCard(key: const ValueKey<String>('off'), onRetry: refreshPaymentAvailability, loading: refreshingPayment),
@@ -536,7 +551,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
           bottomNavigationBar: BottomActionBar(
-            child: model.hasAvailablePaymentMethod
+            child: model.hasAvailablePaymentMethod && !refreshingPayment
                 ? FilledButton(
                     onPressed: placing || refreshingPayment ? null : submit,
                     child: BusyLabel(
@@ -551,7 +566,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     icon: refreshingPayment
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.refresh_rounded),
-                    label: const Text('Revisar métodos de pago'),
+                    label: Text(refreshingPayment
+                        ? 'Verificando métodos de pago…'
+                        : 'Revisar métodos de pago'),
                   ),
           ),
         );
@@ -679,6 +696,46 @@ class PremiumPaymentMethodCard extends StatelessWidget {
           ),
           const Icon(Icons.radio_button_checked_rounded, color: Color(0xFF1687D9)),
         ],
+      ),
+    );
+  }
+}
+
+class PaymentCheckingCard extends StatelessWidget {
+  const PaymentCheckingCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: kSoftPeach,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kLine),
+        ),
+        child: const Row(
+          children: <Widget>[
+            SizedBox(
+              height: 22, width: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.3),
+            ),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Verificando pagos disponibles',
+                    style: TextStyle(color: kInk, fontWeight: FontWeight.w800, fontSize: 14)),
+                  SizedBox(height: 3),
+                  Text('Un momento. Aún no se registrará ningún pedido.',
+                    style: TextStyle(color: kInkSoft, fontSize: 12, height: 1.35)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -870,32 +927,42 @@ class PaymentChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TalaCard(
-      onTap: onTap,
-      borderColor: selected ? kBrand : kLine,
-      color: selected ? kSoftPeach : Colors.white,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(color: selected ? kBrand : kSoftOrange, borderRadius: BorderRadius.circular(14)),
-            child: Icon(icon, color: selected ? Colors.white : kBrandDeep),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(title, style: TalaText.title.copyWith(fontSize: 15)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TalaText.caption),
-              ],
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: TalaCard(
+        onTap: onTap,
+        borderColor: selected ? kBrand : kLine,
+        color: selected ? kSoftPeach : Colors.white,
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: <Widget>[
+            AnimatedContainer(
+              duration: TalaMotion.of(context, TalaMotion.select),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: selected ? kBrand : kSoftOrange,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: selected ? Colors.white : kBrandDeep),
             ),
-          ),
-          Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? kBrand : kSubtle),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(title, style: TalaText.title.copyWith(fontSize: 15)),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: TalaText.caption),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+              color: selected ? kBrand : kSubtle),
+          ],
+        ),
       ),
     );
   }
