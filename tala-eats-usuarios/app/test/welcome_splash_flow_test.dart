@@ -83,22 +83,30 @@ void main() {
     tester.view.resetDevicePixelRatio();
   });
 
-  testWidgets('Google y celular no crean sesion falsa: avisan y ofrecen correo',
+  testWidgets('Google ofrece opciones honestas: registro propio o correo',
       (WidgetTester tester) async {
     int emails = 0;
+    int registrations = 0;
     await tester.pumpWidget(MaterialApp(
       home: TalaLoginMethodsScreen(
         onEmail: () => emails++,
+        onRegister: () => registrations++,
         onBack: () {},
       ),
     ));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey<String>('signInGoogle')));
-    await tester.pump();
-    expect(find.textContaining('todavía no está habilitado'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Google todavía no está conectado'), findsOneWidget);
     expect(emails, 0);
-    await tester.tap(find.text('Usar correo'));
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey<String>('createTalaAccount')));
+    await tester.pumpAndSettle();
+    expect(registrations, 1);
+    expect(emails, 0);
+    await tester.tap(find.byKey(const ValueKey<String>('signInGoogle')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('existingTalaAccount')));
+    await tester.pumpAndSettle();
     expect(emails, 1);
     await tester.pumpWidget(const SizedBox.shrink());
   });
