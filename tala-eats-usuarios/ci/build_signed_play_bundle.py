@@ -42,8 +42,10 @@ def check_source() -> None:
     assert "'package':'com.talaeats.app'" in bootstrap, "Paquete Android inesperado"
     assert (APP / "tools/native/MainActivity.java").is_file()
     assert (APP / "lib/customer_native_push.dart").is_file()
-    assert not list(ROOT.rglob("*.jks")), "No guardar claves en el repositorio"
-    assert not list(ROOT.rglob("*.keystore")), "No guardar claves en el repositorio"
+    # Reject all common private keystore formats (including Windows PKCS#12).
+    forbidden = {".jks", ".keystore", ".p12", ".pfx", ".pkcs12"}
+    assert not any(p.is_file() and p.suffix.lower() in forbidden
+                   for p in ROOT.rglob("*")), "No guardar claves en el repositorio"
     print("RELEASE_SOURCE_GATE_PASS: v1.0.39+50, paquete com.talaeats.app, sin llaves")
 
 
