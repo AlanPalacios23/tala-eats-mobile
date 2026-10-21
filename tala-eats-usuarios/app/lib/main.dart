@@ -476,6 +476,9 @@ class TalaModel extends ChangeNotifier {
       await refreshAll();
       await _recoverPersistedCheckout();
       _resumePush();
+      // The root AnimatedBuilder must learn about registration success,
+      // otherwise it can remain on the sign-up screen with an active token.
+      notifyListeners();
       return true;
     } on ApiException catch (e) {
       lastError = e.message;
