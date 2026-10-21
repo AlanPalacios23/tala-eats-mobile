@@ -880,6 +880,12 @@ class TalaModel extends ChangeNotifier {
   Future<OrderEntry> _placeOrderOnce() async {
     final int sessionRevision = _orderSessionRevision;
     try {
+    // Client-side defense in depth: NEVER send an unsupported payment method.
+    // Backend is the final authority for actual enabled methods and charges.
+    if (!isPaymentMethodEnabled(paymentMethod)) {
+      throw ApiException(409,
+        'No hay un método de pago disponible. Revisa los métodos antes de confirmar.');
+    }
     final Restaurant restaurant = cartRestaurant!;
     AddressEntry? address;
     if (deliveryMode == 'delivery') {
