@@ -103,9 +103,9 @@ class _LoginEmailButton extends StatelessWidget {
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(28),
-        child: const ConstrainedBox(
-          constraints: BoxConstraints(minHeight: 64),
-          child: Padding(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
+          child: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             child: Row(
               children: <Widget>[
