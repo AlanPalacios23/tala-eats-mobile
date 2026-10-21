@@ -1,17 +1,26 @@
-# Tala Eats · bienvenida fotografica
+# TALA EATS Usuarios · v1.0.33+44 · tres pantallas originales
 
-Estos 3 recursos son propiedad visual entregada por el responsable de TALA EATS.
+Los cuatro recursos se incluyen en el paquete de este cambio, pero **no
+están todavía en la rama**. Extraer el ZIP v1.0.33 en la raíz del repositorio
+sin renombrar archivos, validar con el gate y confirmar en un commit de GitHub.
 
-- `food_fiesta.webp`: primera fotografia gastronómica de referencia.
-- `food_tala.webp`: segunda fotografia gastronómica de referencia.
-- `tala_eats_original_wordmark.png`: lettering exacto naranja-rosa del splash blanco.
+## Recursos obligatorios
+- `tala_eats_original_wordmark.png`: logotipo y eslogan de la pantalla splash blanca, conservando la identidad ya aprobada.
+- `food_tala.webp`: **imagen B**, mesa verde con comida, se muestra SOLAMENTE en bienvenida.
+- `tala_eats_wordmark_transparent.png`: lettering naranja-rosa recortado SIN fondo blanco, sombras ni tarjeta; se superpone sobre la imagen B.
+- `food_fiesta.webp`: **imagen A**, fondo colorido, se muestra SOLO en selector de ingreso.
 
-La carpeta debe contener **los tres binarios** antes de fusionar la version 1.0.32.
-No utilizar fotos de stock diferentes, servicios remotos ni logo recreado.
+## Flujo validable
+Splash con entrada y salida animadas -> Bienvenida fija imagen B,
+título alineado a la izquierda y CTA Liquid Glass -> Selector imagen A,
+sin texto central, con botones Google, celular y correo.
 
-La version fuente del archivo principal es /mnt/data/1000253153.png,
-la segunda foto /mnt/data/1000253157.png y el nombre
-/mnt/data/1000253149.png (referencia cargada en el chat).
-El paquete externo conserva las versiones optimizadas y de pantalla real.
+El botón **correo** abre la autenticación real ya integrada.
+Los botones de Google y celular ofrecen mensaje no habilitado y acción
+para continuar por correo. Habilitar OAuth/OIDC y verificación telefónica
+requiere contrato real, configuración de proveedor y pruebas de seguridad.
 
-Los nombres estan referenciados en ui/welcome_screen.dart y main.dart.
+## QA
+`python3 tala-eats-usuarios/ci/verify_landing_assets.py`
+debe decir `4/4 PASS`. Si falta una imagen no se debe fusionar
+ni preparar AAB. El login no debe falsificar autenticación.
