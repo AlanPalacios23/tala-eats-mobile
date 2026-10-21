@@ -753,7 +753,9 @@ class PremiumAuthScaffold extends StatelessWidget {
           SafeArea(
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+              padding: liquidGlass
+                  ? const EdgeInsets.fromLTRB(14, 8, 14, 28)
+                  : const EdgeInsets.fromLTRB(20, 8, 20, 28),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 460),
@@ -807,7 +809,7 @@ class PremiumAuthScaffold extends StatelessWidget {
                             ? Theme(
                                 data: glassTheme,
                                 child: AuthGlassCard(
-                                  padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+                                  padding: const EdgeInsets.fromLTRB(14, 22, 14, 22),
                                   child: form,
                                 ),
                               )
