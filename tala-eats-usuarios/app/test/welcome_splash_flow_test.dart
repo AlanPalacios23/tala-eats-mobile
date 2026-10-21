@@ -35,6 +35,8 @@ void main() {
     expect(find.byKey(const ValueKey<String>('welcomeWordmark')), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('loginPhotoA')), findsNothing);
     expect(find.text('Bienvenido\na Tala Eats'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(
+      const ValueKey<String>('welcomeTitle'))).textAlign, TextAlign.center);
     expect(find.byType(BackdropFilter), findsOneWidget);
     final Finder button = find.byKey(const ValueKey<String>('talaWelcomeContinue'));
     await tester.tap(button);
@@ -64,6 +66,8 @@ void main() {
     ));
     await tester.pump();
     expect(find.byKey(const ValueKey<String>('loginPhotoA')), findsOneWidget);
+    expect(find.text('Un antojo,\nmil posibilidades.'), findsOneWidget);
+    expect(find.text('Tus sabores favoritos están más cerca.'), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('welcomePhotoB')), findsNothing);
     expect(find.byKey(const ValueKey<String>('welcomeWordmark')), findsNothing);
     expect(find.byKey(const ValueKey<String>('signInGoogle')), findsNothing);
