@@ -140,69 +140,69 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
     if (_consentOpen) return;
     _consentOpen = true;
     try {
-    bool acceptedTerms = false, acceptedPrivacy = false;
-    final bool? approved = await showModalBottomSheet<bool>(
-      context: context, useSafeArea: true, isScrollControlled: true,
-      showDragHandle: true, backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (BuildContext sheet) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter update) => Padding(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 26),
-          child: SingleChildScrollView(child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const Text('Términos y condiciones',
-                style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800,
-                  color: Colors.black)),
-              const SizedBox(height: 17),
-              const Divider(),
-              CheckboxListTile(
-                key: const ValueKey<String>('consentTerms'),
-                activeColor: kBrandDeep, contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: acceptedTerms,
-                onChanged: (bool? v) => update(() => acceptedTerms = v ?? false),
-                title: const Text('Acepto los Términos y Condiciones de TALA EATS.'),
-                subtitle: Align(alignment: Alignment.centerLeft, child: TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    premiumRoute(const TermsAndConditionsScreen())),
-                  child: const Text('Leer términos'),
-                )),
-              ),
-              CheckboxListTile(
-                key: const ValueKey<String>('consentPrivacy'),
-                activeColor: kBrandDeep, contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: acceptedPrivacy,
-                onChanged: (bool? v) => update(() => acceptedPrivacy = v ?? false),
-                title: const Text('Acepto el Aviso de Privacidad.'),
-                subtitle: Align(alignment: Alignment.centerLeft, child: TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    premiumRoute(PrivacyNoticeScreen(
-                      supportEmail: widget.model.supportEmail))),
-                  child: const Text('Leer aviso de privacidad'),
-                )),
-              ),
-              const SizedBox(height: 10),
-              FilledButton(
-                key: const ValueKey<String>('legalAccept'),
-                style: FilledButton.styleFrom(backgroundColor: kBrandDeep,
-                  minimumSize: const Size.fromHeight(56)),
-                onPressed: acceptedTerms && acceptedPrivacy
-                  ? () => Navigator.of(sheet).pop(true) : null,
-                child: const Text('Aceptar'),
-              ),
-            ],
-          )),
+      bool acceptedTerms = false, acceptedPrivacy = false;
+      final bool? approved = await showModalBottomSheet<bool>(
+        context: context, useSafeArea: true, isScrollControlled: true,
+        showDragHandle: true, backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        builder: (BuildContext sheet) => StatefulBuilder(
+          builder: (BuildContext context, StateSetter update) => Padding(
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 26),
+            child: SingleChildScrollView(child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Text('Términos y condiciones',
+                  style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800,
+                    color: Colors.black)),
+                const SizedBox(height: 17),
+                const Divider(),
+                CheckboxListTile(
+                  key: const ValueKey<String>('consentTerms'),
+                  activeColor: kBrandDeep, contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: acceptedTerms,
+                  onChanged: (bool? v) => update(() => acceptedTerms = v ?? false),
+                  title: const Text('Acepto los Términos y Condiciones de TALA EATS.'),
+                  subtitle: Align(alignment: Alignment.centerLeft, child: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      premiumRoute(const TermsAndConditionsScreen())),
+                    child: const Text('Leer términos'),
+                  )),
+                ),
+                CheckboxListTile(
+                  key: const ValueKey<String>('consentPrivacy'),
+                  activeColor: kBrandDeep, contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: acceptedPrivacy,
+                  onChanged: (bool? v) => update(() => acceptedPrivacy = v ?? false),
+                  title: const Text('Acepto el Aviso de Privacidad.'),
+                  subtitle: Align(alignment: Alignment.centerLeft, child: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      premiumRoute(PrivacyNoticeScreen(
+                        supportEmail: widget.model.supportEmail))),
+                    child: const Text('Leer aviso de privacidad'),
+                  )),
+                ),
+                const SizedBox(height: 10),
+                FilledButton(
+                  key: const ValueKey<String>('legalAccept'),
+                  style: FilledButton.styleFrom(backgroundColor: kBrandDeep,
+                    minimumSize: const Size.fromHeight(56)),
+                  onPressed: acceptedTerms && acceptedPrivacy
+                    ? () => Navigator.of(sheet).pop(true) : null,
+                  child: const Text('Aceptar'),
+                ),
+              ],
+            )),
+          ),
         ),
-      ),
-    );
-    if (!mounted || approved != true) return;
-    // Marketing preferences are intentionally absent until the backend
-    // can persist consent separately from mandatory terms and privacy.
-    await register();
+      );
+      if (!mounted || approved != true) return;
+      // Marketing preferences are intentionally absent until the backend
+      // can persist consent separately from mandatory terms and privacy.
+      await register();
     } finally {
       _consentOpen = false;
     }
