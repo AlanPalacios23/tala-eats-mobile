@@ -49,6 +49,24 @@ void main() {
     expect(CustomerNativePush.firebaseConfigured, isFalse);
   });
 
+  test('Notificaciones FCM: proyecto ajeno o ausente nunca habilita registro', () {
+    const config = <String, dynamic>{
+      'enabled': true, 'provider': 'fcm',
+      'project_id': 'tala-eats-correcto',
+    };
+    expect(CustomerNativePush.matchesServerProject(config,
+      configuredProjectId: 'tala-eats-otro'), false);
+    expect(CustomerNativePush.matchesServerProject(config,
+      configuredProjectId: 'tala-eats-correcto'), true);
+    expect(CustomerNativePush.matchesServerProject(<String, dynamic>{
+      'enabled': true, 'provider': 'fcm',
+    }, configuredProjectId: 'tala-eats-correcto'), false);
+    expect(CustomerNativePush.matchesServerProject(<String, dynamic>{
+      'enabled': false, 'provider': 'fcm',
+      'project_id': 'tala-eats-correcto',
+    }, configuredProjectId: 'tala-eats-correcto'), false);
+  });
+
   test('FCM config and register customer-only, Android-only', () async {
     final api = _PushApi();
     final config = await api.customerPushConfig();
