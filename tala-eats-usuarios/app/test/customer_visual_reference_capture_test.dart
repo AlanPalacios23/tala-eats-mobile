@@ -172,6 +172,8 @@ void main() {
       '07_account_mock_390.png': AccountScreen(model: m),
       '10_login_mock_390.png': LoginScreen(model: m),
       '11_signup_mock_390.png': SignUpScreen(model: m),
+      '12_welcome_mock_390.png': TalaWelcomeScreen(onContinue: () {}),
+      '13_splash_mock_390.png': const LaunchScreen(),
     };
     for (final MapEntry<String, Widget> page in pages.entries) {
       await snapshot(tester, page.value, page.key);
