@@ -300,6 +300,8 @@ class TalaModel extends ChangeNotifier {
   bool cashPayments = false;
   bool mercadoPagoPayments = false;
   bool stripePayments = false;
+  bool paymentMethodsVerified = false;
+  int _paymentMethodsRequestEpoch = 0;
   String paymentMethod = 'cash';
   // Configuracion comercial de solo lectura recibida del backend.
   CheckoutPricingPolicy? customerPricingPolicy;
@@ -509,6 +511,8 @@ class TalaModel extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    ++_paymentMethodsRequestEpoch;
+    _invalidatePaymentMethods();
     _orderSessionRevision++;
     _activePlaceOrder = null;
     _orderSubmissionGuard.clearAfterConfirmedResolution();
@@ -741,9 +745,11 @@ class TalaModel extends ChangeNotifier {
   void setTip(double value) { tip = value; notifyListeners(); }
   void setCoupon(String value) { coupon = value.trim(); notifyListeners(); }
 
-  bool get hasAvailablePaymentMethod => cashPayments || stripePayments;
+  bool get hasAvailablePaymentMethod =>
+      paymentMethodsVerified && (cashPayments || stripePayments);
 
   bool isPaymentMethodEnabled(String value) {
+    if (!paymentMethodsVerified) return false;
     if (value == 'cash') return cashPayments;
     // RC0 accepts cash and Stripe for NEW orders; keep MP only for legacy history.
     if (value == 'mercadopago') return false;
@@ -757,40 +763,60 @@ class TalaModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Every refresh invalidates cached methods before network IO. Do not
+  /// expose a previously enabled option when the backend is unreachable.
+  void _invalidatePaymentMethods() {
+    paymentMethodsVerified = false;
+    cashPayments = false;
+    mercadoPagoPayments = false;
+    stripePayments = false;
+    onlinePayments = false;
+    paymentMethod = '';
+    customerPricingPolicy = null;
+    notifyListeners();
+  }
+
   Future<void> refreshPaymentMethods() async {
-    final dynamic raw = await api.get('/orders/payment-methods');
-    if (raw is! Map) throw ApiException(502, 'El servidor no devolvió métodos de pago válidos.');
-    final dynamic rows = raw['methods'];
-    bool cash = false;
-    bool stripe = false;
-    if (rows is List) {
-      for (final dynamic value in rows) {
-        if (value is! Map) continue;
-        final String id = (value['id'] ?? '').toString();
-        final bool enabled = value['enabled'] == true;
+    final int requestEpoch = ++_paymentMethodsRequestEpoch;
+    final String previouslySelected = paymentMethod;
+    _invalidatePaymentMethods();
+    try {
+      final dynamic raw = await api.get('/orders/payment-methods');
+      // A slower older request must not overwrite newer data (or logout).
+      if (requestEpoch != _paymentMethodsRequestEpoch) return;
+      if (raw is! Map || raw['methods'] is! List) {
+        throw ApiException(502,
+          'El servidor no devolvió métodos de pago válidos.');
+      }
+      bool cash = false;
+      bool stripe = false;
+      for (final dynamic row in raw['methods'] as List) {
+        if (row is! Map) continue;
+        final String id = (row['id'] ?? '').toString();
+        final bool enabled = row['enabled'] == true;
         if (id == 'cash') cash = enabled;
         if (id == 'stripe') stripe = enabled;
       }
-    }
-    // Nunca usar constantes 7%/$39 como fuente de cobro: la API expone
-    // parametros comerciales configurables, y el pedido final lo determina Kali.
-    customerPricingPolicy = CheckoutPricingPolicy.fromPaymentMethods(raw);
-    cashPayments = cash;
-    mercadoPagoPayments = false;
-    stripePayments = stripe;
-    onlinePayments = stripe;
-    if (!isPaymentMethodEnabled(paymentMethod)) {
-      if (stripePayments) {
+      // Pricing remains a reference only; the backend owns final charges.
+      customerPricingPolicy = CheckoutPricingPolicy.fromPaymentMethods(raw);
+      cashPayments = cash;
+      stripePayments = stripe;
+      onlinePayments = stripe;
+      mercadoPagoPayments = false; // Legacy history only, never new orders.
+      paymentMethodsVerified = true;
+      if (isPaymentMethodEnabled(previouslySelected)) {
+        paymentMethod = previouslySelected;
+      } else if (stripe) {
         paymentMethod = 'stripe';
-      } else if (cashPayments) {
+      } else if (cash) {
         paymentMethod = 'cash';
       }
+      notifyListeners();
+    } catch (_) {
+      // Request begins fail-closed, including unexpected malformed payloads.
+      if (requestEpoch != _paymentMethodsRequestEpoch) return;
+      rethrow;
     }
-    if (!hasAvailablePaymentMethod) {
-      // Do not keep a stale enabled payment method across server config changes.
-      paymentMethod = '';
-    }
-    notifyListeners();
   }
   void setAddress(int index) { if (index >= 0 && index < addresses.length) { selectedAddress = index; notifyListeners(); } }
 
