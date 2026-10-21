@@ -7,26 +7,67 @@ class TalaLoginMethodsScreen extends StatelessWidget {
     super.key,
     required this.onEmail,
     required this.onBack,
+    this.onRegister,
   });
 
   final VoidCallback onEmail;
   final VoidCallback onBack;
+  final VoidCallback? onRegister;
 
   void _unsupported(BuildContext context, String provider) {
     HapticFeedback.selectionClick();
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'El acceso con $provider todavía no está habilitado. '
-          'Puedes continuar con tu correo.',
-        ),
+    if (provider != 'Google') {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text(
+          'El acceso por celular aún no está disponible. '
+          'Puedes entrar o crear tu cuenta con correo.'),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: 'Usar correo',
-          onPressed: onEmail,
-        ),
+        action: SnackBarAction(label: 'Correo', onPressed: onEmail),
+      ));
+      return;
+    }
+    // Critical security boundary: never imitate Google OAuth. The existing
+    // backend accepts only an independent Tala Eats password.
+    showModalBottomSheet<void>(
+      context: context, useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (BuildContext sheet) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        child: Column(mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+          const Text('Acceso a TALA EATS',
+            style: TextStyle(fontSize: 25, color: Colors.black,
+              fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          const Text(
+            'El inicio de sesión con Google todavía no está conectado. '
+            'Puedes crear una cuenta de TALA EATS con tu correo, '
+            'usando una contraseña nueva, distinta de la de Google.',
+            style: TextStyle(fontSize: 15, height: 1.45)),
+          const SizedBox(height: 18),
+          FilledButton(
+            key: const ValueKey<String>('createTalaAccount'),
+            style: FilledButton.styleFrom(
+              backgroundColor: kBrandDeep, minimumSize: const Size.fromHeight(56)),
+            onPressed: () {
+              Navigator.of(sheet).pop();
+              (onRegister ?? onEmail)();
+            },
+            child: const Text('Crear cuenta TALA EATS'),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            key: const ValueKey<String>('existingTalaAccount'),
+            onPressed: () {
+              Navigator.of(sheet).pop();
+              onEmail();
+            },
+            child: const Text('Ya tengo cuenta: iniciar sesión'),
+          ),
+        ]),
       ),
     );
   }
