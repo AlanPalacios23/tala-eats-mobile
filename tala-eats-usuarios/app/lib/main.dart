@@ -1504,17 +1504,28 @@ class _LaunchScreenState extends State<LaunchScreen>
 
   Widget _originalWordmark() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 42),
-      child: Image.asset(
-        'assets/landing/tala_eats_original_wordmark.png',
-        fit: BoxFit.contain,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: SizedBox(
         width: 350,
+        height: 156,
+        child: ClipRect(
+          // The user-provided image contains a white poster and a slogan.
+          // Center-cropping it displays only the ORIGINAL orange/pink
+          // lettering, keeping the bottom tagline as separate readable text.
+          child: Image.asset(
+        'assets/landing/tala_eats_original_wordmark.png',
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        width: 350,
+        height: 156,
         semanticLabel: 'Tala Eats',
         errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
           return const Text('Tala Eats',
               style: TextStyle(color: kBrandDeep, fontSize: 36,
                   fontWeight: FontWeight.w800));
         },
+          ),
+        ),
       ),
     );
   }
