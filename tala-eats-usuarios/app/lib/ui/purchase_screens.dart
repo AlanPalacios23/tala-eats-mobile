@@ -207,6 +207,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> refreshPaymentAvailability() async {
+    if (refreshingPayment || placing) return;
     setState(() {
       refreshingPayment = true;
       error = '';
@@ -215,6 +216,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await widget.model.refreshPaymentMethods();
     } on ApiException catch (e) {
       if (mounted) error = e.message;
+    } catch (_) {
+      if (mounted) error = 'No logramos verificar los métodos de pago. Intenta de nuevo.';
     }
     if (!mounted) return;
     setState(() {
@@ -226,6 +229,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> submit() async {
+    // A cached payment method must never authorize an order while rechecking.
+    if (placing || refreshingPayment) return;
     final TalaModel model = widget.model;
     if (model.deliveryMode == 'delivery' && model.addresses.isEmpty) {
       HapticFeedback.mediumImpact();
@@ -242,6 +247,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
     try {
       final String selectedMethod = model.paymentMethod;
+      // A delayed or changed backend capability must not convert Stripe
+      // into cash implicitly, or authorize a previously disabled method.
+      await model.verifyCheckoutPaymentMethod(selectedMethod);
       final OrderEntry order = await model.placeOrder();
       if (!mounted) return;
       if (selectedMethod == 'cash') {
@@ -530,7 +538,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           bottomNavigationBar: BottomActionBar(
             child: model.hasAvailablePaymentMethod
                 ? FilledButton(
-                    onPressed: placing ? null : submit,
+                    onPressed: placing || refreshingPayment ? null : submit,
                     child: BusyLabel(
                       busy: placing,
                       label: model.paymentMethod == 'cash'
