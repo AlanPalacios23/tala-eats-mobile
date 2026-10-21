@@ -18,6 +18,7 @@ void main() {
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNull);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput0')), 'María');
+    await tester.pump();
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
       reason: 'El dato escrito debe habilitar la flecha');
@@ -25,6 +26,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('¿Cuál es tu apellido?'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput1')), 'López');
+    await tester.pump();
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
       reason: 'El dato escrito debe habilitar la flecha');
@@ -33,6 +35,7 @@ void main() {
     expect(find.text('Por último, agrega tu\ncorreo electrónico'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput2')),
       'maria@example.com');
+    await tester.pump();
     expect(tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('stepNext'))).onPressed, isNotNull,
       reason: 'El dato escrito debe habilitar la flecha');
@@ -40,6 +43,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Crea tu contraseña\nde TALA EATS'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('stepInput3')), 'Segura123');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey<String>('stepNext')));
     await tester.pumpAndSettle();
     expect(find.text('Términos y condiciones'), findsOneWidget);
