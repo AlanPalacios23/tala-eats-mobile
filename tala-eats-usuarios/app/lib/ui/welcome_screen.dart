@@ -45,9 +45,16 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
   Widget build(BuildContext context) {
     final double top = MediaQuery.paddingOf(context).top;
     final double bottom = MediaQuery.paddingOf(context).bottom;
-    return Scaffold(
-      backgroundColor: const Color(0xFF17120F),
-      body: Stack(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF17120F),
+        body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
           // Cover fills the entire screen, including behind the status bar.
@@ -254,6 +261,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
