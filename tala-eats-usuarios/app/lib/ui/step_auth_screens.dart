@@ -312,10 +312,45 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
                   ),
                 ],
                 if (error.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(error, key: const ValueKey<String>('stepError'),
-                    style: const TextStyle(
-                      color: Color(0xFFC62828), fontSize: 14)),
+                  const SizedBox(height: 20),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(15, 15, 15, 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF4F0),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFFDCD0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            const Icon(Icons.cloud_off_outlined,
+                              color: Color(0xFFB83B14), size: 20),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(error,
+                                key: const ValueKey<String>('stepError'),
+                                style: const TextStyle(
+                                  color: Color(0xFF873013),
+                                  fontSize: 13, height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (passwordStep && !signup)
+                          TextButton.icon(
+                            key: const ValueKey<String>('retrySignIn'),
+                            onPressed: valid && !busy ? signIn : null,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Volver a intentar'),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
                 if (step == 0) ...<Widget>[
                   const SizedBox(height: 18),
