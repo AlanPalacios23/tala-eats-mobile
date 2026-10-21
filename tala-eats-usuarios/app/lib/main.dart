@@ -741,11 +741,12 @@ class TalaModel extends ChangeNotifier {
   void setTip(double value) { tip = value; notifyListeners(); }
   void setCoupon(String value) { coupon = value.trim(); notifyListeners(); }
 
-  bool get hasAvailablePaymentMethod => cashPayments || mercadoPagoPayments || stripePayments;
+  bool get hasAvailablePaymentMethod => cashPayments || stripePayments;
 
   bool isPaymentMethodEnabled(String value) {
     if (value == 'cash') return cashPayments;
-    if (value == 'mercadopago') return mercadoPagoPayments;
+    // RC0 accepts cash and Stripe for NEW orders; keep MP only for legacy history.
+    if (value == 'mercadopago') return false;
     if (value == 'stripe') return stripePayments;
     return false;
   }
@@ -761,7 +762,6 @@ class TalaModel extends ChangeNotifier {
     if (raw is! Map) throw ApiException(502, 'El servidor no devolvió métodos de pago válidos.');
     final dynamic rows = raw['methods'];
     bool cash = false;
-    bool mp = false;
     bool stripe = false;
     if (rows is List) {
       for (final dynamic value in rows) {
@@ -769,7 +769,6 @@ class TalaModel extends ChangeNotifier {
         final String id = (value['id'] ?? '').toString();
         final bool enabled = value['enabled'] == true;
         if (id == 'cash') cash = enabled;
-        if (id == 'mercadopago') mp = enabled;
         if (id == 'stripe') stripe = enabled;
       }
     }
@@ -777,17 +776,19 @@ class TalaModel extends ChangeNotifier {
     // parametros comerciales configurables, y el pedido final lo determina Kali.
     customerPricingPolicy = CheckoutPricingPolicy.fromPaymentMethods(raw);
     cashPayments = cash;
-    mercadoPagoPayments = mp;
+    mercadoPagoPayments = false;
     stripePayments = stripe;
-    onlinePayments = mp || stripe;
+    onlinePayments = stripe;
     if (!isPaymentMethodEnabled(paymentMethod)) {
       if (stripePayments) {
         paymentMethod = 'stripe';
-      } else if (mercadoPagoPayments) {
-        paymentMethod = 'mercadopago';
       } else if (cashPayments) {
         paymentMethod = 'cash';
       }
+    }
+    if (!hasAvailablePaymentMethod) {
+      // Do not keep a stale enabled payment method across server config changes.
+      paymentMethod = '';
     }
     notifyListeners();
   }
