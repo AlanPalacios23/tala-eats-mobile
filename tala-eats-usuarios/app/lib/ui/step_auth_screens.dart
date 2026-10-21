@@ -135,7 +135,7 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
   }
 
   Future<void> showConsent() async {
-    bool acceptedTerms = false, acceptedPrivacy = false, promotions = false;
+    bool acceptedTerms = false, acceptedPrivacy = false;
     final bool? approved = await showModalBottomSheet<bool>(
       context: context, useSafeArea: true, isScrollControlled: true,
       showDragHandle: true, backgroundColor: Colors.white,
@@ -180,14 +180,6 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
                   child: const Text('Leer aviso de privacidad'),
                 )),
               ),
-              CheckboxListTile(
-                key: const ValueKey<String>('consentPromotions'),
-                activeColor: kBrandDeep, contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: promotions,
-                onChanged: (bool? v) => update(() => promotions = v ?? false),
-                title: const Text('Quiero recibir promociones (opcional).'),
-              ),
               const SizedBox(height: 10),
               FilledButton(
                 key: const ValueKey<String>('legalAccept'),
@@ -203,8 +195,8 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
       ),
     );
     if (!mounted || approved != true) return;
-    // Marketing preference is never sent: current backend has no consent field.
-    // Never claim promotions are subscribed from a frontend-only checkbox.
+    // Marketing preferences are intentionally absent until the backend
+    // can persist consent separately from mandatory terms and privacy.
     await register();
   }
 
