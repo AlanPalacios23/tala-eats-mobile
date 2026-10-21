@@ -95,7 +95,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                                   ),
                                   SizedBox(height: compact ? 20 : 28),
                                   Text(
-                                    'Bienvenido\\na Tala Eats',
+                                    'Bienvenido\na Tala Eats',
                                     key: const ValueKey<String>('welcomeTitle'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
@@ -108,7 +108,7 @@ class _TalaWelcomeScreenState extends State<TalaWelcomeScreen> {
                                   ),
                                   const SizedBox(height: 14),
                                   Text(
-                                    'Tus platillos favoritos,\\nmás cerca de ti.',
+                                    'Tus platillos favoritos,\nmás cerca de ti.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: Colors.white,
