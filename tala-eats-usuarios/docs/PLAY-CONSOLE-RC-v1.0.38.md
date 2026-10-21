@@ -26,6 +26,20 @@ Este RC0 es una *candidata de integración*, no una versión autorizada para pro
 - [x] Pruebas sin backend real para 503, respuesta inválida, recuperación y carrera de solicitudes.
 - [ ] Repetir suite Flutter, seguridad Android y compilación APK debug de esta rama; conservar el bloqueo de imágenes originales.
 
+## RC2 — Visual checkout y preparación de Play AAB
+
+El trabajo más reciente de **v1.0.39+50** vive en la rama RC2 apilada sobre RC1. Este archivo conserva el registro histórico RC0/RC1.
+
+- [x] Estados visuales separados, sin afirmar disponibilidad al usuario mientras se consulta la API: verificando → Stripe/efectivo → no disponible, con reintento y microcopy claro.
+- [x] Selección de pago destacada y accesible, con animación que respeta Reduce Motion, iconografía sutil y nota de validación de montos por el servidor.
+- [x] Revisión de formato de salida Google Play: `com.talaeats.app`, `1.0.39+50`, SDK 36, `.aab` local firmado con upload key, no debug APK.
+- [x] Control extra: descarta bundles previos, comprueba estructura de ZIP AAB, manifest, recursos Flutter y binarios ARM64 antes de afirmar `SIGNED_AAB_PASS`.
+- [x] Asistente Windows `ci/GENERAR-AAB-PLAY-WINDOWS.ps1`: crea o selecciona upload key fuera de GitHub, pide contraseñas ocultas, quita variables al terminar. **No genera AAB sin los cuatro recursos originales.**
+- [x] Borrador de ficha es-MX con copy e indicaciones de imágenes reales: `docs/PLAY-CONSOLE-FICHA-RC2-ES-MX.md`.
+- [ ] CI de esta rama: suite Flutter, revisión visual, pruebas de formato AAB y APK debug deben concluir en PASS.
+- [ ] Release gate de los cuatro recursos HD originales debe concluir PASS antes de intentar firma.
+- [ ] Verificar el AAB real con bundletool/Play Console y 16 KB de páginas de memoria; las pruebas ZIP no prueban esta compatibilidad.
+
 ## B. Bloqueos estrictos hasta producción
 
 | Bloqueo | Estado / evidencia necesaria |
