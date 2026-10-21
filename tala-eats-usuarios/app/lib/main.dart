@@ -15,6 +15,7 @@ part 'ui/design_system.dart';
 part 'ui/auth_screens.dart';
 part 'ui/welcome_screen.dart';
 part 'ui/login_methods_screen.dart';
+part 'ui/step_auth_screens.dart';
 part 'ui/discovery_screens.dart';
 part 'ui/purchase_screens.dart';
 part 'ui/order_screens.dart';
@@ -1306,6 +1307,7 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
   // exercise the existing authentication screens without a network backend.
   bool welcomeDismissed = false;
   bool emailLoginSelected = false;
+  bool registrationSelected = false;
 
   @override
   void initState() {
@@ -1354,16 +1356,25 @@ class _TalaEatsAppState extends State<TalaEatsApp> {
               stage = 'methods';
               screen = TalaLoginMethodsScreen(
                 onBack: () => setState(() => welcomeDismissed = false),
-                onEmail: () => setState(() => emailLoginSelected = true),
+                onEmail: () => setState(() {
+                  registrationSelected = false;
+                  emailLoginSelected = true;
+                }),
+                onRegister: () => setState(() {
+                  registrationSelected = true;
+                  emailLoginSelected = true;
+                }),
               );
             } else {
               stage = 'login';
-              screen = LoginScreen(
-                model: model,
-                onBackToWelcome: widget.testMode
-                    ? null
-                    : () => setState(() => emailLoginSelected = false),
-              );
+              screen = widget.testMode
+                  ? LoginScreen(model: model)
+                  : TalaStepAuthScreen(
+                      model: model,
+                      initialMode: registrationSelected
+                          ? TalaEmailMode.signUp : TalaEmailMode.signIn,
+                      onBack: () => setState(() => emailLoginSelected = false),
+                    );
             }
           } else {
             stage = 'shell';
