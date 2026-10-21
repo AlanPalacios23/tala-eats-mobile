@@ -498,16 +498,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   selected: model.paymentMethod == 'cash',
                                   onTap: () => model.setPaymentMethod('cash'),
                                 ),
-                              if (model.cashPayments && (model.mercadoPagoPayments || model.stripePayments)) const SizedBox(height: 10),
-                              if (model.mercadoPagoPayments)
-                                PaymentChoiceCard(
-                                  icon: Icons.account_balance_wallet_outlined,
-                                  title: 'Mercado Pago',
-                                  subtitle: 'Pago en línea protegido',
-                                  selected: model.paymentMethod == 'mercadopago',
-                                  onTap: () => model.setPaymentMethod('mercadopago'),
-                                ),
-                              if (model.mercadoPagoPayments && model.stripePayments) const SizedBox(height: 10),
+                              if (model.cashPayments && model.stripePayments) const SizedBox(height: 10),
                               if (model.stripePayments)
                                 PaymentChoiceCard(
                                   icon: Platform.isIOS ? Icons.apple_rounded : Icons.g_mobiledata_rounded,
@@ -544,9 +535,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       busy: placing,
                       label: model.paymentMethod == 'cash'
                           ? 'Confirmar pedido'
-                          : model.paymentMethod == 'stripe'
-                              ? 'Continuar a pago con Stripe'
-                              : 'Continuar a Mercado Pago',
+                          : 'Continuar a pago con Stripe',
                     ),
                   )
                 : OutlinedButton.icon(
@@ -710,9 +699,9 @@ class PaymentUnavailableCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Pago en línea no disponible por ahora', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
+                    Text('No hay métodos de pago disponibles', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kInk)),
                     SizedBox(height: 4),
-                    Text('No se hará ningún cargo. Intenta de nuevo cuando el servidor vuelva a ofrecer un método disponible.', style: TextStyle(color: kInkSoft, fontSize: 13, height: 1.4)),
+                    Text('No se confirmará ningún pedido ni se hará un cargo hasta que el servidor habilite Stripe o efectivo. Intenta nuevamente.', style: TextStyle(color: kInkSoft, fontSize: 13, height: 1.4)),
                   ],
                 ),
               ),
