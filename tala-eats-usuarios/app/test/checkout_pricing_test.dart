@@ -6,7 +6,7 @@ import 'package:talaeats_users/production_api.dart';
 
 class _BackendPolicyApi extends TalaApi {
   _BackendPolicyApi(this.response);
-  final Map<String, dynamic> response;
+  Map<String, dynamic> response;
   @override
   Future<dynamic> get(String path) async {
     if (path == '/orders/payment-methods') return response;
@@ -115,6 +115,32 @@ void main() {
     expect(model.paymentMethod, isEmpty);
     await expectLater(model.placeOrder(),
       throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)));
+    model.dispose();
+  });
+
+  test('RC0: si servidor deshabilita Stripe y efectivo se borra selección obsoleta', () async {
+    final api = _BackendPolicyApi(<String, dynamic>{
+      'methods': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 'cash', 'enabled': true},
+        <String, dynamic>{'id': 'stripe', 'enabled': true},
+      ],
+    });
+    final model = TalaModel(apiClient: api);
+    await model.refreshPaymentMethods();
+    model.setPaymentMethod('stripe');
+    expect(model.paymentMethod, 'stripe');
+
+    api.response = <String, dynamic>{
+      'methods': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 'cash', 'enabled': false},
+        <String, dynamic>{'id': 'stripe', 'enabled': false},
+        <String, dynamic>{'id': 'mercadopago', 'enabled': true},
+      ],
+    };
+    await model.refreshPaymentMethods();
+    expect(model.hasAvailablePaymentMethod, false);
+    expect(model.paymentMethod, isEmpty);
+    expect(model.isPaymentMethodEnabled('mercadopago'), false);
     model.dispose();
   });
 
