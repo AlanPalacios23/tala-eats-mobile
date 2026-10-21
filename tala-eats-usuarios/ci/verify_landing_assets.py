@@ -25,6 +25,10 @@ EXPECTED = {
         "9c4468e976b0660fd56177d7f2e49b9d3f4ea294018a6501a5dd42c42300f17d",
         50_000,
     ),
+    "tala_eats_wordmark_transparent.png": (
+        "b8255a65439392074172c0d934fcfcd455c556d82da5854deb04f6686b7327a2",
+        70_000,
+    ),
 }
 
 
@@ -41,6 +45,8 @@ def validate(name: str, expected_hash: str, minimum_size: int) -> None:
         w, h = struct.unpack(">II", data[16:24])
         if w < 400 or h < 100:
             raise ValueError(f"Dimensiones de logo incorrectas: {w}x{h}")
+        if name == "tala_eats_wordmark_transparent.png" and data[25] != 6:
+            raise ValueError("La bienvenida requiere letras PNG RGBA transparentes")
     else:
         if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
             raise ValueError(f"WEBP dañado: {name}")
@@ -67,12 +73,12 @@ def main() -> int:
     if failures:
         print(
             "\nBLOQUEADO: los fallbacks visuales no son material de lanzamiento. "
-            "Extrae los tres archivos del ZIP de recursos y súbelos a "
+            "Extrae los cuatro archivos del ZIP de recursos y súbelos a "
             "tala-eats-usuarios/app/assets/landing/ de la rama del PR.",
             file=sys.stderr,
         )
         return 1
-    print("TALA EATS landing media: 3/3 PASS")
+    print("TALA EATS landing media: 4/4 PASS")
     return 0
 
 
