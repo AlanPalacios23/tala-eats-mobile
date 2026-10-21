@@ -71,6 +71,12 @@ class PlayReleaseGateTest(unittest.TestCase):
         self.assertIn("BUNDLE.unlink()", source)
         self.assertIn("verify_aab_structure(BUNDLE)", source)
 
+    def test_preflight_blocks_private_pkcs12_inside_repository(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        for extension in (".p12", ".pfx", ".pkcs12", ".jks", ".keystore"):
+            self.assertIn(extension, source)
+        self.assertIn("No guardar claves en el repositorio", source)
+
     def test_release_signing_must_not_fallback_to_debug(self):
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertIn('signingConfigs.getByName("talaUpload")', text)
