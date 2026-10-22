@@ -33,7 +33,11 @@ jobs:
           cache: true
       - name: Generar proyecto Android independiente
         working-directory: tala-eats-admin/app
-        run: flutter create --platforms=android --project-name talaeats_admin --org com.talaeats .
+        run: |
+          flutter create --platforms=android --project-name talaeats_admin --org com.talaeats .
+          # Flutter crea un test demo que intenta instanciar MyApp (no existe).
+          # Solo se elimina el archivo generado; nuestros tests se conservan.
+          rm -f test/widget_test.dart
       - name: Dependencias
         working-directory: tala-eats-admin/app
         run: flutter pub get
