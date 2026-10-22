@@ -1577,10 +1577,10 @@ class _LaunchScreenState extends State<LaunchScreen>
               bottom: 58,
               child: FadeTransition(
                 opacity: _subtitle,
-                child: const Column(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text(
+                    const Text(
                       'Pide, disfruta y repite.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
