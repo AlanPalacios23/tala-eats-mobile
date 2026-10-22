@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - feat/admin-mobile-mvp-20261020
+      - feat/admin-v0.1.1-auth-qa-20261022
     paths:
       - 'tala-eats-admin/**'
       - '.github/workflows/admin-android-qa.yml'
