@@ -1415,9 +1415,13 @@ class _SupportScreenState extends State<SupportScreen> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent,
-        duration: TalaMotion.of(context, const Duration(milliseconds: 260)),
-        curve: TalaMotion.ease);
+      if (TalaMotion.reduced(context)) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      } else {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 260),
+          curve: TalaMotion.ease);
+      }
     });
   }
 
