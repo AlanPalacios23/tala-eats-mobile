@@ -17,7 +17,7 @@ import verify_play_store_media as listing
 def review() -> dict[str, object]:
     result: dict[str, object] = {
         "application": "Tala Eats Usuarios",
-        "release": "1.0.41+52",
+        "release": "1.0.42+53",
         "package": "com.talaeats.app",
         "target_api_expected": 36,
         "source": "BLOCKED",
@@ -73,9 +73,9 @@ def main() -> int:
     report = review()
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if report["offline_assets_ready"]:
-        print("RC4_OFFLINE_ASSETS_PASS; publicación pendiente de E2E y Play", file=sys.stderr)
+        print("RC5_OFFLINE_ASSETS_PASS; publicación pendiente de E2E y Play", file=sys.stderr)
         return 0
-    print("RC4_OFFLINE_ASSETS_BLOCKED: faltan recursos; NO PUBLICAR", file=sys.stderr)
+    print("RC5_OFFLINE_ASSETS_BLOCKED: faltan recursos; NO PUBLICAR", file=sys.stderr)
     return 2
 
 
