@@ -5,6 +5,7 @@ import importlib.util
 import tempfile
 import zipfile
 import subprocess
+import struct
 import sys
 import unittest
 
@@ -65,6 +66,33 @@ class PlayReleaseGateTest(unittest.TestCase):
             with zipfile.ZipFile(path, "a") as out:
                 out.writestr("base/lib/arm64-v8a/libapp.so", b"fake-so-for-structure-test")
             module.verify_aab_structure(path)
+
+    def test_arm64_elf_load_segments_require_16kb_alignment(self):
+        spec = importlib.util.spec_from_file_location("tala_play_bundle", SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        def fixture(align):
+            elf = bytearray(128)
+            elf[:4] = bytes((127, 69, 76, 70))  # ELF magic
+            elf[4] = 2  # ELF64
+            elf[5] = 1  # little endian
+            struct.pack_into("<Q", elf, 32, 64)  # e_phoff
+            struct.pack_into("<H", elf, 54, 56)  # e_phentsize
+            struct.pack_into("<H", elf, 56, 1)   # e_phnum
+            struct.pack_into("<I", elf, 64, 1)   # PT_LOAD
+            struct.pack_into("<Q", elf, 112, align)
+            return elf
+
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "app-release.aab"
+            with zipfile.ZipFile(path, "w") as out:
+                out.writestr("base/lib/arm64-v8a/libapp.so", fixture(4096))
+            with self.assertRaisesRegex(RuntimeError, "16 KB"):
+                module.verify_arm64_native_alignment(path)
+            with zipfile.ZipFile(path, "w") as out:
+                out.writestr("base/lib/arm64-v8a/libapp.so", fixture(16384))
+            module.verify_arm64_native_alignment(path)
 
     def test_release_build_always_removes_stale_output(self):
         source = SCRIPT.read_text(encoding="utf-8")
