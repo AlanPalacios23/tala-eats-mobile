@@ -1,4 +1,4 @@
-# Tala Eats ADMIN · Flutter independiente (MVP 0.1.2 en revisión)
+# Tala Eats ADMIN · Flutter independiente (MVP 0.1.3 (QA Node RC6) en revisión)
 
 Cuarta app del monorepo, separada de Usuarios / Restaurante / Repartidor y del portal ADMIN web ya existente. Consume exclusivamente el backend compartido de Tala Eats. **No introduce un servidor ni una base de datos nuevos.**
 
@@ -26,9 +26,9 @@ flutter analyze
 flutter test
 flutter run --dart-define=TALAEATS_ADMIN_API_BASE_URL=https://SU-GATEWAY-STAGING/api/v1
 ```
-Se permite `http://10.0.2.2` únicamente en builds DEBUG del emulador. En dispositivos reales es obligatorio HTTPS con certificado válido. El Node actual se publica solo en loopback de Kali y **no** se debe abrir a Internet sin un gateway administrativo autenticado/seguro.
+Se permite `http://10.0.2.2` únicamente en builds DEBUG del emulador. En dispositivos reales es obligatorio HTTPS con certificado válido. El release Node RC6 en Kali escucha en loopback 127.0.0.1:18190 y el dominio HTTPS público de Tala Eats se redirigió a él mediante Cloudflare Tunnel (según documentación operativa del 22/oct/2026). No abrir el puerto directamente a Internet.
 
-Backend verificado contra `node-backend/src/app.ts`, `src/auth/routes.ts` y `src/operational/routes.ts` de la rama `feat/node-kali-direct-pm2-release-20261020` (20 oct 2026). Requiere `AUTH_V02_ENABLED=true` y `MARKETPLACE_B_ENABLED=true`, DB de staging migrada, datos de ADMIN de staging y Node operativo. La existencia del endpoint no confirma un despliegue en Kali ni pruebas E2E.
+Backend verificado contra `node-backend/src/app.ts`, `src/auth/routes.ts` y `src/operational/routes.ts` de la rama `feat/node-kali-direct-pm2-release-20261020` (20 oct 2026). Requiere `AUTH_V02_ENABLED=true` y `MARKETPLACE_B_ENABLED=true`, DB de staging migrada, datos de ADMIN de staging y Node operativo. El SHA Node RC6 30ab51b5… se reporta desplegado con migraciones Prisma y TOTP/soporte/archivo. La documentación confirma la ejecución reportada en Kali, pero la lectura de GitHub NO verifica el estado del servidor en este instante.
 
 El inicio de sesión de Node hoy retorna token Bearer para mobile. En Flutter se guarda únicamente usando flutter_secure_storage después de verificar rol+MFA; no se guardan contraseñas, secretos de TOTP o datos de negocio offline. Servidor debe rechazar rol incorrecto o TOTP inactivo. Este repositorio no almacena claves de firma o tokens.
 
@@ -75,3 +75,13 @@ solicitud/documentos antes de aprobar, y no compilar el modo de escrituras contr
 - APK debug de GitHub Actions: se compila con `TALAEATS_ADMIN_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1` (dominio previamente documentado para la API compartida). **La dirección se incluye en el build, pero no equivale a conexión real validada desde GitHub/ChatGPT.** Si sigue sirviendo Python, las funciones Node de los PR #109 seguirán faltando y el APK indicará error real, no simulará respuestas.
 - **Solo QA, sin escrituras ADMIN:** el flag de mutaciones queda en `false`, ningún `--dart-define` ni secreto productivo se sube a GitHub; es un APK debug, **no** una versión firmada release de Play.
 - Requisitos para funcionalidad administrativa completa: exponer el Node staging con gateway HTTPS ADMIN de acceso restringido tras superar sus preflight, cambiar la URL del build al gateway real y ejecutar E2E role/MFA/soporte/archivo con base de staging.
+
+
+## 0.1.3: APK debug para QA de ADMIN operativo (22 octubre 2026)
+
+- El operador reportó en GitHub Node RC6 público en `https://talaeats.alan-palacios-dev.com/api/v1`, SHA servidor `30ab51b587b21127c3f3419e0ec4c3a8539dfb0a` con soporte y archivado de comercios. **NO** está listo para transacciones comerciales (`productionReady=false`).
+- GitHub Actions construye **solo DEBUG** v0.1.3 con `TALAEATS_ADMIN_API_BASE_URL`, `TALAEATS_ADMIN_WRITES_ENABLED=true` y `TALAEATS_ADMIN_WRITE_API_BASE_URL` fijadas **exactamente** al dominio HTTPS indicado. Las mutaciones siguen denegadas en release, contra URLs distintas, sin rol ADMIN o sin MFA verificada. Esta versión solo se distribuye al propietario para QA, no a Play Store.
+- El usuario puede registrarse mediante `POST /auth/register`, pero adquiere exclusivamente el rol `customer`. La promoción controlada se realiza **desde Kali** contra la DB de STAGING Node con auditoría y revocación de sesiones; nunca incluirla como un endpoint público ni hacer que el registro conceda admin.
+- Flujo de primera activación: registrar cuenta -> promover por operador local -> iniciar sesión sin OTP -> configurar TOTP -> cerrar sesión temporal -> nuevo inicio con TOTP -> leer estadísticas -> probar soporte/archivo con datos de ensayo.
+- La promoción de rol NO implica que este PR, por sí mismo, haya modificado base de datos o activado un usuario real; requiere ejecución interactiva local en Kali.
+- No se cambian Python legado, Stripe LIVE, datos, DB, túneles o servidores. No registrar claves, correos particulares, contraseñas ni tokens en commits o logs.
