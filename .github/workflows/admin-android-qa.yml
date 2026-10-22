@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - feat/admin-mobile-mvp-20261020
+      - feat/admin-v0.1.1-auth-qa-20261022
     paths:
       - 'tala-eats-admin/**'
       - '.github/workflows/admin-android-qa.yml'
@@ -53,9 +54,11 @@ jobs:
           flutter test test/admin_stage_gate_test.dart \
             --dart-define=TALAEATS_ADMIN_WRITES_ENABLED=true \
             --dart-define=TALAEATS_ADMIN_WRITE_API_BASE_URL=https://admin-stage.example.test/api/v1
-      - name: APK debug (requiere API segura configurada en dispositivo)
+      - name: APK debug con API Tala Eats preconfigurada (SOLO consulta)
         working-directory: tala-eats-admin/app
-        run: flutter build apk --debug
+        run: |
+          flutter build apk --debug \
+            --dart-define=TALAEATS_ADMIN_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1
       - uses: actions/upload-artifact@v4
         if: success()
         with:

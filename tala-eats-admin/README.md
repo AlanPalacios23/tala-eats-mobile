@@ -1,4 +1,4 @@
-# Tala Eats ADMIN · Flutter independiente (MVP 0.1.1 en revisión)
+# Tala Eats ADMIN · Flutter independiente (MVP 0.1.2 en revisión)
 
 Cuarta app del monorepo, separada de Usuarios / Restaurante / Repartidor y del portal ADMIN web ya existente. Consume exclusivamente el backend compartido de Tala Eats. **No introduce un servidor ni una base de datos nuevos.**
 
@@ -65,3 +65,13 @@ solicitud/documentos antes de aprobar, y no compilar el modo de escrituras contr
 - Frente a 401/403 se borra sesión y caché del panel; ante error de red se vacía la pestaña para no presentar métricas antiguas como actuales.
 - Un CI de PR comprueba análisis estático, tests read-only, tests de escrituras solo sobre host sintético de staging y APK debug sin credenciales.
 - **Pendiente para GO**: pruebas reales PostgreSQL/Redis aislados con PR #109, migración revisada, flujo completo de tickets y archivo, verificación de gateway administrativo y APK en dispositivo físico. No publicar ni mezclar a la línea de Play de Usuarios sin pasar esos controles.
+
+
+## v0.1.2: Crear cuenta y APK de QA con API preconfigurada (22-oct-2026)
+
+- Pantalla **Crear cuenta** independiente del formulario de inicio de sesión. Solicita nombre, correo, contraseña y confirmación; usa `POST /auth/register` del backend compartido.
+- **Seguridad:** la ruta solo crea `role=customer`. Ni el formulario ni el backend promueven automáticamente a ADMIN. Si el servidor entrega un token temporal de registro, el cliente intenta revocarlo con `POST /auth/logout` y siempre lo descarta. Para usar el panel se necesita alta/promoción autorizada fuera de este formulario y TOTP obligatorio.
+- Botón **Probar conexión al backend**: consulta `GET /health` sin autenticación y distingue Node staging de otras APIs cuyo contrato administrativo aún no se comprobó.
+- APK debug de GitHub Actions: se compila con `TALAEATS_ADMIN_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1` (dominio previamente documentado para la API compartida). **La dirección se incluye en el build, pero no equivale a conexión real validada desde GitHub/ChatGPT.** Si sigue sirviendo Python, las funciones Node de los PR #109 seguirán faltando y el APK indicará error real, no simulará respuestas.
+- **Solo QA, sin escrituras ADMIN:** el flag de mutaciones queda en `false`, ningún `--dart-define` ni secreto productivo se sube a GitHub; es un APK debug, **no** una versión firmada release de Play.
+- Requisitos para funcionalidad administrativa completa: exponer el Node staging con gateway HTTPS ADMIN de acceso restringido tras superar sus preflight, cambiar la URL del build al gateway real y ejecutar E2E role/MFA/soporte/archivo con base de staging.

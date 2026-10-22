@@ -99,6 +99,54 @@ class AdminApi {
     }
   }
 
+  /// Comprobar transporte y versión sin enviar credenciales administrativas.
+  Future<String> connectionInfo() async {
+    final result = await request('GET', '/health');
+    if (result is! Map || result['status'] != 'ok') {
+      throw const AdminApiException(502, 'La API no respondió como se esperaba.');
+    }
+    final version = result['version']?.toString() ?? 'desconocida';
+    if (result['production'] == false &&
+        result['digital_payment_provider'] == 'stripe') {
+      return 'Node staging conectado · $version. '
+          'Acceso ADMIN sujeto a rol y MFA.';
+    }
+    return 'API disponible · $version. '
+        'No se verificó compatibilidad con las funciones ADMIN de Node.';
+  }
+
+  /// Autoregistro ordinario: el servidor asigna exclusivamente role=customer.
+  /// Una cuenta nueva NO recibe permisos ADMIN ni acceso al panel.
+  /// Revocamos de inmediato el token emitido durante el registro.
+  Future<void> registerCustomer(String name, String email, String password) async {
+    if (token != null) {
+      throw const AdminApiException(409, 'Cierra la sesión antes de crear otra cuenta.');
+    }
+    if (name.trim().length < 2 || name.trim().length > 120 ||
+        !email.contains('@') || password.length < 8 || password.length > 128) {
+      throw const AdminApiException(422, 'Revisa nombre, correo y contraseña.');
+    }
+    final data = await request('POST', '/auth/register', data: {
+      'name': name.trim(), 'email': email.trim().toLowerCase(),
+      'password': password,
+    });
+    if (data is! Map || data['user'] is! Map ||
+        data['user']['role'] != 'customer') {
+      throw const AdminApiException(502, 'El registro no confirmó una cuenta estándar.');
+    }
+    final issued = data['access_token'];
+    if (issued is String && issued.isNotEmpty && issued != 'cookie') {
+      token = issued;
+      try {
+        await logout();
+      } catch (_) {
+        // La aplicación descarta el token aunque el servidor esté sin red.
+      } finally {
+        token = null;
+      }
+    }
+  }
+
   Future<Map<String, dynamic>> login(String email, String password, String otp) async {
     final result = await request('POST', '/auth/login',
       data: <String, dynamic>{'email': email.trim(), 'password': password, 'otp': otp.trim()});

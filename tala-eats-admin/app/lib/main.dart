@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'admin_api.dart';
 import 'admin_support.dart';
 import 'admin_restaurants.dart';
+import 'admin_registration.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -462,6 +463,23 @@ class _LoginScreenState extends State<_LoginScreen> {
   final password = TextEditingController();
   final otp = TextEditingController();
   bool hidden = true;
+  bool checkingApi = false;
+  Future<void> checkConnection() async {
+    if (checkingApi) return;
+    setState(() => checkingApi = true);
+    String message;
+    try {
+      message = await widget.control.api.connectionInfo();
+    } catch (_) {
+      message = 'No se pudo comprobar la API. Verifica el servidor '
+          'y la conexión a Internet.';
+    }
+    if (!mounted) return;
+    setState(() => checkingApi = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 7)));
+  }
+
   @override
   void dispose() {
     email.dispose();
@@ -488,7 +506,19 @@ class _LoginScreenState extends State<_LoginScreen> {
                       const _BrandHeader(
                           title: 'Centro de operaciones',
                           subtitle: 'Acceso privado para personal autorizado.'),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: checkingApi ? null : checkConnection,
+                        icon: checkingApi
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.wifi_tethering_rounded),
+                        label: Text(checkingApi
+                            ? 'Comprobando conexión…'
+                            : 'Probar conexión al backend'),
+                      ),
+                      const SizedBox(height: 24),
                       TextFormField(
                         controller: email,
                         keyboardType: TextInputType.emailAddress,
@@ -551,6 +581,24 @@ class _LoginScreenState extends State<_LoginScreen> {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white))
                             : const Text('Acceder al panel'),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: widget.control.busy ? null : () async {
+                          final created = await Navigator.of(context)
+                              .push<String>(MaterialPageRoute(
+                                  builder: (_) => AdminRegistrationScreen(
+                                      api: widget.control.api)));
+                          if (!context.mounted || created == null) return;
+                          email.text = created;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text(
+                              'Cuenta estándar creada. El acceso ADMIN '
+                              'requiere habilitación privada y 2FA.')),
+                          );
+                        },
+                        icon: const Icon(Icons.person_add_alt_outlined),
+                        label: const Text('Crear cuenta'),
                       ),
                       const SizedBox(height: 22),
                       const Text('Protegido por autenticación y verificación en dos pasos.',
