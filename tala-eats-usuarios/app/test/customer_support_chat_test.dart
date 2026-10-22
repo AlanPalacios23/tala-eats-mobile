@@ -64,6 +64,7 @@ void main() {
     expect(find.textContaining('pedido #42'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey<String>('supportChatInput')),
       'Necesito ayuda con mi pedido');
+    await tester.pump(); // Rebuild send button after text change.
     await tester.tap(find.byKey(const ValueKey<String>('supportChatSend')));
     await tester.pumpAndSettle();
     expect(api.posts, 1);
@@ -82,6 +83,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('supportChatInput')),
       'Problema de pago');
+    await tester.pump(); // Rebuild send button after text change.
     await tester.tap(find.byKey(const ValueKey<String>('supportChatSend')));
     await tester.pumpAndSettle();
     expect(api.posts, 1);
