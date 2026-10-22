@@ -52,6 +52,11 @@ def review() -> dict[str, object]:
         result["play_listing_hd"] = "PASS"
     else:
         errors.extend(play_issues)
+    result["offline_assets_ready"] = (
+        result["source"] == "PASS"
+        and result["original_hd"] == "PASS"
+        and result["play_listing_hd"] == "PASS"
+    )
     result["release_ready"] = False
     result["reason"] = (
         "Este control local nunca confirma E2E, firma ni aprobación Play; "
@@ -67,8 +72,10 @@ def main() -> int:
     args = p.parse_args()
     report = review()
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    # A success exit status is deliberately impossible for a source-only gate.
-    print("RC4_RELEASE_NO_GO: aprobación final externa pendiente", file=sys.stderr)
+    if report["offline_assets_ready"]:
+        print("RC4_OFFLINE_ASSETS_PASS; publicación pendiente de E2E y Play", file=sys.stderr)
+        return 0
+    print("RC4_OFFLINE_ASSETS_BLOCKED: faltan recursos; NO PUBLICAR", file=sys.stderr)
     return 2
 
 
