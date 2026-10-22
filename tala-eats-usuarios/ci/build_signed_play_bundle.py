@@ -10,6 +10,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -182,18 +183,39 @@ def verify_arm64_native_alignment(path: Path) -> None:
     print(f"ANDROID_ARM64_16KB_ELF_PASS: {total} librerías; falta validar con Play y dispositivo")
 
 
+def locate_flutter() -> str:
+    """Resolve flutter.bat explicitly on Windows for Python subprocess/WinError 2.
+
+    PowerShell resolves 'flutter' to a .bat shim via PATHEXT, but a raw
+    CreateProcess call may not, depending on the caller/environment.
+    """
+    command = "flutter.bat" if os.name == "nt" else "flutter"
+    executable = shutil.which(command)
+    if executable is None and command != "flutter":
+        executable = shutil.which("flutter")
+    if not executable:
+        raise RuntimeError(
+            "No se encontro Flutter en PATH. Comprueba en PowerShell: "
+            "Get-Command flutter; flutter --version. "
+            "En Windows agrega <FlutterSDK>\\\\bin a PATH y abre nueva terminal."
+        )
+    return executable
+
+
 def build() -> None:
     check_source()
     require_local_configuration()
     # Always block a signed AAB while original customer-provided HD media is missing.
     subprocess.run([sys.executable, str(ROOT / "ci/verify_landing_assets.py")],
       cwd=APP, check=True)
-    subprocess.run(["flutter", "pub", "get"], cwd=APP, check=True)
+    flutter_exe = locate_flutter()
+    print("FLUTTER_TOOL_FOUND: " + str(Path(flutter_exe).name), flush=True)
+    subprocess.run([flutter_exe, "pub", "get"], cwd=APP, check=True)
     configure_ephemeral_gradle()
     # Prevent a previously signed/stale bundle from being reported as a new RC.
     if BUNDLE.exists():
         BUNDLE.unlink()
-    cmd = ["flutter", "build", "appbundle", "--release", "--no-pub"]
+    cmd = [flutter_exe, "build", "appbundle", "--release", "--no-pub"]
     cmd.extend("--dart-define=" + k + "=" + os.environ[k] for k in PUBLIC_FIREBASE)
     subprocess.run(cmd, cwd=APP, check=True)
     if not BUNDLE.is_file() or BUNDLE.stat().st_size < 10000:
