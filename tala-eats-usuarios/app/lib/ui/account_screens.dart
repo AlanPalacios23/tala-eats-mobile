@@ -1338,77 +1338,351 @@ class SupportScreen extends StatefulWidget {
 
 class _SupportScreenState extends State<SupportScreen> {
   final TextEditingController message = TextEditingController();
-  bool sending = false;
+  final ScrollController _scroll = ScrollController();
+  List<Map<String, dynamic>> _tickets = <Map<String, dynamic>>[];
+  String _category = 'general';
+  String _loadError = '';
+  String _sendError = '';
+  bool _loading = true;
+  bool _sending = false;
+
+  static const Map<String, String> _categories = <String, String>{
+    'general': 'General',
+    'pedido': 'Pedido',
+    'pago': 'Pago',
+    'cuenta': 'Cuenta',
+    'reembolso': 'Reembolso',
+    'otro': 'Otro',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadTickets();
+    });
+  }
 
   @override
   void dispose() {
     message.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> send() async {
-    FocusScope.of(context).unfocus();
-    if (message.text.trim().isEmpty) {
-      showMessage(context, 'Escribe un mensaje para soporte.');
-      return;
-    }
-    setState(() => sending = true);
-    final bool ok = await widget.model.createSupportTicket(message.text, orderId: widget.orderId, category: 'customer_app');
+  List<Map<String, dynamic>> _visibleTickets(List<Map<String, dynamic>> rows) {
+    final int? order = widget.orderId;
+    return rows.where((Map<String, dynamic> row) {
+      final dynamic owner = row['user_id'];
+      if (owner != null && owner.toString() != widget.model.userId.toString()) {
+        return false;
+      }
+      if (order == null) return true;
+      return row['order_id']?.toString() == order.toString();
+    }).toList();
+  }
+
+  Future<void> _loadTickets() async {
     if (!mounted) return;
-    setState(() => sending = false);
-    if (!ok) {
-      showMessage(context, widget.model.lastError.isEmpty ? 'Escribe al menos unas palabras para poder ayudarte.' : widget.model.lastError);
+    setState(() { _loading = true; _loadError = ''; });
+    try {
+      final dynamic data = await widget.model.api.get('/platform/support');
+      if (data is! List) throw ApiException(502,
+        'No pudimos cargar tus solicitudes. Intenta de nuevo.');
+      final List<Map<String, dynamic>> rows = <Map<String, dynamic>>[];
+      for (final dynamic value in data) {
+        if (value is Map) {
+          rows.add(Map<String, dynamic>.from(value));
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        // API lists recent first. Render oldest → newest like a conversation.
+        _tickets = _visibleTickets(rows.reversed.toList());
+        _loading = false;
+      });
+      _scrollToBottom();
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _loadError = e.message; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() {
+        _loadError = 'No pudimos cargar tus solicitudes. Revisa tu conexión.';
+        _loading = false;
+      });
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scroll.animateTo(_scroll.position.maxScrollExtent,
+        duration: TalaMotion.of(context, const Duration(milliseconds: 260)),
+        curve: TalaMotion.ease);
+    });
+  }
+
+  Future<void> send() async {
+    final String draft = message.text.trim();
+    if (_sending) return;
+    if (draft.length < 5) {
+      setState(() => _sendError = 'Escribe al menos 5 caracteres para enviar.');
       return;
     }
-    HapticFeedback.mediumImpact();
-    showMessage(context, 'Mensaje enviado. Soporte te responderá pronto.');
-    message.clear();
+    if (draft.length > 3000) {
+      setState(() => _sendError = 'El mensaje debe tener 3000 caracteres o menos.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() { _sending = true; _sendError = ''; });
+    try {
+      final Map<String, dynamic> ticket = await widget.model.api.createSupport(
+        draft, category: _category, orderId: widget.orderId);
+      final int? id = int.tryParse(ticket['id']?.toString() ?? '');
+      if (id == null || id <= 0) throw ApiException(502,
+        'El servidor no confirmó el número de solicitud. Verifica el historial.');
+      if (!mounted) return;
+      setState(() {
+        _tickets.add(ticket);
+        _sending = false;
+        message.clear();
+      });
+      HapticFeedback.selectionClick();
+      _scrollToBottom();
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _sendError = e.message; _sending = false; });
+    } catch (_) {
+      if (mounted) setState(() {
+        _sendError = 'No se pudo confirmar el envío. Revisa tu historial antes de reintentar.';
+        _sending = false;
+      });
+    }
+  }
+
+  String _statusLabel(dynamic raw) {
+    switch ((raw ?? '').toString().toLowerCase()) {
+      case 'open': return 'Abierto';
+      case 'in_progress': return 'En revisión';
+      case 'resolved': return 'Resuelto';
+      case 'closed': return 'Cerrado';
+      default: return 'Registrado';
+    }
+  }
+
+  Widget _ticketBubble(Map<String, dynamic> ticket) {
+    final String text = (ticket['message'] ?? '').toString();
+    final String label = _statusLabel(ticket['status']);
+    final String reference = (ticket['id'] ?? '').toString();
+    final DateTime? date = DateTime.tryParse((ticket['created_at'] ?? '').toString());
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 36, bottom: 12),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(15, 13, 15, 11),
+            decoration: BoxDecoration(
+              color: kSoftPeach,
+              border: Border.all(color: const Color(0xFFFFDBCB)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20), topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(20), bottomRight: Radius.circular(6),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(text, style: const TextStyle(color: kInk, height: 1.42, fontSize: 14)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8, runSpacing: 4,
+                  children: <Widget>[
+                    Text('Caso #' + reference + ' · ' + label,
+                      style: const TextStyle(color: kBrandDeep,
+                        fontSize: 11, fontWeight: FontWeight.w700)),
+                    if (date != null)
+                      Text(TimeOfDay.fromDateTime(date.toLocal()).format(context),
+                        style: const TextStyle(color: kInkSoft, fontSize: 11)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool hasText = message.text.trim().length >= 5 &&
+        message.text.trim().length <= 3000;
     return Scaffold(
-      appBar: AppBar(title: const Text('Ayuda y soporte')),
-      body: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-        children: <Widget>[
-          if (widget.orderId != null) ...<Widget>[
-            Align(alignment: Alignment.centerLeft, child: StatusPill(label: 'Sobre el pedido #${widget.orderId}', color: kBrandDeep, background: kSoftOrange, dot: false)),
-            const SizedBox(height: 14),
-          ],
-          const Text('Preguntas frecuentes', style: TalaText.h2),
-          const SizedBox(height: 10),
-          const TalaGroup(
-            children: <Widget>[
-              SupportFaq(title: '¿Cómo sigo mi pedido?', body: 'En Pedidos abre tu pedido en curso y toca “Seguir pedido” para ver su avance y al repartidor asignado.'),
-              SupportFaq(title: '¿Cómo cancelo un pedido?', body: 'Puedes cancelarlo desde el detalle del pedido mientras está recibido, confirmado o en preparación. Después, escríbenos y te ayudamos.'),
-              SupportFaq(title: '¿Qué pasa si hubo un problema con el pago?', body: 'Si elegiste efectivo, el cobro ocurre al entregar o recoger. Si elegiste un pago en línea, Tala Eats solo lo marca como pagado cuando el proveedor lo confirma desde el servidor. Si ves algo raro, cuéntanos aquí abajo.'),
-            ],
+      backgroundColor: kBackground,
+      appBar: AppBar(
+        title: const Text('Ayuda y soporte'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Actualizar solicitudes',
+            onPressed: _loading || _sending ? null : _loadTickets,
+            icon: const Icon(Icons.refresh_rounded),
           ),
-          const SizedBox(height: 24),
-          const Text('Escríbenos', style: TalaText.h2),
-          const SizedBox(height: 4),
-          const Text('Cuéntanos qué pasó y te responderemos lo antes posible.', style: TalaText.muted),
-          const SizedBox(height: 12),
-          TextField(
-            controller: message,
-            minLines: 4,
-            maxLines: 6,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(hintText: 'Escribe tu mensaje…', alignLabelWithHint: true),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: sending ? null : send,
-            icon: const Icon(Icons.send_rounded, size: 18),
-            label: BusyLabel(busy: sending, label: 'Enviar mensaje'),
-          ),
-          if (widget.model.supportEmail.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 16),
-            QuietNote(icon: Icons.mail_outline_rounded, text: 'También puedes escribirnos a ${widget.model.supportEmail}'),
-          ],
         ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+              child: TalaCard(
+                padding: const EdgeInsets.all(15),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(color: kSoftPeach,
+                        borderRadius: BorderRadius.circular(15)),
+                      child: const Icon(Icons.support_agent_rounded, color: kBrandDeep),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          const Text('Estamos para ayudarte',
+                            style: TextStyle(color: kInk, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 3),
+                          Text(widget.orderId == null
+                              ? 'Cuéntanos qué pasó. Cada envío genera un caso.'
+                              : 'Soporte para tu pedido #' + widget.orderId.toString(),
+                            style: TalaText.caption),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    controller: _scroll,
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                    children: <Widget>[
+                      if (_loadError.isNotEmpty) ...<Widget>[
+                        AuthNotice(icon: Icons.wifi_off_rounded,
+                          text: _loadError, danger: true),
+                        Align(alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _loadTickets,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Reintentar historial'),
+                          )),
+                      ],
+                      if (_tickets.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Column(
+                            children: <Widget>[
+                              const Icon(Icons.chat_bubble_outline_rounded,
+                                size: 40, color: kBrand),
+                              const SizedBox(height: 12),
+                              const Text('Aquí comienza tu conversación',
+                                textAlign: TextAlign.center, style: TalaText.h2),
+                              const SizedBox(height: 8),
+                              Text('Describe tu problema. Tus mensajes se guardan como solicitudes de soporte.',
+                                textAlign: TextAlign.center, style: TalaText.muted),
+                            ],
+                          ),
+                        ),
+                      for (final Map<String, dynamic> ticket in _tickets)
+                        _ticketBubble(ticket),
+                      const SizedBox(height: 12),
+                      const QuietNote(
+                        icon: Icons.info_outline_rounded,
+                        text: 'Por ahora puedes enviar y consultar solicitudes. Las respuestas de agentes dentro del chat se habilitarán cuando el servidor tenga conversaciones.',
+                      ),
+                      const SizedBox(height: 12),
+                      const TalaGroup(
+                        children: <Widget>[
+                          SupportFaq(title: '¿Dónde veo mi pedido?',
+                            body: 'En Pedidos puedes consultar el estado y la entrega.'),
+                          SupportFaq(title: '¿Cómo reporto un pago?',
+                            body: 'Elige Pago, explica qué ocurrió e incluye el número de pedido, sin compartir datos de tarjeta.'),
+                        ],
+                      ),
+                    ],
+                  ),
+            ),
+            Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: kLine)),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: <Widget>[
+                        for (final MapEntry<String, String> entry in _categories.entries) ...<Widget>[
+                          ChoiceChip(
+                            label: Text(entry.value),
+                            selected: _category == entry.key,
+                            onSelected: _sending ? null : (_) =>
+                              setState(() => _category = entry.key),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (_sendError.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 5),
+                    Text(_sendError, style: const TextStyle(color: kBrandDeep,
+                      fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          key: const ValueKey<String>('supportChatInput'),
+                          controller: message,
+                          onChanged: (_) => setState(() {}),
+                          enabled: !_sending,
+                          minLines: 1, maxLines: 4, maxLength: 3000,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            hintText: 'Escribe tu problema…',
+                            counterText: '',
+                            prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton.filled(
+                        key: const ValueKey<String>('supportChatSend'),
+                        tooltip: 'Enviar solicitud a soporte',
+                        onPressed: _sending || !hasText ? null : send,
+                        icon: _sending
+                            ? const SizedBox(width: 20, height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2,
+                                  color: Colors.white))
+                            : const Icon(Icons.send_rounded),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
