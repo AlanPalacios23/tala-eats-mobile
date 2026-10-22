@@ -8,6 +8,7 @@ import subprocess
 import struct
 import sys
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "ci/build_signed_play_bundle.py"
@@ -93,6 +94,20 @@ class PlayReleaseGateTest(unittest.TestCase):
             with zipfile.ZipFile(path, "w") as out:
                 out.writestr("base/lib/arm64-v8a/libapp.so", fixture(16384))
             module.verify_arm64_native_alignment(path)
+
+    def test_flutter_path_resolution_exposes_missing_binary_and_uses_resolved_shim(self):
+        spec = importlib.util.spec_from_file_location("tala_play_bundle", SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        shim = r"C:\\flutter\\bin\\flutter.bat"
+        with mock.patch.object(module.shutil, "which", return_value=shim):
+            self.assertEqual(module.locate_flutter(), shim)
+        with mock.patch.object(module.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "Flutter en PATH"):
+                module.locate_flutter()
+        build = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("subprocess.run([flutter_exe, \"pub\", \"get\"]", build)
+        self.assertIn("cmd = [flutter_exe, \"build\", \"appbundle\"", build)
 
     def test_release_build_always_removes_stale_output(self):
         source = SCRIPT.read_text(encoding="utf-8")
