@@ -306,9 +306,19 @@ class TalaApi {
   Future<List<dynamic>> notifications() async => List<dynamic>.from((await get('/platform/notifications')) as List);
 
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await post('/orders', payload)) as Map);
-  Future<Map<String, dynamic>> checkout(int orderId) async => Map<String, dynamic>.from((await post('/payments/mercadopago/orders/$orderId/checkout')) as Map);
-  Future<Map<String, dynamic>> stripeConfig() async => Map<String, dynamic>.from((await get('/payments/stripe/config')) as Map);
-  Future<Map<String, dynamic>> stripePaymentIntent(int orderId) async => Map<String, dynamic>.from((await post('/payments/stripe/orders/$orderId/payment-intent')) as Map);
+  @Deprecated('Mercado Pago no forma parte de Node RC7. Usar Stripe TEST o efectivo cuando la API lo habilite.')
+  Future<Map<String, dynamic>> checkout(int orderId) async =>
+      throw UnsupportedError('Mercado Pago está deshabilitado. Consulta los métodos disponibles de Tala Eats.');
+  Future<Map<String, dynamic>> paymentMethods() async =>
+      Map<String, dynamic>.from((await get('/orders/payment-methods')) as Map);
+  Future<Map<String, dynamic>> stripeConfig() async =>
+      Map<String, dynamic>.from((await get('/payments/stripe/config')) as Map);
+  Future<Map<String, dynamic>> stripePaymentIntent(int orderId) async =>
+      Map<String, dynamic>.from((await post('/payments/stripe/orders/$orderId/payment-intent')) as Map);
+  /// Estado autoritativo: PaymentSheet no constituye prueba de dinero capturado.
+  /// No debe darse una orden por pagada a menos que confirmed_by_server sea true.
+  Future<Map<String, dynamic>> stripePaymentStatus(int orderId) async =>
+      Map<String, dynamic>.from((await get('/payments/stripe/orders/$orderId/status')) as Map);
   Future<Map<String, dynamic>> liveOrder(int orderId) async => Map<String, dynamic>.from((await get('/v11/orders/$orderId/live')) as Map);
 
   Future<void> forgotPassword(String email) async { await post('/auth/password/forgot', <String, dynamic>{'email': email}); }
