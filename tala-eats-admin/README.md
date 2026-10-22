@@ -18,6 +18,9 @@ La app **no tiene URL por defecto** por seguridad. Se compila con:
 ```bash
 cd tala-eats-admin/app
 flutter create --platforms=android --project-name talaeats_admin --org com.talaeats .
+# Flutter genera un test de ejemplo que busca "MyApp", ausente en ADMIN.
+# Bash: rm -f test/widget_test.dart
+# Windows PowerShell: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
 flutter pub get
 flutter analyze
 flutter test
