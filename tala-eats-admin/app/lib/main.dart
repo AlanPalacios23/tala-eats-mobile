@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'admin_api.dart';
 import 'admin_support.dart';
 import 'admin_restaurants.dart';
+import 'admin_registration.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -551,6 +552,24 @@ class _LoginScreenState extends State<_LoginScreen> {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white))
                             : const Text('Acceder al panel'),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: widget.control.busy ? null : () async {
+                          final created = await Navigator.of(context)
+                              .push<String>(MaterialPageRoute(
+                                  builder: (_) => AdminRegistrationScreen(
+                                      api: widget.control.api)));
+                          if (!mounted || created == null) return;
+                          email.text = created;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text(
+                              'Cuenta estándar creada. El acceso ADMIN '
+                              'requiere habilitación privada y 2FA.')),
+                          );
+                        },
+                        icon: const Icon(Icons.person_add_alt_outlined),
+                        label: const Text('Crear cuenta'),
                       ),
                       const SizedBox(height: 22),
                       const Text('Protegido por autenticación y verificación en dos pasos.',
