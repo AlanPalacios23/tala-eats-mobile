@@ -496,13 +496,15 @@ void main() {
         find.byKey(const ValueKey<String>('payment-method-cash'))).enabled, isTrue);
     expect(tester.widget<PaymentChoiceCard>(
         find.byKey(const ValueKey<String>('payment-method-stripe'))).enabled, isTrue);
-    expect(model.paymentMethod, 'stripe');
-    await tester.tap(find.text('Efectivo'));
-    await tester.pumpAndSettle();
+    // El modelo conserva la selección previa de efectivo si el servidor
+    // habilita ambos métodos; no impone Stripe silenciosamente.
     expect(model.paymentMethod, 'cash');
     await tester.tap(find.text('Tarjeta con Stripe'));
     await tester.pumpAndSettle();
     expect(model.paymentMethod, 'stripe');
+    await tester.tap(find.text('Efectivo'));
+    await tester.pumpAndSettle();
+    expect(model.paymentMethod, 'cash');
     await tester.pumpWidget(const SizedBox());
     model.dispose();
   });
