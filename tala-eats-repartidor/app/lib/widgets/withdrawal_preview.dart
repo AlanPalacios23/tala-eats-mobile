@@ -40,9 +40,7 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
       // The Node RC7 contract is explicit: there is no active Stripe Connect
       // recipient account or onboarding capability. Do not request TOTP or
       // pretend that a bank can be linked while the backend says disabled.
-      if (status['configuration'] == 'disabled-node-staging' ||
-          status['recipient_transfer_capability_active'] == false &&
-              status['withdrawals_enabled'] == false) {
+      if (status['configuration'] == 'disabled-node-staging') {
         if (mounted) {
           setState(() => _status = 'disabled');
           _message('Stripe Connect todavía no está habilitado. No hay retiros disponibles.');
