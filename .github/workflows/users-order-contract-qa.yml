@@ -84,6 +84,10 @@ jobs:
         run: flutter test --reporter=compact test/premium_discovery_polish_test.dart
       - name: Contraste AA de marca y botones (sin APK)
         run: flutter test --reporter=compact test/premium_brand_contrast_test.dart
+      - name: "RC3 Soporte tipo chat: casos persistidos y envíos verificados"
+        run: flutter test --reporter=compact test/customer_support_chat_test.dart
+      - name: "RC3 Splash y acceso: semántica y registro directo 320dp"
+        run: flutter test --reporter=compact test/customer_launch_signup_visual_test.dart
       - name: "RC2 Checkout: estados visuales y seleccion accesible"
         run: flutter test --reporter=compact test/checkout_rc2_visual_test.dart
       - name: "UX compra: producto, carrito, checkout y pedidos 320-430 dp"
