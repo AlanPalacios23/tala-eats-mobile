@@ -40,6 +40,7 @@ flutter run \
   --dart-define=TALAEATS_ADMIN_WRITES_ENABLED=true \
   --dart-define=TALAEATS_ADMIN_WRITE_API_BASE_URL=https://TU-STAGING-ADMIN/api/v1
 ```
+Solo funciona en compilaciones **DEBUG** para QA; los builds release permanecen en modo consulta.
 Las dos URLs deben coincidir **exactamente** y utilizar HTTPS. No basta con activar el
 booleano; todo destino distinto queda en modo consulta. Esta barrera cliente no sustituye
 la autorización ADMIN + TOTP, validación transaccional y auditoría del servidor. Revisar
