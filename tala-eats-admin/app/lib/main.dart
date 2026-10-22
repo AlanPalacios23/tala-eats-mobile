@@ -708,7 +708,18 @@ class _AdminShell extends StatelessWidget {
                       _ErrorLabel(message: control.error!),
                     ],
                     const SizedBox(height: 18),
-                    if (control.tab == 0) _StatsGrid(data: control.stats),
+                    if (control.tab == 0) ...[
+                      _StatsGrid(data: control.stats),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Text(
+                          'Los importes provienen de pedidos no cancelados y '
+                          'pueden incluir pedidos pendientes de pago. '
+                          'No representan ingresos cobrados ni utilidad neta.',
+                          style: TextStyle(color: Colors.black54, fontSize: 12),
+                        ),
+                      ),
+                    ],
                     if (control.tab == 1) _OrdersList(orders: control.orders),
                     if (control.tab == 2) AdminSupportPanel(
                       tickets: control.tickets, busy: control.busy,
@@ -776,8 +787,8 @@ class _StatsGrid extends StatelessWidget {
       ('Repartidores', '${data['drivers'] ?? '—'}', Icons.two_wheeler_outlined),
       ('Usuarios', '${data['users'] ?? '—'}', Icons.people_alt_outlined),
       ('Soporte abierto', '${data['support_open'] ?? '—'}', Icons.support_agent_outlined),
-      ('Ventas brutas', '\$ ${data['gross_sales'] ?? '—'}', Icons.attach_money_rounded),
-      ('Comisiones', '\$ ${data['commissions'] ?? '—'}', Icons.account_balance_wallet_outlined),
+      ('Importe no cancelado', '\$ ${data['gross_sales'] ?? '—'}', Icons.attach_money_rounded),
+      ('Comisiones calculadas', '\$ ${data['commissions'] ?? '—'}', Icons.account_balance_wallet_outlined),
     ];
     return LayoutBuilder(builder: (context, constraints) {
       final cols = constraints.maxWidth >= 760 ? 4 : 2;
