@@ -43,7 +43,7 @@ y ejecutar GitHub Actions. La verificación de originales debe quedar
 
 El ícono para Google Play, la imagen promocional y las capturas de pantallas
 **son recursos distintos** de los cuatro binarios integrados a la app.
-Seguir `../../../../play-store-assets/README.md` y ejecutar:
+Seguir `../../../play-store-assets/README.md` y ejecutar:
 
 ```powershell
 python ci/verify_play_store_media.py --check
