@@ -1,6 +1,12 @@
-name: Tala Eats ADMIN Android QA (manual)
+name: Tala Eats ADMIN Android QA
 
 on:
+  pull_request:
+    branches:
+      - feat/admin-mobile-mvp-20261020
+    paths:
+      - 'tala-eats-admin/**'
+      - '.github/workflows/admin-android-qa.yml'
   workflow_dispatch:
 
 permissions:
@@ -37,6 +43,12 @@ jobs:
       - name: Tests
         working-directory: tala-eats-admin/app
         run: flutter test
+      - name: Contrato de escrituras SOLO contra staging exacto
+        working-directory: tala-eats-admin/app
+        run: |
+          flutter test test/admin_stage_gate_test.dart \
+            --dart-define=TALAEATS_ADMIN_WRITES_ENABLED=true \
+            --dart-define=TALAEATS_ADMIN_WRITE_API_BASE_URL=https://admin-stage.example.test/api/v1
       - name: APK debug (requiere API segura configurada en dispositivo)
         working-directory: tala-eats-admin/app
         run: flutter build apk --debug
