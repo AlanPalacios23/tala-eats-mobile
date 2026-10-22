@@ -13,6 +13,11 @@ const String kAdminApiBase = String.fromEnvironment(
 const bool kAdminWritesEnabled = bool.fromEnvironment(
   'TALAEATS_ADMIN_WRITES_ENABLED', defaultValue: false);
 
+/// Un build con permisos de escritura se fija a UNA URL exacta de staging.
+/// Ningún dominio queda permitido implícitamente, ni siquiera producción.
+const String kAdminWriteApiBase = String.fromEnvironment(
+  'TALAEATS_ADMIN_WRITE_API_BASE_URL', defaultValue: '');
+
 class AdminApiException implements Exception {
   const AdminApiException(this.status, this.message);
   final int status;
@@ -30,6 +35,16 @@ class AdminApi {
   final http.Client _client;
   String? token;
   bool get configured => baseUrl.isNotEmpty;
+
+  /// Exige 2 definiciones independientes y la coincidencia exacta HTTPS.
+  /// No sustituye la autorización ADMIN+MFA del servidor.
+  bool get writesEnabled =>
+      // V0.1 solo pruebas DEBUG; nunca habilitar escrituras en un APK release.
+      kDebugMode &&
+      kAdminWritesEnabled &&
+      kAdminWriteApiBase.isNotEmpty &&
+      baseUrl == kAdminWriteApiBase &&
+      Uri.tryParse(baseUrl)?.scheme == 'https';
 
   void dispose() => _client.close();
 
@@ -49,6 +64,8 @@ class AdminApi {
 
   Future<dynamic> request(String method, String path, {Map<String, dynamic>? data}) async {
     final request = http.Request(method, _uri(path));
+    // No reenviar Authorization a destinos externos tras 30x.
+    request.followRedirects = false;
     request.headers.addAll(<String, String>{
       'Accept': 'application/json',
       'Cache-Control': 'no-store',
@@ -68,7 +85,7 @@ class AdminApi {
       } on FormatException {
         throw AdminApiException(response.statusCode, 'Respuesta inesperada del servidor.');
       }
-      if (response.statusCode >= 400) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         final detail = value is Map ? (value['detail'] ?? value['error']) : null;
         throw AdminApiException(response.statusCode,
             detail is String && detail.isNotEmpty
@@ -133,7 +150,7 @@ class AdminApi {
   }
 
   Future<void> respondSupport(int id, String status, String reply) async {
-    if (!kAdminWritesEnabled) {
+    if (!writesEnabled) {
       throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas.');
     }
     if (id <= 0 || !{'in_progress', 'resolved'}.contains(status) ||
@@ -145,7 +162,7 @@ class AdminApi {
   }
 
   Future<void> archiveRestaurant(int id, String name, String reason) async {
-    if (!kAdminWritesEnabled) {
+    if (!writesEnabled) {
       throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas.');
     }
     if (id <= 0 || name.trim().isEmpty || reason.trim().length < 10) {
@@ -156,14 +173,14 @@ class AdminApi {
   }
 
   Future<void> suspendRestaurant(int id) async {
-    if (!kAdminWritesEnabled || id <= 0) {
+    if (!writesEnabled || id <= 0) {
       throw const AdminApiException(403, 'Suspensión no autorizada en este build.');
     }
     await request('PATCH', '/admin/restaurants/$id/verification?status=suspended');
   }
 
   Future<void> decideOnboarding(int id, String status, String notes) async {
-    if (!kAdminWritesEnabled) {
+    if (!writesEnabled) {
       throw const AdminApiException(403, 'Escrituras ADMIN deshabilitadas en este build.');
     }
     if (!{'approved', 'rejected', 'needs_info'}.contains(status) || id <= 0) {
