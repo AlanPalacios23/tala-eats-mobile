@@ -38,8 +38,8 @@ PRIVATE_SIGNING = (
 
 def check_source() -> None:
     pubspec = (APP / "pubspec.yaml").read_text(encoding="utf-8")
-    assert re.search(r"^version: 1\.0\.41\+52$", pubspec, re.MULTILINE), (
-        "La versión de Play RC debe ser 1.0.41+52")
+    assert re.search(r"^version: 1\.0\.42\+53$", pubspec, re.MULTILINE), (
+        "La versión de Play RC debe ser 1.0.42+53")
     bootstrap = (ROOT / "ci/bootstrap_android.py").read_text(encoding="utf-8")
     assert "'package':'com.talaeats.app'" in bootstrap, "Paquete Android inesperado"
     assert (APP / "tools/native/MainActivity.java").is_file()
@@ -48,7 +48,7 @@ def check_source() -> None:
     forbidden = {".jks", ".keystore", ".p12", ".pfx", ".pkcs12"}
     assert not any(p.is_file() and p.suffix.lower() in forbidden
                    for p in ROOT.rglob("*")), "No guardar claves en el repositorio"
-    print("RELEASE_SOURCE_GATE_PASS: v1.0.41+52, paquete com.talaeats.app, sin llaves")
+    print("RELEASE_SOURCE_GATE_PASS: v1.0.42+53, paquete com.talaeats.app, sin llaves")
 
 
 def require_local_configuration() -> Path:

@@ -38,6 +38,7 @@ void main() {
               icon: Icons.credit_card_outlined,
               title: 'Tarjeta y Google Pay',
               subtitle: 'Pago seguro procesado por Stripe',
+              enabled: true,
               selected: true,
               onTap: () => taps++,
             ),
