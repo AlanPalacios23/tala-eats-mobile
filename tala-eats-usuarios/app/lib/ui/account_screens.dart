@@ -1345,6 +1345,7 @@ class _SupportScreenState extends State<SupportScreen> {
   String _sendError = '';
   bool _loading = true;
   bool _sending = false;
+  int _ticketsEpoch = 0;
 
   static const Map<String, String> _categories = <String, String>{
     'general': 'General',
@@ -1384,6 +1385,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   Future<void> _loadTickets() async {
     if (!mounted) return;
+    final int epoch = ++_ticketsEpoch;
     setState(() { _loading = true; _loadError = ''; });
     try {
       final dynamic data = await widget.model.api.get('/platform/support');
@@ -1395,7 +1397,7 @@ class _SupportScreenState extends State<SupportScreen> {
           rows.add(Map<String, dynamic>.from(value));
         }
       }
-      if (!mounted) return;
+      if (!mounted || epoch != _ticketsEpoch) return;
       setState(() {
         // API lists recent first. Render oldest → newest like a conversation.
         _tickets = _visibleTickets(rows.reversed.toList());
@@ -1403,9 +1405,11 @@ class _SupportScreenState extends State<SupportScreen> {
       });
       _scrollToBottom();
     } on ApiException catch (e) {
-      if (mounted) setState(() { _loadError = e.message; _loading = false; });
+      if (mounted && epoch == _ticketsEpoch) {
+        setState(() { _loadError = e.message; _loading = false; });
+      }
     } catch (_) {
-      if (mounted) setState(() {
+      if (mounted && epoch == _ticketsEpoch) setState(() {
         _loadError = 'No pudimos cargar tus solicitudes. Revisa tu conexión.';
         _loading = false;
       });
@@ -1446,7 +1450,11 @@ class _SupportScreenState extends State<SupportScreen> {
         'El servidor no confirmó el número de solicitud. Verifica el historial.');
       if (!mounted) return;
       setState(() {
+        // Do not let a stale GET erase this freshly accepted support ticket.
+        ++_ticketsEpoch;
         _tickets.add(ticket);
+        _loading = false;
+        _loadError = '';
         _sending = false;
         message.clear();
       });
