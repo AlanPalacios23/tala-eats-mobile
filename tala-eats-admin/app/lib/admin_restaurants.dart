@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'admin_api.dart';
 
 /// Operaciones mínimas: consulta, suspensión y archivado seguro de comercios.
 class AdminRestaurantsPanel extends StatefulWidget {
   const AdminRestaurantsPanel({super.key, required this.restaurants,
-      required this.busy, required this.onAction, this.error});
+      required this.busy, required this.onAction,
+      required this.writesEnabled, this.error});
   final List<Map<String, dynamic>> restaurants;
   final bool busy;
+  final bool writesEnabled;
   final String? error;
   final Future<bool> Function(int id, String action,
       String confirmName, String reason) onAction;
@@ -127,7 +128,7 @@ class _AdminRestaurantsPanelState extends State<AdminRestaurantsPanel> {
         ChoiceChip(label: const Text('Archivados'), selected: filter == 'archived',
           onSelected: (_) => setState(() => filter = 'archived')),
       ]),
-      if (!kAdminWritesEnabled) const Padding(
+      if (!widget.writesEnabled) const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Text('Modo consulta. Suspensión y archivo requieren '
           'un build habilitado expresamente para staging.',
@@ -170,7 +171,7 @@ class _AdminRestaurantsPanelState extends State<AdminRestaurantsPanel> {
               const Padding(padding: EdgeInsets.only(top: 5),
                 child: Text('No se permite archivar mientras existan pedidos pendientes.',
                     style: TextStyle(color: Color(0xFFB95421), fontSize: 12))),
-            if (kAdminWritesEnabled && !archived) ...[
+            if (widget.writesEnabled && !archived) ...[
               const SizedBox(height: 11),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 if (open) OutlinedButton.icon(
