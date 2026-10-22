@@ -39,6 +39,8 @@ class AdminApi {
   /// Exige 2 definiciones independientes y la coincidencia exacta HTTPS.
   /// No sustituye la autorización ADMIN+MFA del servidor.
   bool get writesEnabled =>
+      // V0.1 solo pruebas DEBUG; nunca habilitar escrituras en un APK release.
+      kDebugMode &&
       kAdminWritesEnabled &&
       kAdminWriteApiBase.isNotEmpty &&
       baseUrl == kAdminWriteApiBase &&
