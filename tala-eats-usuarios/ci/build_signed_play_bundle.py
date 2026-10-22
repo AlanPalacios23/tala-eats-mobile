@@ -155,7 +155,7 @@ def verify_arm64_native_alignment(path: Path) -> None:
             if not (name.startswith("base/lib/arm64-v8a/") and name.endswith(".so")):
                 continue
             elf = bundle.read(name)
-            if (len(elf) < 64 or elf[:4] != b"\\x7fELF" or
+            if (len(elf) < 64 or elf[:4] != b"\x7fELF" or
                 elf[4] != 2 or elf[5] != 1):
                 raise RuntimeError("ELF ARM64 inválido: " + name)
             phoff = struct.unpack_from("<Q", elf, 32)[0]
