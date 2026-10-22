@@ -82,7 +82,7 @@ jobs:
         run: flutter pub get
       - name: Analisis estatico (sin APK)
         run: flutter analyze --no-fatal-infos
-      - name: Release Play preflight 1.0.41+52 (sin secretos ni publicacion)
+      - name: Release Play preflight 1.0.42+53 (sin secretos ni publicacion)
         run: |
           python3 ../ci/build_signed_play_bundle.py --check
           python3 -m unittest discover -s ../ci -p 'test_signed_release_gate.py' -v
@@ -159,7 +159,7 @@ jobs:
       - name: Adjuntar APK DEBUG privada para instalar y probar
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.41-RC4-APK-DEBUG-PRUEBAS
+          name: TALA-EATS-Usuarios-v1.0.42-CASH-STRIPE-APK-DEBUG-PRUEBAS
           path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
