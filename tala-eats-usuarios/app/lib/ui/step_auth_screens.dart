@@ -284,7 +284,7 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
                     : emailStep ? <String>[AutofillHints.email]
                     : <String>[step == 0
                       ? AutofillHints.givenName : AutofillHints.familyName],
-                  textInputAction: TextInputAction.done,
+                  textInputAction: passwordStep ? TextInputAction.done : TextInputAction.next,
                   onSubmitted: (_) => next(),
                   onChanged: (_) => setState(() => error = ''),
                   style: TextStyle(
@@ -383,8 +383,24 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
           Padding(padding: const EdgeInsets.fromLTRB(20, 10, 25, 18),
             child: Align(alignment: Alignment.centerRight,
               child: busy
-                ? const Padding(padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(color: kBrandDeep))
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Semantics(
+                      liveRegion: true,
+                      label: 'Validando tus datos',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          SizedBox(width: 23, height: 23,
+                            child: CircularProgressIndicator(
+                              color: kBrandDeep, strokeWidth: 2.5)),
+                          SizedBox(width: 12),
+                          Text('Validando…', style: TextStyle(
+                            color: kBrandDeep, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  )
                 : FilledButton(
                     key: const ValueKey<String>('stepNext'),
                     onPressed: valid ? next : null,
