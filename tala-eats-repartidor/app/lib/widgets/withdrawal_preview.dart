@@ -34,8 +34,23 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
       }
       final id = who['id'] as int;
       final status = await backend.api.get('/withdrawals/driver/$id/connect/status');
-      if (status is! Map || status['status'] is! String) {
+      if (status is! Map) {
         throw StateError('Respuesta de Stripe no confirmada');
+      }
+      // The Node RC7 contract is explicit: there is no active Stripe Connect
+      // recipient account or onboarding capability. Do not request TOTP or
+      // pretend that a bank can be linked while the backend says disabled.
+      if (status['configuration'] == 'disabled-node-staging' ||
+          status['recipient_transfer_capability_active'] == false &&
+              status['withdrawals_enabled'] == false) {
+        if (mounted) {
+          setState(() => _status = 'disabled');
+          _message('Stripe Connect todavía no está habilitado. No hay retiros disponibles.');
+        }
+        return;
+      }
+      if (status['status'] is! String) {
+        throw StateError('Estado Stripe Connect desconocido');
       }
       if (mounted) setState(() => _status = status['status'] as String);
       // Every banking link requires fresh TOTP step-up (including first registration).
