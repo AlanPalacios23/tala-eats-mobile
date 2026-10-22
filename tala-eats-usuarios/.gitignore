@@ -17,3 +17,10 @@
 .DS_Store
 # Font binaries: recovered/downloaded only on runner, never redistributed.
 app/assets/fonts/*.ttf
+
+# Nunca subir claves privadas de carga a GitHub
+**/*.p12
+**/*.pfx
+**/*.pkcs12
+**/*.jks
+**/*.keystore

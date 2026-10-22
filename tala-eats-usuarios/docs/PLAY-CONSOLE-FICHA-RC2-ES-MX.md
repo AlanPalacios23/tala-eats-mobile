@@ -35,7 +35,7 @@
 |---|---|
 | Aplicación | Usuarios; no es Restaurante, Repartidor ni ADMIN |
 | Identificador (no modificar) | `com.talaeats.app` |
-| Versión en fuente | `1.0.40+51` |
+| Versión en fuente | `1.0.41+52` |
 | Android mínimo | API 23 (validar en AAB) |
 | Objetivo Play | Android 16 / API 36 |
 | Formato de publicación | **Android App Bundle (`.aab`) de release firmado con upload key**, no APK debug |

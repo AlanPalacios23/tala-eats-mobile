@@ -32,11 +32,9 @@ EXPECTED = {
 }
 
 
-def validate(name: str, expected_hash: str, minimum_size: int) -> None:
-    file = ASSETS / name
-    if not file.is_file():
-        raise ValueError(f"FALTA {file}: sube las imagenes originales a la rama del PR")
-    data = file.read_bytes()
+def validate_blob(name: str, data: bytes, expected_hash: str,
+                  minimum_size: int) -> None:
+    """Single source of truth for both ZIP import and release integrity."""
     if len(data) < minimum_size:
         raise ValueError(f"Recurso demasiado pequeño o incompleto: {name}")
     if name.endswith(".png"):
@@ -60,6 +58,13 @@ def validate(name: str, expected_hash: str, minimum_size: int) -> None:
             "No reemplazar el material sin aprobación del responsable."
         )
     print(f"PASS {name}  {len(data)} bytes  sha256={digest[:12]}...")
+
+
+def validate(name: str, expected_hash: str, minimum_size: int) -> None:
+    file = ASSETS / name
+    if not file.is_file():
+        raise ValueError(f"FALTA {file}: sube las imagenes originales a la rama del PR")
+    validate_blob(name, file.read_bytes(), expected_hash, minimum_size)
 
 
 def main() -> int:

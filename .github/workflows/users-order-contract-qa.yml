@@ -14,6 +14,11 @@ on:
       - 'tala-eats-usuarios/ci/build_signed_play_bundle.py'
       - 'tala-eats-usuarios/ci/test_signed_release_gate.py'
       - 'tala-eats-usuarios/ci/GENERAR-AAB-PLAY-WINDOWS.ps1'
+      - 'tala-eats-usuarios/ci/import_original_hd_assets.py'
+      - 'tala-eats-usuarios/ci/test_hd_asset_import.py'
+      - 'tala-eats-usuarios/ci/verify_play_store_media.py'
+      - 'tala-eats-usuarios/ci/test_play_store_media.py'
+      - 'tala-eats-usuarios/play-store-assets/**'
       - '.github/workflows/users-order-contract-qa.yml'
   push:
     branches: [main]
@@ -28,6 +33,11 @@ on:
       - 'tala-eats-usuarios/ci/build_signed_play_bundle.py'
       - 'tala-eats-usuarios/ci/test_signed_release_gate.py'
       - 'tala-eats-usuarios/ci/GENERAR-AAB-PLAY-WINDOWS.ps1'
+      - 'tala-eats-usuarios/ci/import_original_hd_assets.py'
+      - 'tala-eats-usuarios/ci/test_hd_asset_import.py'
+      - 'tala-eats-usuarios/ci/verify_play_store_media.py'
+      - 'tala-eats-usuarios/ci/test_play_store_media.py'
+      - 'tala-eats-usuarios/play-store-assets/**'
       - '.github/workflows/users-order-contract-qa.yml'
   workflow_dispatch:
 
@@ -72,10 +82,12 @@ jobs:
         run: flutter pub get
       - name: Analisis estatico (sin APK)
         run: flutter analyze --no-fatal-infos
-      - name: Release Play preflight 1.0.40+51 (sin secretos ni publicacion)
+      - name: Release Play preflight 1.0.41+52 (sin secretos ni publicacion)
         run: |
           python3 ../ci/build_signed_play_bundle.py --check
           python3 -m unittest discover -s ../ci -p 'test_signed_release_gate.py' -v
+          python3 -m unittest discover -s ../ci -p 'test_hd_asset_import.py' -v
+          python3 -m unittest discover -s ../ci -p 'test_play_store_media.py' -v
       - name: RC1 seguridad checkout (red, carreras y método antes del POST)
         run: flutter test --reporter=compact test/payment_availability_fail_closed_test.dart
       - name: QA de doble toque y llave persistente durante reintentos
@@ -147,7 +159,7 @@ jobs:
       - name: Adjuntar APK DEBUG privada para instalar y probar
         uses: actions/upload-artifact@v4
         with:
-          name: TALA-EATS-Usuarios-v1.0.40-RC3-APK-DEBUG-PRUEBAS
+          name: TALA-EATS-Usuarios-v1.0.41-RC4-APK-DEBUG-PRUEBAS
           path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
