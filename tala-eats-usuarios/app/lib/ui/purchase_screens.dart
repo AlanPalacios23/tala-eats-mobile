@@ -492,47 +492,62 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 index: 3,
                 child: CheckoutSectionCard(
                   title: 'Pago',
-                  child: AnimatedSwitcher(
-                    duration: TalaMotion.of(context, TalaMotion.reveal),
-                    child: refreshingPayment
-                        ? const PaymentCheckingCard(key: ValueKey<String>('checking'))
-                        : model.hasAvailablePaymentMethod
-                        ? Column(
-                            key: const ValueKey<String>('methods'),
-                            children: <Widget>[
-                              if (model.cashPayments)
-                                PaymentChoiceCard(
-                                  icon: Icons.payments_outlined,
-                                  title: 'Efectivo',
-                                  subtitle: model.deliveryMode == 'delivery' ? 'Paga al recibir tu pedido' : 'Paga al recoger tu pedido',
-                                  selected: model.paymentMethod == 'cash',
-                                  onTap: () => model.setPaymentMethod('cash'),
-                                ),
-                              if (model.cashPayments && model.stripePayments) const SizedBox(height: 10),
-                              if (model.stripePayments)
-                                PaymentChoiceCard(
-                                  icon: Platform.isIOS ? Icons.apple_rounded : Icons.g_mobiledata_rounded,
-                                  title: Platform.isIOS ? 'Tarjeta y Apple Pay' : 'Tarjeta y Google Pay',
-                                  subtitle: 'Pago seguro procesado por Stripe',
-                                  selected: model.paymentMethod == 'stripe',
-                                  onTap: () => model.setPaymentMethod('stripe'),
-                                ),
-                              const SizedBox(height: 12),
-                              const Row(
-                                children: <Widget>[
-                                  Icon(Icons.lock_outline_rounded, color: kGreen, size: 16),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'El total y el estado del pago los confirma el servidor.',
-                                      style: TextStyle(fontSize: 12, color: kInkSoft, height: 1.35),
-                                    ),
-                                  ),
-                                ],
+                  // Both payment choices stay visible even before activation.
+                  // Server capabilities still gate taps, orders and all charges.
+                  child: Column(
+                    key: const ValueKey<String>('cash-stripe-methods'),
+                    children: <Widget>[
+                      if (refreshingPayment) ...<Widget>[
+                        const PaymentCheckingCard(),
+                        const SizedBox(height: 10),
+                      ],
+                      PaymentChoiceCard(
+                        key: const ValueKey<String>('payment-method-cash'),
+                        icon: Icons.payments_outlined,
+                        title: 'Efectivo',
+                        subtitle: model.cashPayments
+                            ? (model.deliveryMode == 'delivery'
+                                ? 'Paga al recibir tu pedido'
+                                : 'Paga al recoger tu pedido')
+                            : 'Pendiente de activación',
+                        enabled: !refreshingPayment && model.isPaymentMethodEnabled('cash'),
+                        selected: model.paymentMethod == 'cash',
+                        onTap: () => model.setPaymentMethod('cash'),
+                      ),
+                      const SizedBox(height: 10),
+                      PaymentChoiceCard(
+                        key: const ValueKey<String>('payment-method-stripe'),
+                        icon: Icons.credit_card_rounded,
+                        title: 'Tarjeta con Stripe',
+                        subtitle: model.stripePayments
+                            ? 'Tarjeta y billeteras compatibles · pago seguro'
+                            : 'Pendiente de activación',
+                        enabled: !refreshingPayment && model.isPaymentMethodEnabled('stripe'),
+                        selected: model.paymentMethod == 'stripe',
+                        onTap: () => model.setPaymentMethod('stripe'),
+                      ),
+                      if (!refreshingPayment && !model.hasAvailablePaymentMethod) ...<Widget>[
+                        const SizedBox(height: 12),
+                        PaymentUnavailableCard(
+                          onRetry: refreshPaymentAvailability,
+                          loading: refreshingPayment,
+                        ),
+                      ] else if (!refreshingPayment) ...<Widget>[
+                        const SizedBox(height: 12),
+                        const Row(
+                          children: <Widget>[
+                            Icon(Icons.lock_outline_rounded, color: kGreen, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Los métodos disponibles y el pago los confirma el servidor.',
+                                style: TextStyle(fontSize: 12, color: kInkSoft, height: 1.35),
                               ),
-                            ],
-                          )
-                        : PaymentUnavailableCard(key: const ValueKey<String>('off'), onRetry: refreshPaymentAvailability, loading: refreshingPayment),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -917,23 +932,34 @@ class SummaryCard extends StatelessWidget {
 }
 
 class PaymentChoiceCard extends StatelessWidget {
-  const PaymentChoiceCard({super.key, required this.icon, required this.title, required this.subtitle, required this.selected, required this.onTap});
+  const PaymentChoiceCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.selected,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final bool enabled;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final bool chosen = enabled && selected;
     return Semantics(
       button: true,
-      selected: selected,
+      enabled: enabled,
+      selected: chosen,
       child: TalaCard(
-        onTap: onTap,
-        borderColor: selected ? kBrand : kLine,
-        color: selected ? kSoftPeach : Colors.white,
+        onTap: enabled ? onTap : null,
+        borderColor: chosen ? kBrand : kLine,
+        color: chosen ? kSoftPeach : (enabled ? Colors.white : kSunken),
         padding: const EdgeInsets.all(14),
         child: Row(
           children: <Widget>[
@@ -942,25 +968,28 @@ class PaymentChoiceCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: selected ? kBrand : kSoftOrange,
+                color: chosen ? kBrand : (enabled ? kSoftOrange : kLine),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: selected ? Colors.white : kBrandDeep),
+              child: Icon(icon, color: chosen ? Colors.white : (enabled ? kBrandDeep : kMuted)),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(title, style: TalaText.title.copyWith(fontSize: 15)),
+                  Text(title, style: TalaText.title.copyWith(
+                    fontSize: 15, color: enabled ? kInk : kInkSoft,
+                  )),
                   const SizedBox(height: 3),
                   Text(subtitle, style: TalaText.caption),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-              color: selected ? kBrand : kSubtle),
+            Icon(chosen ? Icons.radio_button_checked_rounded
+                : (enabled ? Icons.radio_button_off_rounded : Icons.lock_outline_rounded),
+              color: chosen ? kBrand : kSubtle),
           ],
         ),
       ),
