@@ -10,6 +10,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 import zipfile
@@ -142,6 +143,45 @@ def verify_aab_structure(path: Path) -> None:
     print("ANDROID_APP_BUNDLE_STRUCTURE_PASS: base, manifest, Flutter assets y ARM64")
 
 
+def verify_arm64_native_alignment(path: Path) -> None:
+    """Check AArch64 ELF PT_LOAD alignment; Play/device checks are still required.
+
+    ELF page compatibility is only one 16 KB prerequisite. Google Play's
+    generated device APK ZIP alignment and runtime need independent review.
+    """
+    total = 0
+    with zipfile.ZipFile(path, "r") as bundle:
+        for name in bundle.namelist():
+            if not (name.startswith("base/lib/arm64-v8a/") and name.endswith(".so")):
+                continue
+            elf = bundle.read(name)
+            if (len(elf) < 64 or elf[:4] != b"\\x7fELF" or
+                elf[4] != 2 or elf[5] != 1):
+                raise RuntimeError("ELF ARM64 inválido: " + name)
+            phoff = struct.unpack_from("<Q", elf, 32)[0]
+            size = struct.unpack_from("<H", elf, 54)[0]
+            count = struct.unpack_from("<H", elf, 56)[0]
+            if count == 0 or size < 56 or phoff + size * count > len(elf):
+                raise RuntimeError("ELF ARM64 sin encabezados válidos: " + name)
+            found = False
+            for i in range(count):
+                start = phoff + i * size
+                ptype = struct.unpack_from("<I", elf, start)[0]
+                if ptype != 1:  # PT_LOAD
+                    continue
+                found = True
+                align = struct.unpack_from("<Q", elf, start + 48)[0]
+                if align < 16384 or align % 16384 != 0:
+                    raise RuntimeError(
+                        f"ELF ARM64 no alineado a 16 KB: {name} p_align={align}")
+            if not found:
+                raise RuntimeError("ELF ARM64 sin segmentos PT_LOAD: " + name)
+            total += 1
+    if total == 0:
+        raise RuntimeError("No se encontraron librerías ARM64 para validar 16 KB")
+    print(f"ANDROID_ARM64_16KB_ELF_PASS: {total} librerías; falta validar con Play y dispositivo")
+
+
 def build() -> None:
     check_source()
     require_local_configuration()
@@ -159,6 +199,7 @@ def build() -> None:
     if not BUNDLE.is_file() or BUNDLE.stat().st_size < 10000:
         raise RuntimeError("No se generó el AAB de release")
     verify_aab_structure(BUNDLE)
+    verify_arm64_native_alignment(BUNDLE)
     verification = subprocess.run(
         ["jarsigner", "-verify", str(BUNDLE)],
         capture_output=True, text=True, check=False,
