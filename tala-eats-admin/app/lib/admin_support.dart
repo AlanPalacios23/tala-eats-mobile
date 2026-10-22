@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'admin_api.dart';
 
 /// Bandeja basada en tickets enviados por Tala Eats Usuarios.
 /// No crea un sistema de soporte paralelo.
 class AdminSupportPanel extends StatefulWidget {
   const AdminSupportPanel({super.key, required this.tickets, required this.busy,
-    required this.onRespond, this.error});
+    required this.onRespond, required this.writesEnabled, this.error});
   final List<Map<String, dynamic>> tickets;
   final bool busy;
+  final bool writesEnabled;
   final String? error;
   final Future<bool> Function(int id, String status, String reply) onRespond;
 
@@ -119,7 +119,7 @@ class _AdminSupportPanelState extends State<AdminSupportPanel> {
             onSelected: (_) => setState(() => filter = 'all')),
       ]),
       const SizedBox(height: 13),
-      if (!kAdminWritesEnabled)
+      if (!widget.writesEnabled)
         const _MutedInfo('Modo de consulta. La respuesta y el cambio de estado '
           'solo se habilitan en compilaciones autorizadas para staging.'),
       if (visible.isEmpty)
@@ -160,7 +160,7 @@ class _AdminSupportPanelState extends State<AdminSupportPanel> {
               const SizedBox(height: 5),
               SelectableText(reply),
             ],
-            if (!resolved && kAdminWritesEnabled) ...[
+            if (!resolved && widget.writesEnabled) ...[
               const SizedBox(height: 14),
               Wrap(spacing: 7, runSpacing: 7, children: [
                 if (status == 'open') OutlinedButton.icon(
