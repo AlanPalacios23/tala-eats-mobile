@@ -8,7 +8,8 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 680));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const MaterialApp(home: LaunchScreen()));
-    await tester.pumpAndSettle();
+    // The loading indicator is deliberately indeterminate; it never settles.
+    await tester.pump(const Duration(milliseconds: 1200));
     expect(find.text('Pide, disfruta y repite.'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.bySemanticsLabel('Preparando Tala Eats'), findsWidgets);
