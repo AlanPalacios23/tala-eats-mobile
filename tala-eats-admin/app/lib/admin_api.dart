@@ -99,6 +99,22 @@ class AdminApi {
     }
   }
 
+  /// Comprobar transporte y versión sin enviar credenciales administrativas.
+  Future<String> connectionInfo() async {
+    final result = await request('GET', '/health');
+    if (result is! Map || result['status'] != 'ok') {
+      throw const AdminApiException(502, 'La API no respondió como se esperaba.');
+    }
+    final version = result['version']?.toString() ?? 'desconocida';
+    if (result['production'] == false &&
+        result['digital_payment_provider'] == 'stripe') {
+      return 'Node staging conectado · $version. '
+          'Acceso ADMIN sujeto a rol y MFA.';
+    }
+    return 'API disponible · $version. '
+        'No se verificó compatibilidad con las funciones ADMIN de Node.';
+  }
+
   /// Autoregistro ordinario: el servidor asigna exclusivamente role=customer.
   /// Una cuenta nueva NO recibe permisos ADMIN ni acceso al panel.
   /// Revocamos de inmediato el token emitido durante el registro.
