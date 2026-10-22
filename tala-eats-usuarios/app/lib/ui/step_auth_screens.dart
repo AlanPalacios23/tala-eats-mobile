@@ -383,8 +383,8 @@ class _TalaStepAuthScreenState extends State<TalaStepAuthScreen> {
           Padding(padding: const EdgeInsets.fromLTRB(20, 10, 25, 18),
             child: Align(alignment: Alignment.centerRight,
               child: busy
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
+                ? Padding(
+                    padding: const EdgeInsets.all(12),
                     child: Semantics(
                       liveRegion: true,
                       label: 'Validando tus datos',
