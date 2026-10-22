@@ -463,6 +463,23 @@ class _LoginScreenState extends State<_LoginScreen> {
   final password = TextEditingController();
   final otp = TextEditingController();
   bool hidden = true;
+  bool checkingApi = false;
+  Future<void> checkConnection() async {
+    if (checkingApi) return;
+    setState(() => checkingApi = true);
+    String message;
+    try {
+      message = await widget.control.api.connectionInfo();
+    } catch (_) {
+      message = 'No se pudo comprobar la API. Verifica el servidor '
+          'y la conexión a Internet.';
+    }
+    if (!mounted) return;
+    setState(() => checkingApi = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 7)));
+  }
+
   @override
   void dispose() {
     email.dispose();
@@ -489,7 +506,19 @@ class _LoginScreenState extends State<_LoginScreen> {
                       const _BrandHeader(
                           title: 'Centro de operaciones',
                           subtitle: 'Acceso privado para personal autorizado.'),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: checkingApi ? null : checkConnection,
+                        icon: checkingApi
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.wifi_tethering_rounded),
+                        label: Text(checkingApi
+                            ? 'Comprobando conexión…'
+                            : 'Probar conexión al backend'),
+                      ),
+                      const SizedBox(height: 24),
                       TextFormField(
                         controller: email,
                         keyboardType: TextInputType.emailAddress,
