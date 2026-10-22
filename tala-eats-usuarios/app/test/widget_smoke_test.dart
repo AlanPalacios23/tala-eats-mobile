@@ -310,6 +310,22 @@ void main() {
 
     expect(find.text('Finalizar pedido'), findsOneWidget);
     expect(find.text('Revisar métodos de pago'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Efectivo'), 160,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(find.text('Tarjeta con Stripe'), findsOneWidget);
+    final PaymentChoiceCard cashCard =
+        tester.widget<PaymentChoiceCard>(find.byKey(const ValueKey<String>('payment-method-cash')));
+    final PaymentChoiceCard stripeCard =
+        tester.widget<PaymentChoiceCard>(find.byKey(const ValueKey<String>('payment-method-stripe')));
+    expect(cashCard.enabled, isFalse);
+    expect(stripeCard.enabled, isFalse);
+    expect(model.paymentMethod, isEmpty);
+    expect(model.hasAvailablePaymentMethod, isFalse);
+    expect(find.text('Mercado Pago'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
   });
 
   // v1.0.9 — Home muestra directamente la lista de comercios.
@@ -392,6 +408,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Efectivo'), findsOneWidget);
+    expect(find.text('Tarjeta con Stripe'), findsOneWidget);
+    expect(tester.widget<PaymentChoiceCard>(
+        find.byKey(const ValueKey<String>('payment-method-cash'))).enabled, isTrue);
+    expect(tester.widget<PaymentChoiceCard>(
+        find.byKey(const ValueKey<String>('payment-method-stripe'))).enabled, isFalse);
+    expect(model.paymentMethod, 'cash');
     expect(find.textContaining('Confirmar pedido'), findsOneWidget);
     expect(find.text('Mercado Pago'), findsNothing);
     await tester.pumpWidget(const SizedBox());
@@ -431,17 +453,59 @@ void main() {
     expect(model.stripePayments, isTrue);
     expect(model.isPaymentMethodEnabled('mercadopago'), isFalse);
     expect(find.text('Mercado Pago'), findsNothing);
-    await tester.scrollUntilVisible(find.text('Tarjeta y Google Pay'), 120, scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(find.text('Tarjeta con Stripe'), 120, scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Tarjeta y Google Pay'), findsOneWidget);
-    expect(find.text('Pago seguro procesado por Stripe'), findsOneWidget);
+    expect(find.text('Tarjeta con Stripe'), findsOneWidget);
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(tester.widget<PaymentChoiceCard>(
+        find.byKey(const ValueKey<String>('payment-method-stripe'))).enabled, isTrue);
+    expect(tester.widget<PaymentChoiceCard>(
+        find.byKey(const ValueKey<String>('payment-method-cash'))).enabled, isFalse);
+    expect(find.text('Tarjeta y billeteras compatibles · pago seguro'), findsOneWidget);
     // The production CTA deliberately avoids showing a provisional total.
     expect(find.text('Continuar a pago con Stripe'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     model.dispose();
   });
 
+
+  testWidgets('Checkout permite alternar efectivo y Stripe solo cuando ambos estan habilitados',
+      (WidgetTester tester) async {
+    final _CheckoutPaymentMethodsQaApi api =
+        _CheckoutPaymentMethodsQaApi(cash: true, mercadoPago: true, stripe: true);
+    final TalaModel model = TalaModel(apiClient: api);
+    model.restaurants.add(const Restaurant(
+      id: 90, name: 'Comercio Ambos QA', category: 'QA', rating: 4.6,
+      eta: '20 min', deliveryFee: 15, image: '', description: 'QA',
+    ));
+    model.addToCart(const FoodItem(
+      id: 9001, restaurantId: 90, name: 'Producto Ambos QA',
+      description: 'QA', price: 105, image: '', category: 'QA',
+    ), 1);
+    await tester.pumpWidget(MaterialApp(home: CheckoutScreen(model: model)));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Efectivo'), 160,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(find.text('Tarjeta con Stripe'), findsOneWidget);
+    expect(find.text('Mercado Pago'), findsNothing);
+    expect(tester.widget<PaymentChoiceCard>(
+        find.byKey(const ValueKey<String>('payment-method-cash'))).enabled, isTrue);
+    expect(tester.widget<PaymentChoiceCard>(
+        find.byKey(const ValueKey<String>('payment-method-stripe'))).enabled, isTrue);
+    expect(model.paymentMethod, 'stripe');
+    await tester.tap(find.text('Efectivo'));
+    await tester.pumpAndSettle();
+    expect(model.paymentMethod, 'cash');
+    await tester.tap(find.text('Tarjeta con Stripe'));
+    await tester.pumpAndSettle();
+    expect(model.paymentMethod, 'stripe');
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
 
   test('Stripe pendiente se muestra como pago pendiente y no como pedido activo', () async {
     final TalaModel model = TalaModel(apiClient: _PendingStripeOrderApi());
