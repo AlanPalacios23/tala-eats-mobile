@@ -32,6 +32,7 @@ class AdminController extends ChangeNotifier {
   int tab = 0;
   bool busy = false;
   String? error;
+  String? notice;
   String? mfaSecret;
 
   void _signal() => notifyListeners();
@@ -49,6 +50,9 @@ class AdminController extends ChangeNotifier {
         api.token = remembered;
         final me = await api.me();
         if (me['role'] == 'admin' && me['two_factor_enabled'] == true) {
+          // /auth/me comprueba identidad, pero /admin/stats comprueba además
+          // la sesión MFA efectiva. Un JWT previo al alta de 2FA no basta.
+          stats = await api.stats();
           user = me;
           stage = AdminStage.signedIn;
         } else {
@@ -68,6 +72,7 @@ class AdminController extends ChangeNotifier {
     api.token = null;
     user = null;
     mfaSecret = null;
+    notice = null;
     stats = {};
     orders = [];
     applications = [];
@@ -85,6 +90,7 @@ class AdminController extends ChangeNotifier {
     if (busy) return;
     busy = true;
     error = null;
+    notice = null;
     _signal();
     try {
       final identity = await api.login(email, password, otp);
@@ -135,14 +141,17 @@ class AdminController extends ChangeNotifier {
     _signal();
     try {
       await api.mfaConfirm(otp);
-      final me = await api.me();
-      if (me['role'] != 'admin' || me['two_factor_enabled'] != true) {
-        throw const AdminApiException(403, 'El servidor no confirmó el segundo factor.');
+      // La sesión original fue emitida ANTES de probar TOTP: el JWT
+      // conserva mfa=false. Revocarla y exigir nuevo login con OTP.
+      try {
+        await api.logout();
+      } catch (_) {
+        // Aun sin red, jamás reutilizar ese token temporal.
       }
-      user = me;
-      mfaSecret = null;
-      await storage.write(key: _key, value: api.token);
-      stage = AdminStage.signedIn;
+      await _forget();
+      stage = AdminStage.signedOut;
+      notice = 'Autenticador activado. Inicia sesión de nuevo '
+          'con tu contraseña y el código TOTP para entrar al panel.';
     } catch (e) {
       error = e.toString();
     } finally {
@@ -164,6 +173,16 @@ class AdminController extends ChangeNotifier {
     busy = true;
     error = null;
     _signal();
+    // Nunca presentar un snapshot anterior como si fuera información actual.
+    if (tab == 0) stats = {};
+    if (tab == 1) orders = [];
+    if (tab == 2) tickets = [];
+    if (tab == 3) restaurants = [];
+    if (tab == 4) {
+      applications = [];
+      users = [];
+    }
+    _signal();
     try {
       if (tab == 0) {
         stats = await api.stats();
@@ -174,8 +193,12 @@ class AdminController extends ChangeNotifier {
       } else if (tab == 3) {
         restaurants = await api.collection('/admin/restaurants?filter=all&limit=100');
       } else {
-        applications = await api.collection('/operations/admin/onboarding');
-        users = await api.collection('/admin/users?limit=50&offset=0');
+        final nextApplications =
+            await api.collection('/operations/admin/onboarding');
+        final nextUsers =
+            await api.collection('/admin/users?limit=50&offset=0');
+        applications = nextApplications;
+        users = nextUsers;
       }
     } on AdminApiException catch (e) {
       if (e.status == 401 || e.status == 403) {
@@ -228,7 +251,7 @@ class AdminController extends ChangeNotifier {
       await refresh();
       return stage == AdminStage.signedIn && error == null;
     } on AdminApiException catch (e) {
-      if (e.status == 401) {
+      if (e.status == 401 || e.status == 403) {
         await _forget();
         stage = AdminStage.signedOut;
       }
@@ -261,7 +284,7 @@ class AdminController extends ChangeNotifier {
       await refresh();
       return stage == AdminStage.signedIn && error == null;
     } on AdminApiException catch (e) {
-      if (e.status == 401) {
+      if (e.status == 401 || e.status == 403) {
         await _forget();
         stage = AdminStage.signedOut;
       }
@@ -286,6 +309,7 @@ class AdminController extends ChangeNotifier {
     stage = AdminStage.signedOut;
     tab = 0;
     error = null;
+    notice = null;
     _signal();
   }
 
@@ -507,6 +531,14 @@ class _LoginScreenState extends State<_LoginScreen> {
                       const SizedBox(height: 18),
                       if (widget.control.error != null) _ErrorLabel(
                           message: widget.control.error!),
+                      if (widget.control.notice != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(widget.control.notice!,
+                              style: const TextStyle(
+                                  color: Color(0xFF276749),
+                                  fontWeight: FontWeight.w600)),
+                        ),
                       const SizedBox(height: 12),
                       FilledButton(
                         onPressed: widget.control.busy ? null : () {
@@ -680,10 +712,12 @@ class _AdminShell extends StatelessWidget {
                     if (control.tab == 1) _OrdersList(orders: control.orders),
                     if (control.tab == 2) AdminSupportPanel(
                       tickets: control.tickets, busy: control.busy,
+                      writesEnabled: control.api.writesEnabled,
                       onRespond: control.supportAction,
                       error: control.error),
                     if (control.tab == 3) AdminRestaurantsPanel(
                       restaurants: control.restaurants, busy: control.busy,
+                      writesEnabled: control.api.writesEnabled,
                       onAction: (id, action, name, reason) =>
                           control.restaurantAction(id, action,
                             confirmName: name, reason: reason),
@@ -919,7 +953,7 @@ class _OnboardingList extends StatelessWidget {
               const SizedBox(height: 8),
               Text('${item['notes']}', style: const TextStyle(fontSize: 13)),
             ],
-            if (pending && id > 0 && kAdminWritesEnabled) ...[
+            if (pending && id > 0 && control.api.writesEnabled) ...[
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 FilledButton.tonal(
@@ -939,7 +973,7 @@ class _OnboardingList extends StatelessWidget {
                 ),
               ]),
             ],
-            if (pending && !kAdminWritesEnabled) ...[
+            if (pending && !control.api.writesEnabled) ...[
               const SizedBox(height: 10),
               const Text('Decisiones desactivadas en esta compilación de consulta.',
                 style: TextStyle(fontSize: 12, color: Colors.black54)),
