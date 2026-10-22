@@ -1,5 +1,5 @@
 # TALA EATS Usuarios - Ejecutar UNICAMENTE en Windows propio; NO en CI.
-# Esta herramienta NO sube la app a Play, no imprime contraseñas y no exporta claves.
+# Esta herramienta NO sube la app a Play, no imprime contrasenas y no exporta claves.
 [CmdletBinding()]
 param(
     [switch]$SoloRevisar,
@@ -46,7 +46,7 @@ function Invoke-ReleaseScript([string] $flag) {
 
 Push-Location $Root
 try {
-    # Gate sin llaves ni conexión LIVE.
+    # Gate sin llaves ni conexion LIVE.
     Invoke-ReleaseScript '--check'
     if (-not [string]::IsNullOrWhiteSpace($OriginalesZip)) {
         $ZipResolved = (Resolve-Path -LiteralPath $OriginalesZip -ErrorAction Stop).Path
@@ -60,21 +60,21 @@ try {
         }
     }
     if ($SoloRevisar) {
-        Write-Host 'Comprobación del código aprobada; no se generó ni firmó el AAB.'
+        Write-Host 'Comprobacion del codigo aprobada; no se genero ni firmo el AAB.'
         return
     }
 
     # Explicitly validate originals before even creating an upload key.
     & python $HdVerifyScript
     if ($LASTEXITCODE -ne 0) {
-        throw 'Faltan originales HD verificados. NO se generó la clave ni el AAB.'
+        throw 'Faltan originales HD verificados. NO se genero la clave ni el AAB.'
     }
 
     if (-not (Test-Path -LiteralPath $KeystorePath -PathType Leaf)) {
         $KeyDir = Split-Path -Parent $KeystorePath
         New-Item -ItemType Directory -Force -Path $KeyDir | Out-Null
-        Write-Host 'No se encontró la upload key. Se creará localmente con keytool.'
-        Write-Host 'Los datos y contraseñas se ingresan en la terminal, sin subirlos aquí.'
+        Write-Host 'No se encontro la upload key. Se creara localmente con keytool.'
+        Write-Host 'Los datos y contrasenas se ingresan en la terminal, sin subirlos aqui.'
         & keytool -genkeypair -v -keystore $KeystorePath -storetype PKCS12 -keyalg RSA -keysize 3072 -validity 10000 -alias 'talaeats-upload'
         if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar la upload key.' }
         Write-Host 'IMPORTANTE: respalda este archivo cifrado fuera del equipo.'
@@ -86,7 +86,7 @@ try {
     if ([string]::IsNullOrWhiteSpace($alias)) { $alias = 'talaeats-upload' }
     [Environment]::SetEnvironmentVariable('TALAEATS_UPLOAD_KEY_ALIAS', $alias, 'Process')
 
-    $storePassword = Read-Secret 'Contraseña del almacén de claves'
+    $storePassword = Read-Secret 'Contrasena del almacen de claves'
     [Environment]::SetEnvironmentVariable(
         'TALAEATS_UPLOAD_STORE_PASSWORD', $storePassword, 'Process')
     if ([IO.Path]::GetExtension($KeystorePath).ToLowerInvariant() -in @('.p12', '.pfx')) {
@@ -96,12 +96,12 @@ try {
     } else {
         [Environment]::SetEnvironmentVariable(
             'TALAEATS_UPLOAD_KEY_PASSWORD',
-            (Read-Secret 'Contraseña de la clave'), 'Process')
+            (Read-Secret 'Contrasena de la clave'), 'Process')
     }
     $storePassword = $null
 
     foreach ($name in $PublicNames) {
-        $value = Read-Host "Valor público Firebase: $name"
+        $value = Read-Host "Valor publico Firebase: $name"
         if ([string]::IsNullOrWhiteSpace($value)) {
             throw "Falta $name; no se puede compilar."
         }
@@ -109,9 +109,9 @@ try {
     }
 
     Invoke-ReleaseScript '--build'
-    Write-Host 'AAB firmado listo para validación manual. NO publicado.'
+    Write-Host 'AAB firmado listo para validacion manual. NO publicado.'
     Write-Host 'Ruta: app\build\app\outputs\bundle\release\app-release.aab'
-    Write-Host 'Revisar además Play App Signing, recursos HD, pruebas reales y compatibilidad 16 KB.'
+    Write-Host 'Revisar ademas Play App Signing, recursos HD, pruebas reales y compatibilidad 16 KB.'
 } finally {
     foreach ($name in ($PrivateNames + $PublicNames)) {
         Remove-Item -Path ("Env:" + $name) -ErrorAction SilentlyContinue
