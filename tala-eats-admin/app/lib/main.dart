@@ -589,7 +589,7 @@ class _LoginScreenState extends State<_LoginScreen> {
                               .push<String>(MaterialPageRoute(
                                   builder: (_) => AdminRegistrationScreen(
                                       api: widget.control.api)));
-                          if (!mounted || created == null) return;
+                          if (!context.mounted || created == null) return;
                           email.text = created;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text(
