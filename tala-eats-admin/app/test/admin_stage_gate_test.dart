@@ -9,6 +9,17 @@ import 'package:talaeats_admin/admin_api.dart';
 void main() {
   const stage = 'https://admin-stage.example.test/api/v1';
 
+  // flutter test normal sigue siendo read-only; la matriz CI ejecuta
+  // además este mismo archivo con dos --dart-define explícitos.
+  if (!kAdminWritesEnabled) {
+    test('La compilación estándar no permite escrituras administrativas', () {
+      final api = AdminApi(baseUrl: stage);
+      expect(api.writesEnabled, isFalse);
+      api.dispose();
+    });
+    return;
+  }
+
   test('Mutaciones requieren coincidencia HTTPS exacta con staging', () async {
     expect(kAdminWritesEnabled, isTrue);
     expect(kAdminWriteApiBase, stage);
