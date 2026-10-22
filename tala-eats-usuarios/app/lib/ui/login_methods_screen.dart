@@ -121,12 +121,37 @@ class TalaLoginMethodsScreen extends StatelessWidget {
               bottom: math.max(20, bottom + 18),
               left: 22,
               right: 22,
-              child: _LoginEmailButton(
-                key: const ValueKey<String>('signInEmail'),
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  onEmail();
-                },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  _LoginEmailButton(
+                    key: const ValueKey<String>('signInEmail'),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      onEmail();
+                    },
+                  ),
+                  if (onRegister != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      key: const ValueKey<String>('registerFromMethods'),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        onRegister!();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text('¿Aún no tienes cuenta? Crear cuenta',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w800,
+                          shadows: <Shadow>[
+                            Shadow(color: Color(0x99000000), blurRadius: 10),
+                          ])),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
