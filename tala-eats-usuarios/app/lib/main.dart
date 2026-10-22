@@ -1574,18 +1574,37 @@ class _LaunchScreenState extends State<LaunchScreen>
             Positioned(
               left: 16,
               right: 16,
-              bottom: 74,
+              bottom: 58,
               child: FadeTransition(
                 opacity: _subtitle,
-                child: const Text(
-                  'Pide, disfruta y repite.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 17,
-                    color: Color(0xFF777777),
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: -0.2,
-                  ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      'Pide, disfruta y repite.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 17,
+                        color: Color(0xFF777777),
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    Semantics(
+                      label: 'Preparando Tala Eats',
+                      liveRegion: true,
+                      child: SizedBox(
+                        width: 110,
+                        child: LinearProgressIndicator(
+                          minHeight: 3,
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                          backgroundColor: Color(0xFFFFE9DD),
+                          valueColor: AlwaysStoppedAnimation<Color>(kBrandDeep),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
