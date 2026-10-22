@@ -87,7 +87,8 @@ void main() {
     expect(api.posts, 1);
     expect(api.tickets, isEmpty);
     expect(find.text('No hay conexión'), findsOneWidget);
-    expect(find.text('Problema de pago'), findsNothing);
+    // Keep the unsent draft so customers can retry without retyping.
+    expect(find.text('Problema de pago'), findsOneWidget);
     expect(find.textContaining('Caso #'), findsNothing);
     expect(find.byKey(const ValueKey<String>('supportChatInput')), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
