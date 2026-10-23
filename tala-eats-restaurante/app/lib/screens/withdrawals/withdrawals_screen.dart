@@ -188,8 +188,8 @@ class _WithdrawalsScreenState extends State<WithdrawalsScreen> {
 
     return <Widget>[
       if (!c.transfersEnabled) ...<Widget>[
-        const InlineAlert(
-          key: ValueKey<String>('withdrawals-disabled-notice'),
+        InlineAlert(
+          key: const ValueKey<String>('withdrawals-disabled-notice'),
           title: 'Registro bancario y retiros son distintos',
           message: onboardingUnavailable
               ? 'Stripe Connect y los retiros todavía no están habilitados. '
