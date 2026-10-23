@@ -31,12 +31,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Java 21 for temporary Android scaffold
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Flutter 3.47.6
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.6"
           channel: stable
           cache: true
+      - name: Generate disposable Android scaffold (never signs releases)
+        run: python3 "tala-eats-${{ matrix.role }}/ci/bootstrap_android.py" --role "${{ matrix.role }}"
       - name: Android security gate (no keystores or Stripe LIVE keys)
         run: python3 ci/security_android_gate.py --role "${{ matrix.role }}"
       - name: Prepare bundled font assets for restaurant
