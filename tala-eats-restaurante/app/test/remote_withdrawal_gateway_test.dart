@@ -73,6 +73,25 @@ void main() {
     expect(overview.serverAllowsRequests, false);
   });
 
+  test('Node RC7 devuelve bloqueo de retiros sin inventar saldo cero', () async {
+    final api = RemoteApi(session: _Session(), client: MockClient((request) async {
+      expect(request.url.path, '/api/v1/withdrawals/restaurant/7/balance');
+      return http.Response(jsonEncode(<String, Object>{
+        'currency': 'MXN',
+        'provider': 'not-configured',
+        'eligible': false,
+        'reconciliation_hold': true,
+        'available_for_withdrawal': '0.00',
+      }), 200);
+    }));
+    final gateway = RemoteWithdrawalGateway(api, recipientId: 7, journal: _Journal());
+    final overview = await gateway.fetchOverview();
+    expect(overview.balance, isNull);
+    expect(overview.bank.status, BankAccountStatus.unavailable);
+    expect(overview.serverAllowsRequests, false);
+    expect(overview.reconciling, true);
+  });
+
   test('v1.6.2 sin endpoint retiros devuelve error y no saldo falso', () async {
     final api = RemoteApi(session: _Session(), client: MockClient((_) async =>
         http.Response('not found', 404)));

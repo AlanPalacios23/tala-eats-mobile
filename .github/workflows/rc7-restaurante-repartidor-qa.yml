@@ -1,0 +1,60 @@
+name: "TALA EATS | RC7 Restaurante y Repartidor QA"
+
+# Only runs when relevant mobile sources or this QA workflow are reviewed.
+# Never sends secrets to PRs, never deploys, never signs release APKs.
+on:
+  pull_request:
+    paths:
+      - "tala-eats-restaurante/**"
+      - "tala-eats-repartidor/**"
+      - ".github/workflows/rc7-restaurante-repartidor-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rc7-mobile-roles-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    name: "${{ matrix.role }} - analyze + tests"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [restaurante, repartidor]
+    steps:
+      - name: Checkout (read-only, no persistent token)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Java 21 for temporary Android scaffold
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Flutter 3.47.6
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+          cache: true
+      - name: Generate disposable Android scaffold (never signs releases)
+        run: python3 "tala-eats-${{ matrix.role }}/ci/bootstrap_android.py" --role "${{ matrix.role }}"
+      - name: Android security gate (no keystores or Stripe LIVE keys)
+        run: python3 ci/security_android_gate.py --role "${{ matrix.role }}"
+      - name: Prepare bundled font assets for restaurant
+        if: matrix.role == 'restaurante'
+        run: python3 tala-eats-restaurante/ci/prepare_fonts.py
+      - name: Install dependencies
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: flutter pub get
+      - name: Static analysis
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: flutter analyze --no-fatal-infos
+      - name: All Flutter tests (including RC7 financial UI guards)
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: flutter test --reporter expanded

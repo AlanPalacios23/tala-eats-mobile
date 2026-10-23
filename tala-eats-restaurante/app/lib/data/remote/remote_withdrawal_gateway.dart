@@ -108,6 +108,23 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
         serverAllowsRequests: false,
       );
     }
+    // Node RC7 deliberately reports NO withdrawable amount while Connect
+    // verification and reconciliation are unfinished. The legacy Python
+    // contract uses *_cents fields, which RC7 does not expose yet.
+    // Only accept the EXACT fail-closed shape below; never infer 0 from a
+    // malformed/missing money response or enable transfers.
+    final rc7Held = data['reconciliation_hold'] == true &&
+        data['eligible'] == false &&
+        data['provider'] == 'not-configured' &&
+        data['available_for_withdrawal'] == '0.00';
+    if (rc7Held) {
+      return const WithdrawalOverview(
+        integration: WithdrawalIntegration.connected,
+        bank: BankAccountSummary(status: BankAccountStatus.unavailable),
+        serverAllowsRequests: false,
+        reconciling: true,
+      );
+    }
     final balance = WithdrawalBalance.fromJson(data);
     if (!balance.isMxn || balance.withdrawableCents < 0 ||
         balance.alreadyRequestedCents < 0 ||

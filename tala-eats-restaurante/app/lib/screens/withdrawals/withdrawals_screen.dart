@@ -181,20 +181,28 @@ class _WithdrawalsScreenState extends State<WithdrawalsScreen> {
     final bank = overviewFailed
         ? const BankAccountSummary(status: BankAccountStatus.unavailable)
         : overview.bank;
+    // Node RC7 reports a held, unverified withdrawal balance, with Connect
+    // onboarding disabled. Do not advertise a link the server cannot issue.
+    final onboardingUnavailable = overview.reconciling &&
+        bank.status == BankAccountStatus.unavailable;
 
     return <Widget>[
       if (!c.transfersEnabled) ...<Widget>[
-        const InlineAlert(
-          key: ValueKey<String>('withdrawals-disabled-notice'),
+        InlineAlert(
+          key: const ValueKey<String>('withdrawals-disabled-notice'),
           title: 'Registro bancario y retiros son distintos',
-          message: 'Puedes registrar tu banco con Stripe Connect ahora. '
-              'Enviar ganancias al banco sigue bloqueado hasta que '
-              'Tala Eats confirme fondos y autorice los retiros.',
+          message: onboardingUnavailable
+              ? 'Stripe Connect y los retiros todavía no están habilitados. '
+                  'Tus ingresos siguen pendientes de conciliación.'
+              : 'Puedes registrar tu banco con Stripe Connect ahora. '
+                  'Enviar ganancias al banco sigue bloqueado hasta que '
+                  'Tala Eats confirme fondos y autorice los retiros.',
           tone: AlertTone.info,
           icon: Icons.account_balance_outlined,
         ),
         const SizedBox(height: AppSpace.md),
-        if (!overviewLoading && bank.status != BankAccountStatus.verified) ...<Widget>[
+        if (!overviewLoading && !onboardingUnavailable &&
+            bank.status != BankAccountStatus.verified) ...<Widget>[
           AppButton(
             key: const ValueKey<String>('connect-register-now'),
             label: 'Vincular banco con Stripe',
