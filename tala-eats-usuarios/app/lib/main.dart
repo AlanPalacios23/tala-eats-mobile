@@ -284,6 +284,7 @@ class TalaModel extends ChangeNotifier {
   final List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
   // No confundir una wallet que respondió 503 con saldo y movimientos cero.
   bool walletSyncFailed = false;
+  bool notificationsSyncFailed = false;
   int _marketCatalogEpoch = 0;
   final Set<int> _menusLoading = <int>{};
   final Set<int> _menuLoadErrors = <int>{};
@@ -411,8 +412,10 @@ class TalaModel extends ChangeNotifier {
       }
       try {
         _applyNotifications(await api.notifications());
+        notificationsSyncFailed = false;
       } catch (_) {
-        // No presentar notificaciones anteriores como recien recibidas.
+        // No confundir un HTTP 503 con una bandeja realmente vacía.
+        notificationsSyncFailed = true;
       }
 
       // Módulos secundarios degradan de forma independiente.
