@@ -29,10 +29,12 @@ class _DriverSettlementBalancesState extends State<DriverSettlementBalances> {
       if(response is! Map)throw const FormatException('Missing Connect link');
       final uri=Uri.tryParse((response['url']??'').toString());
       if(uri==null||uri.scheme!='https'||
-         !{'connect.stripe.com','dashboard.stripe.com'}.contains(uri.host))
+         !{'connect.stripe.com','dashboard.stripe.com'}.contains(uri.host)) {
         throw const FormatException('Connect link is not from Stripe');
-      if(!await launchUrl(uri,mode:LaunchMode.externalApplication))
+      }
+      if(!await launchUrl(uri,mode:LaunchMode.externalApplication)) {
         throw const FormatException('Unable to open Stripe');
+      }
     }catch(_){
       if(mounted){
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -58,9 +60,11 @@ class _DriverSettlementBalancesState extends State<DriverSettlementBalances> {
         final status=Map<dynamic,dynamic>.from(snapshot.data as Map);
         final complete=status['transfers_active']==true&&
           status['payouts_enabled']==true&&status['details_submitted']==true;
-        if(complete)return const Text('Stripe Connect: verificación completada. '
-          'Tus ganancias aún requieren conciliación y aprobación.',
-          style:TextStyle(fontSize:12));
+        if(complete) {
+          return const Text('Stripe Connect: verificación completada. '
+            'Tus ganancias aún requieren conciliación y aprobación.',
+            style:TextStyle(fontSize:12));
+        }
         return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           const Text('Stripe Connect pendiente de verificación bancaria.',
             style:TextStyle(fontSize:12)),
@@ -81,7 +85,7 @@ class _DriverSettlementBalancesState extends State<DriverSettlementBalances> {
     }
     return cents;
   }
-  String _money(int cents) => 'MXN ' + (cents/100).toStringAsFixed(2);
+  String _money(int cents) => 'MXN ${(cents/100).toStringAsFixed(2)}';
   @override
   Widget build(BuildContext context) => Card(
     child:Padding(padding:const EdgeInsets.all(16),
