@@ -175,7 +175,8 @@ class OperationsController extends ChangeNotifier {
   void _startLiveSync() {
     if (!services.isRemote || _ordersTimer != null || _disposed) return;
     _ordersTimer = Timer.periodic(
-      const Duration(seconds: 12),
+      // Short foreground refresh until server-originated push is validated.
+      const Duration(seconds: 6),
       (_) => _pollOrders(),
     );
   }
