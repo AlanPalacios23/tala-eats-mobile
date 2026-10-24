@@ -282,6 +282,8 @@ class TalaModel extends ChangeNotifier {
   final List<Map<String, dynamic>> promotions = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> coupons = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
+  // No confundir una wallet que respondió 503 con saldo y movimientos cero.
+  bool walletSyncFailed = false;
   int _marketCatalogEpoch = 0;
   final Set<int> _menusLoading = <int>{};
   final Set<int> _menuLoadErrors = <int>{};
@@ -390,8 +392,6 @@ class TalaModel extends ChangeNotifier {
         api.addresses(),
         api.orders(),
         api.favorites(),
-        api.wallet(),
-        api.notifications(),
       ]);
       _applyBootstrap(Map<String, dynamic>.from(core[0] as Map));
       if (catalogEpoch == _marketCatalogEpoch && requestedMarket == marketCode) {
@@ -400,9 +400,20 @@ class TalaModel extends ChangeNotifier {
       _applyAddresses(List<dynamic>.from(core[2] as List));
       _applyOrders(List<dynamic>.from(core[3] as List));
       _applyFavorites(List<dynamic>.from(core[4] as List));
-      _applyWallet(Map<String, dynamic>.from(core[5] as Map));
-      _applyNotifications(List<dynamic>.from(core[6] as List));
       online = true;
+      // La falla de una funcion secundaria no debe bloquear el catalogo,
+      // direcciones ni pedidos que ya respondieron correctamente.
+      try {
+        _applyWallet(await api.wallet());
+        walletSyncFailed = false;
+      } catch (_) {
+        walletSyncFailed = true;
+      }
+      try {
+        _applyNotifications(await api.notifications());
+      } catch (_) {
+        // No presentar notificaciones anteriores como recien recibidas.
+      }
 
       // Módulos secundarios degradan de forma independiente.
       try { _applyPrivacy(Map<String, dynamic>.from((await api.privacy()) as Map)); } catch (_) {}
