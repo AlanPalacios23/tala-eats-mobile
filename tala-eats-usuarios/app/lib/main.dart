@@ -308,6 +308,7 @@ class TalaModel extends ChangeNotifier {
   // hasta que exista una cotización y ruta de creación soportada en backend.
   bool backendPickupOnly = false;
   bool pickupQuoteSupported = false;
+  bool deliveryCapabilitiesDeclared = false;
   bool deliveryCashSupported = false;
   bool deliveryStripeSupported = false;
   bool deliveryQuoteSupported = false;
@@ -780,11 +781,11 @@ class TalaModel extends ChangeNotifier {
   bool isPaymentMethodEnabled(String value) {
     if (!paymentMethodsVerified) return false;
     if (value == 'cash') return cashPayments &&
-        (deliveryMode != 'delivery' || deliveryCashSupported);
+        (deliveryMode != 'delivery' || !deliveryCapabilitiesDeclared || deliveryCashSupported);
     // RC0 accepts cash and Stripe for NEW orders; keep MP only for legacy history.
     if (value == 'mercadopago') return false;
     if (value == 'stripe') return stripePayments &&
-        (deliveryMode != 'delivery' || deliveryStripeSupported);
+        (deliveryMode != 'delivery' || !deliveryCapabilitiesDeclared || deliveryStripeSupported);
     return false;
   }
 
@@ -803,6 +804,7 @@ class TalaModel extends ChangeNotifier {
     stripePayments = false;
     backendPickupOnly = false;
     pickupQuoteSupported = false;
+    deliveryCapabilitiesDeclared = false;
     deliveryCashSupported = false;
     deliveryStripeSupported = false;
     deliveryQuoteSupported = false;
@@ -838,6 +840,8 @@ class TalaModel extends ChangeNotifier {
         }
       }
       pickupQuoteSupported = raw['pickup_quote_supported'] == true;
+      deliveryCapabilitiesDeclared = raw.containsKey('delivery_cash_supported') ||
+          raw.containsKey('delivery_stripe_supported');
       deliveryCashSupported = raw['delivery_cash_supported'] == true;
       deliveryStripeSupported = raw['delivery_stripe_supported'] == true;
       deliveryQuoteSupported = raw['delivery_quote_supported'] == true;
