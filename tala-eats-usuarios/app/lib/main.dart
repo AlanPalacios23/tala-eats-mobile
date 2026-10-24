@@ -777,7 +777,7 @@ class TalaModel extends ChangeNotifier {
   void setCoupon(String value) { coupon = value.trim(); notifyListeners(); }
 
   bool get hasAvailablePaymentMethod =>
-      paymentMethodsVerified && (cashPayments || stripePayments);
+      isPaymentMethodEnabled('cash') || isPaymentMethodEnabled('stripe');
 
   bool isPaymentMethodEnabled(String value) {
     if (!paymentMethodsVerified) return false;
