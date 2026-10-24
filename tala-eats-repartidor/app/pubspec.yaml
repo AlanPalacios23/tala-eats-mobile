@@ -1,7 +1,7 @@
 name: talaeats_driver
 description: Tala Eats Repartidor - frontend Android-first del ecosistema Tala Eats.
 publish_to: 'none'
-version: 1.2.7+23
+version: 1.2.8+24
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
