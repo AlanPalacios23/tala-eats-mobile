@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/remote/remote_api.dart';
 
 /// Amounts read from the server's held-payee ledger. Does not show bank
@@ -14,6 +15,8 @@ class RestaurantSettlementBalances extends StatefulWidget {
 }
 class _RestaurantSettlementBalancesState extends State<RestaurantSettlementBalances> {
   late Future<dynamic> _future;
+  late Future<dynamic> _connectFuture;
+  bool _openingOnboarding=false;
   @override
   void initState(){super.initState();_reload();}
   @override
@@ -23,8 +26,57 @@ class _RestaurantSettlementBalancesState extends State<RestaurantSettlementBalan
   }
   void _reload(){
     _future=widget.api.get('/owner/finance/earnings/'+widget.restaurantId.toString());
+    _connectFuture=widget.api.get('/owner/finance/connect/'+widget.restaurantId.toString()+'/status');
   }
   void _retry()=>setState(_reload);
+  Future<void> _openStripeOnboarding() async{
+    if(_openingOnboarding)return;
+    setState(()=>_openingOnboarding=true);
+    try{
+      final path='/owner/finance/connect/'+widget.restaurantId.toString();
+      await widget.api.post(path+'/confirm');
+      final response=await widget.api.post(path+'/onboarding-link');
+      if(response is! Map)throw const FormatException('Missing Connect link');
+      final uri=Uri.tryParse((response['url']??'').toString());
+      if(uri==null||uri.scheme!='https'||
+         !{'connect.stripe.com','dashboard.stripe.com'}.contains(uri.host))
+        throw const FormatException('Connect link is not from Stripe');
+      if(!await launchUrl(uri,mode:LaunchMode.externalApplication))
+        throw const FormatException('Unable to open Stripe');
+    }catch(_){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('No fue posible abrir Stripe Connect. Reintenta.')));
+    }finally{
+      if(mounted)setState((){_openingOnboarding=false;_reload();});
+    }
+  }
+  Widget _connectStatus()=>FutureBuilder<dynamic>(
+    future:_connectFuture,
+    builder:(context,snapshot){
+      if(snapshot.connectionState!=ConnectionState.done){
+        return const Padding(padding:EdgeInsets.symmetric(vertical:8),
+          child:LinearProgressIndicator());
+      }
+      if(snapshot.hasError||snapshot.data is! Map){
+        return const Text('Para recibir depósitos, solicita el registro de '
+          'Stripe Connect al administrador de Tala Eats.',
+          style:TextStyle(fontSize:12));
+      }
+      final status=Map<dynamic,dynamic>.from(snapshot.data as Map);
+      final verified=status['transfers_active']==true&&
+        status['payouts_enabled']==true&&status['details_submitted']==true;
+      if(verified)return const Text('Stripe Connect verificado. '
+        'Las transferencias todavía requieren conciliación y aprobación.',
+        style:TextStyle(fontSize:12));
+      return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        const Text('Tu cuenta Stripe Connect aún requiere datos de identidad '
+          'o cuenta bancaria.',style:TextStyle(fontSize:12)),
+        TextButton.icon(onPressed:_openingOnboarding?null:_openStripeOnboarding,
+          icon:const Icon(Icons.open_in_new),
+          label:const Text('Continuar en Stripe')),
+      ]);
+    },
+  );
   int _sum(dynamic source,String name,String state){
     if(source is! List)return 0;
     var value=0;
@@ -75,6 +127,8 @@ class _RestaurantSettlementBalancesState extends State<RestaurantSettlementBalan
           _line('Pendiente de revisión',held),
           _line('Revisado (no transferido)',reviewed),
           _line('Efectivo por rendir',due),
+          const SizedBox(height:8),
+          _connectStatus(),
           const SizedBox(height:8),
           const Text('La transferencia Stripe Connect y el depósito al banco '
             'son estados distintos. Los saldos se actualizan desde el servidor.',
