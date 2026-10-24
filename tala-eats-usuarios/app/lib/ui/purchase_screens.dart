@@ -355,7 +355,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // silent, unexpected Stripe charge or cash purchase.
         final String key = _quoteFingerprint();
         final Map<String, dynamic>? displayed = _verifiedQuote;
-        final Map<String, dynamic> fresh = await _requestPickupQuote();
+        final Map<String, dynamic> fresh = await _requestCheckoutQuote();
         if (!mounted) return;
         setState(() {
           _serverQuoteKey = key;
