@@ -396,6 +396,7 @@ class DriverBackend {
       customerLat: _nullableDouble(customer['lat']),
       customerLng: _nullableDouble(customer['lng']),
       total: _double(raw['total']),
+      paymentMethod: _text(raw['payment_method'], fallback: 'unknown'),
       earning: _double(raw['earning']),
       distanceKm: _double(raw['distance_km']),
       etaMinutes: _int(raw['eta_minutes']),
@@ -429,6 +430,7 @@ class DriverBackend {
       customerLat: _nullableDouble(raw['delivery_lat']) ?? fallback.customerLat,
       customerLng: _nullableDouble(raw['delivery_lng']) ?? fallback.customerLng,
       total: _double(raw['total'], fallback: fallback.total),
+      paymentMethod: _text(raw['payment_method'], fallback: fallback.paymentMethod),
       earning: _double(raw['driver_earning'], fallback: fallback.earning) +
           _double(raw['tip']),
       distanceKm: _double(raw['distance_km'], fallback: fallback.distanceKm),
