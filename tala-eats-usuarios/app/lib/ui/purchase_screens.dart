@@ -232,6 +232,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // A cached payment method must never authorize an order while rechecking.
     if (placing || refreshingPayment) return;
     final TalaModel model = widget.model;
+    if (model.deliveryCheckoutBlocked) {
+      setState(() => error = 'A domicilio todavía no está disponible en este servidor. '
+          'Elige Recoger antes de confirmar.');
+      return;
+    }
     if (model.deliveryMode == 'delivery' && model.addresses.isEmpty) {
       HapticFeedback.mediumImpact();
       setState(() => error = 'Agrega una dirección de entrega para continuar.');
@@ -429,6 +434,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
               ),
+              if (model.deliveryCheckoutBlocked) ...<Widget>[
+                const SizedBox(height: 12),
+                const QuietNote(
+                  icon: Icons.info_outline_rounded,
+                  text: 'Este servidor solo permite Recoger por ahora. '
+                      'La entrega por distancia se habilitará cuando el backend '
+                      'pueda cotizarla y confirmarla antes del cobro.',
+                ),
+              ],
               if (delivery) ...<Widget>[
                 const SizedBox(height: 12),
                 Reveal(
@@ -566,7 +580,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
           bottomNavigationBar: BottomActionBar(
-            child: model.hasAvailablePaymentMethod && !refreshingPayment
+            child: model.deliveryCheckoutBlocked
+                ? FilledButton(
+                    onPressed: null,
+                    child: const Text('Entrega a domicilio no disponible'),
+                  )
+                : model.hasAvailablePaymentMethod && !refreshingPayment
                 ? FilledButton(
                     onPressed: placing || refreshingPayment ? null : submit,
                     child: BusyLabel(
