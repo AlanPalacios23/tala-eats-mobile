@@ -1590,20 +1590,7 @@ class _LaunchScreenState extends State<LaunchScreen>
                         letterSpacing: -0.2,
                       ),
                     ),
-                    SizedBox(height: 24),
-                    Semantics(
-                      label: 'Preparando Tala Eats',
-                      liveRegion: true,
-                      child: SizedBox(
-                        width: 110,
-                        child: LinearProgressIndicator(
-                          minHeight: 3,
-                          borderRadius: BorderRadius.all(Radius.circular(6)),
-                          backgroundColor: Color(0xFFFFE9DD),
-                          valueColor: AlwaysStoppedAnimation<Color>(kBrandDeep),
-                        ),
-                      ),
-                    ),
+
                   ],
                 ),
               ),
