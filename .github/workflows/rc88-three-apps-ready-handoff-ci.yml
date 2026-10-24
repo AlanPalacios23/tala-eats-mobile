@@ -1,0 +1,53 @@
+name: TALA EATS RC8.8 | Three Apps READY Handoff CI
+on:
+  push:
+    branches: [feat/rc88-three-app-ready-handoff-20261024]
+permissions:
+  contents: read
+jobs:
+  flutter-apps:
+    name: Flutter ${{ matrix.role }} analyze test and debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [usuarios, restaurante, repartidor]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Generate ephemeral Android scaffold
+        run: python3 tala-eats-${{ matrix.role }}/ci/bootstrap_android.py --role ${{ matrix.role }}
+      - name: Verify Android application security
+        run: python3 ci/security_android_gate.py --role ${{ matrix.role }}
+      - name: Flutter pub get
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: flutter pub get
+      - name: Flutter static analysis
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: flutter analyze --no-fatal-infos
+      - name: Full widget and integration tests
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: flutter test --reporter expanded
+      - name: Ephemeral Android DEBUG only, NO Play publication
+        working-directory: tala-eats-${{ matrix.role }}/app
+        run: |
+          flutter build apk --debug
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Save non-release test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-RC88-${{ matrix.role }}-DEBUG
+          path: tala-eats-${{ matrix.role }}/app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error

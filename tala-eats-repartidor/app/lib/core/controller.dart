@@ -778,7 +778,8 @@ class DriverController extends ChangeNotifier {
       return;
     }
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+    // Foreground fallback for a new READY assignment. Not a background push.
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_signedIn && (_online || _active != null)) {
         unawaited(_hydrateDashboard(silent: true));
       }

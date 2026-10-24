@@ -29,24 +29,6 @@ flutter:
     - assets/icons/
     - assets/fonts/OFL-Figtree.txt
     - assets/fonts/OFL-BricolageGrotesque.txt
-  fonts:
-    - family: Figtree
-      fonts:
-        - asset: assets/fonts/Figtree_400Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Figtree_500Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Figtree_600SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Figtree_700Bold.ttf
-          weight: 700
-        - asset: assets/fonts/Figtree_800ExtraBold.ttf
-          weight: 800
-    - family: Bricolage
-      fonts:
-        - asset: assets/fonts/BricolageGrotesque_600SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/BricolageGrotesque_700Bold.ttf
-          weight: 700
-        - asset: assets/fonts/BricolageGrotesque_800ExtraBold.ttf
-          weight: 800
+  # RC8.8: private font binaries were never committed to this repository.
+  # Flutter's system-font fallback keeps the signed build reproducible while
+  # the visual font assets require a separately reviewed licensed source.

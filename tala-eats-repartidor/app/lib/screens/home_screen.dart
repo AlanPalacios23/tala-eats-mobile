@@ -31,7 +31,34 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Re-fetch the authoritative assignment on foreground return; a READY
+    // event can arrive while Dart timers are suspended by Android.
+    if (state == AppLifecycleState.resumed &&
+        controller.isProduction && controller.signedIn && controller.online) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          controller.refreshHistory();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   bool _showLockNotice = false;
 
   /// Dirección pedida mientras el backend confirma la disponibilidad.
