@@ -27,6 +27,7 @@ class DeliveryJob {
     this.customerLat,
     this.customerLng,
     required this.total,
+    this.paymentMethod = 'unknown',
     required this.earning,
     required this.distanceKm,
     required this.etaMinutes,
@@ -50,6 +51,10 @@ class DeliveryJob {
 
   /// Total del pedido pagado por el cliente. NO es ganancia del repartidor.
   final double total;
+  /// Método de pago declarado por el backend (nunca por el repartidor).
+  final String paymentMethod;
+  bool get isCardPaid => paymentMethod == 'stripe';
+  bool get collectsCash => paymentMethod == 'cash';
 
   /// Ganancia del repartidor por esta entrega.
   final double earning;
@@ -77,6 +82,7 @@ class DeliveryJob {
         customerLat: customerLat,
         customerLng: customerLng,
         total: total,
+        paymentMethod: paymentMethod,
         earning: earning,
         distanceKm: distanceKm,
         etaMinutes: etaMinutes,
