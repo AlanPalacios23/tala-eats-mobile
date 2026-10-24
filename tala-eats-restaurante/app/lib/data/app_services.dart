@@ -22,6 +22,7 @@ class AppServices {
     this.withdrawals = const DisconnectedWithdrawalGateway(),
     this.locationStore = const LocalRestaurantLocationStore(),
     this.deviceLocation = const GeolocatorLocationProvider(),
+    this.financeApi,
     this.isRemote = false,
   });
 
@@ -38,6 +39,7 @@ class AppServices {
       menu: RemoteMenuRepository(api),
       orders: RemoteOrdersRepository(api),
       finance: RemoteFinanceRepository(api),
+      financeApi: api,
       media: media ?? LocalMediaRepository(),
       // Always use authenticated, server-authorized withdrawals; no Stripe
       // secrets or independent balance calculation in the mobile application.
@@ -84,6 +86,8 @@ class AppServices {
   final MenuRepository menu;
   final OrdersRepository orders;
   final FinanceRepository finance;
+  /// Authenticated API used only for server-ledger balances and Connect status.
+  final RemoteApi? financeApi;
   final MediaRepository media;
 
   /// Retiros: gateway autenticado en producción, desconectado en QA local.
