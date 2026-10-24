@@ -230,12 +230,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final bool delivery = model.deliveryMode == 'delivery';
     final AddressEntry? address = _selectedQuoteAddress();
     if (delivery &&
-        (!model.deliveryCashSupported || !model.deliveryQuoteSupported ||
-         model.paymentMethod != 'cash' ||
+        (!model.deliveryQuoteSupported ||
+         !model.isPaymentMethodEnabled(model.paymentMethod) ||
+         (model.paymentMethod != 'cash' && model.paymentMethod != 'stripe') ||
          address?.lat == null || address?.lng == null)) {
       throw ApiException(409,
-          'Solo se puede cotizar a domicilio con efectivo, '
-          'repartidor disponible y ubicación exacta.');
+          'Verifica un método autorizado por el backend, '
+          'un repartidor disponible y la ubicación exacta.');
     }
     final Map<String, dynamic> body = <String, dynamic>{
       'restaurant_id': restaurant.id,
@@ -680,7 +681,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         icon: Icons.credit_card_rounded,
                         title: 'Tarjeta con Stripe',
                         subtitle: model.stripePayments
-                            ? 'Tarjeta y billeteras compatibles · pago seguro'
+                            ? (model.deliveryMode == 'delivery' &&
+                                    model.deliveryStripeSupported
+                                ? 'Stripe TEST: pago verificado antes de preparar'
+                                : 'Tarjeta y billeteras compatibles · pago seguro')
                             : 'Pendiente de activación',
                         enabled: !refreshingPayment && model.isPaymentMethodEnabled('stripe'),
                         selected: model.paymentMethod == 'stripe',
