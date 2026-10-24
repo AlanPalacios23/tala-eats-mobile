@@ -24,12 +24,13 @@ jobs:
           cache: true
       - run: python3 tala-eats-usuarios/ci/bootstrap_android.py --role usuarios
       - run: python3 ci/security_android_gate.py --role usuarios
+      - name: Install Flutter packages
+        working-directory: tala-eats-usuarios/app
+        run: flutter pub get
       - run: python3 tala-eats-usuarios/ci/stripe_jvm.py
       - name: Flutter analyze
         working-directory: tala-eats-usuarios/app
-        run: |
-          flutter pub get
-          flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos
       - name: Flutter tests
         working-directory: tala-eats-usuarios/app
         run: flutter test --reporter expanded
