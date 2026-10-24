@@ -767,7 +767,8 @@ class TalaModel extends ChangeNotifier {
 
   void setDeliveryMode(String value) {
     deliveryMode = value;
-    if (value == 'delivery' && !deliveryStripeSupported && paymentMethod == 'stripe') {
+    if (value == 'delivery' && deliveryCapabilitiesDeclared &&
+        !deliveryStripeSupported && paymentMethod == 'stripe') {
       paymentMethod = isPaymentMethodEnabled('cash') ? 'cash' : '';
     }
     notifyListeners();
