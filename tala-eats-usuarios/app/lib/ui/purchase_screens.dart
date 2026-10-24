@@ -273,6 +273,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> reviewPendingOrder() async {
+    if (placing || refreshingPayment) return;
+    setState(() { placing = true; error = ''; });
+    try {
+      final OrderEntry? recovered = await widget.model.checkPendingOrder();
+      if (!mounted) return;
+      if (recovered == null) {
+        setState(() {
+          error = 'Todavía no podemos confirmar qué pasó con ese pedido. '
+              'No se ha enviado otro ni iniciado un segundo cobro. '
+              'Consulta Mis pedidos o contacta soporte.';
+        });
+        return;
+      }
+      Navigator.of(context).pushReplacement(premiumRoute(
+        OrderDetailScreen(model: widget.model, order: recovered),
+      ));
+    } on ApiException catch (e) {
+      if (mounted) setState(() { error = e.message; });
+    } catch (_) {
+      if (mounted) setState(() {
+        error = 'No se pudo consultar el pedido anterior de forma segura.';
+      });
+    } finally {
+      if (mounted) setState(() { placing = false; });
+    }
+  }
+
   void applyCoupon() {
     FocusScope.of(context).unfocus();
     widget.model.setCoupon(coupon.text);
@@ -567,6 +595,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const SizedBox(height: 12),
               Reveal(index: 4, child: SummaryCard(model: model)),
+              if (error.toLowerCase().contains('sin confirmar')) ...<Widget>[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: placing ? null : reviewPendingOrder,
+                  icon: const Icon(Icons.manage_search_rounded),
+                  label: const Text('Consultar pedido pendiente'),
+                ),
+              ],
               AnimatedSize(
                 duration: TalaMotion.of(context, TalaMotion.select),
                 curve: TalaMotion.ease,
