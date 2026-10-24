@@ -12,6 +12,7 @@ import '../widgets/skeleton.dart';
 import '../widgets/states.dart';
 import '../widgets/surfaces.dart';
 import '../widgets/withdrawal_preview.dart';
+import 'restaurant_settlement_balances.dart';
 
 /// Finanzas: lectura rápida de ventas, pedidos, ticket y neto del periodo.
 /// Los montos vienen de la fuente de datos; aquí no se calculan comisiones.
@@ -99,6 +100,14 @@ class FinanceScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpace.lg),
                         StateSwitcher(child: body),
+                        if (ops.services.financeApi != null &&
+                            ops.restaurant != null) ...<Widget>[
+                          const SizedBox(height: AppSpace.lg),
+                          RestaurantSettlementBalances(
+                            api: ops.services.financeApi!,
+                            restaurantId: ops.restaurant!.id,
+                          ),
+                        ],
                       ],
                     ),
                   ),
