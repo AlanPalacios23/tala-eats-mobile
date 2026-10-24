@@ -817,8 +817,9 @@ class TalaModel extends ChangeNotifier {
           activeCheckoutModes.add((row['mode'] ?? '').toString());
         }
       }
-      backendPickupOnly = activeCheckoutModes.isNotEmpty &&
-          activeCheckoutModes.every((String mode) => mode.endsWith('-pickup'));
+      backendPickupOnly = raw['delivery_checkout_supported'] == false ||
+          (activeCheckoutModes.isNotEmpty &&
+          activeCheckoutModes.every((String mode) => mode.endsWith('-pickup')));
       // Pricing remains a reference only; the backend owns final charges.
       customerPricingPolicy = CheckoutPricingPolicy.fromPaymentMethods(raw);
       cashPayments = cash;
