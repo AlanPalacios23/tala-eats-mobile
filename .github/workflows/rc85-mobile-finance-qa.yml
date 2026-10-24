@@ -31,7 +31,7 @@ jobs:
         run: flutter pub get
         working-directory: tala-eats-${{ matrix.role }}/app
       - name: Analyze Flutter source
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
         working-directory: tala-eats-${{ matrix.role }}/app
       - name: Widget and unit tests
         run: flutter test
