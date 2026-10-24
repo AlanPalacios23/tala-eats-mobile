@@ -1,0 +1,47 @@
+name: TALA EATS RC8.7 | Usuarios v1.0.44 CI ONLY
+on:
+  push:
+    branches: [ci/rc87-usuarios-v1044-20261024]
+permissions:
+  contents: read
+jobs:
+  users-rc87:
+    name: Usuarios v1.0.44 Flutter analyze, test, Android debug
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: python3 tala-eats-usuarios/ci/bootstrap_android.py --role usuarios
+      - run: python3 ci/security_android_gate.py --role usuarios
+      - run: python3 tala-eats-usuarios/ci/stripe_jvm.py
+      - name: Flutter analyze
+        working-directory: tala-eats-usuarios/app
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+      - name: Flutter tests
+        working-directory: tala-eats-usuarios/app
+        run: flutter test --reporter expanded
+      - name: Build debug APK without signing/releasing
+        working-directory: tala-eats-usuarios/app
+        run: |
+          flutter build apk --debug --dart-define=TALAEATS_API_BASE_URL=https://talaeats.alan-palacios-dev.com/api/v1
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Save only debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Usuarios-RC87-DEBUG-CI
+          path: tala-eats-usuarios/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
