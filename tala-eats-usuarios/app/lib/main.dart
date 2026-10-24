@@ -909,23 +909,34 @@ class TalaModel extends ChangeNotifier {
     } on ApiException catch (e) { lastError = e.message; notifyListeners(); return false; }
   }
 
+  /// Consulta en modo solo lectura la referencia pendiente. Un 404 NO prueba
+  /// que el POST anterior nunca se procesó: el journal sigue cifrado y no
+  /// autorizamos crear otro pedido distinto hasta obtener certeza.
+  Future<OrderEntry?> checkPendingOrder() async {
+    if (!signedIn || userId <= 0) {
+      throw ApiException(401, 'Inicia sesión para consultar el pedido.');
+    }
+    final result = await _orderSubmissionGuard.recover(
+      (String reference) async => Map<String, dynamic>.from(
+        (await api.get('/orders/by-reference/${Uri.encodeComponent(reference)}')) as Map,
+      ),
+    );
+    if (result == null) return null;
+    final OrderEntry order = _orderFromJson(result);
+    if (!orders.any((OrderEntry existing) => existing.id == order.id)) {
+      orders.insert(0, order);
+      notifyListeners();
+    }
+    return order;
+  }
+
   Future<void> _recoverPersistedCheckout() async {
     if (!signedIn || userId <= 0) return;
     try {
-      final result = await _orderSubmissionGuard.recover(
-        (String reference) async => Map<String, dynamic>.from(
-          (await api.get('/orders/by-reference/${Uri.encodeComponent(reference)}')) as Map,
-        ),
-      );
-      if (result == null) return;
-      final order = _orderFromJson(result);
-      if (!orders.any((OrderEntry existing) => existing.id == order.id)) {
-        orders.insert(0, order);
-        notifyListeners();
-      }
+      await checkPendingOrder();
     } on ApiException catch (e) {
-      // Never send another order automatically and never delete the
-      // encrypted journal because an HTTP error could be transient.
+      // Los errores de transporte no prueban que no exista el pedido.
+      // Nunca se elimina la referencia ni se reenvía POST automáticamente.
       lastError = e.message;
       notifyListeners();
     }
