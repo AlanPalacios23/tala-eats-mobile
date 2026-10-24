@@ -190,6 +190,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool placing = false;
   bool refreshingPayment = false;
   String error = '';
+  Map<String, dynamic>? _serverQuote;
+  String _serverQuoteKey = '';
+
+  // The quote is a NON-binding server preview. Never cache it across a
+  // different cart, payment method, coupon, location or restaurant.
+  String _quoteFingerprint() {
+    final TalaModel m = widget.model;
+    return jsonEncode(<String, dynamic>{
+      'restaurant': m.cartRestaurant?.id,
+      'method': m.paymentMethod,
+      'delivery': m.deliveryMode,
+      'coupon': m.coupon,
+      'items': m.cart.map((CartLine line) => <Object?>[
+        line.item.id, line.quantity, line.note,
+      ]).toList(),
+    });
+  }
+
+  Map<String, dynamic>? get _verifiedQuote =>
+      _serverQuoteKey == _quoteFingerprint() ? _serverQuote : null;
+
+  Future<Map<String, dynamic>> _requestPickupQuote() async {
+    final TalaModel model = widget.model;
+    final Restaurant? restaurant = model.cartRestaurant;
+    if (restaurant == null || model.deliveryMode != 'pickup') {
+      throw ApiException(409, 'Cotización solo disponible para recoger.');
+    }
+    final Map<String, dynamic> response = await model.api.pickupQuote(
+      <String, dynamic>{
+        'restaurant_id': restaurant.id,
+        'order_type': 'pickup',
+        'payment_method': model.paymentMethod,
+        'items': model.cart.map((CartLine line) => <String, dynamic>{
+          'menu_item_id': line.item.id,
+          'quantity': line.quantity,
+          'options': line.note,
+        }).toList(),
+        'tip': '0',
+        'coupon_code': model.coupon,
+        'delivery_lat': null,
+        'delivery_lng': null,
+      },
+    );
+    final num? amount = num.tryParse('${response['total'] ?? ''}');
+    if (response['currency'] != 'MXN' ||
+        response['order_type'] != 'pickup' ||
+        response['payment_method'] != model.paymentMethod ||
+        response['restaurant_id'] != restaurant.id ||
+        response['inventory_reserved'] != false ||
+        response['quote_is_binding'] != false ||
+        amount == null || !amount.isFinite || amount <= 0) {
+      throw ApiException(502, 'El servidor devolvió una cotización inválida.');
+    }
+    return response;
+  }
 
   @override
   void initState() {
@@ -214,6 +269,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
     try {
       await widget.model.refreshPaymentMethods();
+      if (widget.model.pickupQuoteSupported &&
+          widget.model.deliveryMode == 'pickup' &&
+          widget.model.hasAvailablePaymentMethod) {
+        final String key = _quoteFingerprint();
+        final Map<String, dynamic> quote = await _requestPickupQuote();
+        if (mounted && key == _quoteFingerprint()) {
+          setState(() {
+            _serverQuote = quote;
+            _serverQuoteKey = key;
+          });
+        }
+      }
     } on ApiException catch (e) {
       if (mounted) error = e.message;
     } catch (_) {
@@ -255,6 +322,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // A delayed or changed backend capability must not convert Stripe
       // into cash implicitly, or authorize a previously disabled method.
       await model.verifyCheckoutPaymentMethod(selectedMethod);
+      if (model.pickupQuoteSupported && model.deliveryMode == 'pickup') {
+        // Verify the live catalog price AGAIN immediately before POST /orders.
+        // A changed price requires a second deliberate confirmation, not a
+        // silent, unexpected Stripe charge or cash purchase.
+        final String key = _quoteFingerprint();
+        final Map<String, dynamic>? displayed = _verifiedQuote;
+        final Map<String, dynamic> fresh = await _requestPickupQuote();
+        if (!mounted) return;
+        setState(() {
+          _serverQuoteKey = key;
+          _serverQuote = fresh;
+        });
+        if (displayed == null ||
+            displayed['total'] != fresh['total'] ||
+            displayed['service_fee'] != fresh['service_fee'] ||
+            displayed['subtotal'] != fresh['subtotal']) {
+          throw ApiException(409,
+              'El servidor actualizó los precios del pedido. '
+              'Revisa el nuevo desglose y presiona confirmar nuevamente.');
+        }
+      }
       final OrderEntry order = await model.placeOrder();
       if (!mounted) return;
       if (selectedMethod == 'cash') {
@@ -594,7 +682,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Reveal(index: 4, child: SummaryCard(model: model)),
+              Reveal(index: 4, child: SummaryCard(model: model, serverQuote: _verifiedQuote)),
               if (error.toLowerCase().contains('sin confirmar')) ...<Widget>[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -859,22 +947,26 @@ class PaymentUnavailableCard extends StatelessWidget {
 // Unico desglose de carrito y checkout: referencias obtenidas de
 // /orders/payment-methods. El monto real siempre proviene de OrderPublic.
 class CustomerCheckoutBreakdown extends StatelessWidget {
-  const CustomerCheckoutBreakdown({super.key, required this.model});
+  const CustomerCheckoutBreakdown({super.key, required this.model, this.serverQuote});
   final TalaModel model;
+  final Map<String, dynamic>? serverQuote;
 
   @override
   Widget build(BuildContext context) {
     final CheckoutPricingPreview preview = model.checkoutPreview;
-    final double? shipping = preview.deliveryReference;
-    final double? serviceFee = preview.serviceFee;
-    final double? referenceTotal = preview.estimatedReferenceTotal;
+    double? serverAmount(String key) => serverQuote == null
+        ? null : double.tryParse('${serverQuote![key] ?? ''}');
+    final bool server = serverQuote != null;
+    final double? shipping = server ? serverAmount('delivery_fee') : preview.deliveryReference;
+    final double? serviceFee = server ? serverAmount('service_fee') : preview.serviceFee;
+    final double? referenceTotal = server ? serverAmount('total') : preview.estimatedReferenceTotal;
     final double? rate = model.customerPricingPolicy?.serviceFeeRate;
     final String serviceLabel = rate == null
         ? 'Tarifa de servicio'
         : 'Tarifa de servicio (${(rate * 100).toStringAsFixed(((rate * 100) - (rate * 100).round()).abs() < 0.000001 ? 0 : 1)}%${model.customerPricingPolicy?.serviceFeeCap == null ? '' : ', máx ${moneyWithCents(model.customerPricingPolicy!.serviceFeeCap!)}'})';
     return Column(
       children: <Widget>[
-        _CustomerAmountRow(label: 'Subtotal', amount: model.subtotal),
+        _CustomerAmountRow(label: 'Subtotal', amount: serverQuote == null ? model.subtotal : serverAmount('subtotal')),
         const SizedBox(height: 9),
         _CustomerAmountRow(
           label: serviceLabel,
@@ -892,9 +984,12 @@ class CustomerCheckoutBreakdown extends StatelessWidget {
           _CustomerAmountRow(label: 'Propina para repartidor', amount: model.tip),
         ],
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
-        _CustomerAmountRow(label: 'Total de referencia', amount: referenceTotal, bold: true),
+        _CustomerAmountRow(label: server ? 'Total calculado por el servidor' : 'Total de referencia', amount: referenceTotal, bold: true),
         const SizedBox(height: 7),
-        Text(preview.disclosure, style: TalaText.caption.copyWith(fontSize: 11)),
+        Text(server
+          ? 'Importes calculados desde el catálogo del servidor. '
+            'Se verifican otra vez al registrar el pedido; no se ha reservado inventario.'
+          : preview.disclosure, style: TalaText.caption.copyWith(fontSize: 11)),
       ],
     );
   }
@@ -955,9 +1050,10 @@ class _CustomerAmountRow extends StatelessWidget {
 }
 
 class SummaryCard extends StatelessWidget {
-  const SummaryCard({super.key, required this.model});
+  const SummaryCard({super.key, required this.model, this.serverQuote});
 
   final TalaModel model;
+  final Map<String, dynamic>? serverQuote;
 
   @override
   Widget build(BuildContext context) {
@@ -979,7 +1075,7 @@ class SummaryCard extends StatelessWidget {
               ),
             ),
           const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
-          CustomerCheckoutBreakdown(model: model),
+          CustomerCheckoutBreakdown(model: model, serverQuote: serverQuote),
         ],
       ),
     );
