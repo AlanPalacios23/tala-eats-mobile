@@ -171,4 +171,48 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     model.dispose();
   });
+
+  test('Node pickup-only bloquea entrega sin enviar un POST de pedido', () async {
+    final api = _BackendPolicyApi(<String, dynamic>{
+      'methods': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 'cash', 'enabled': true, 'mode': 'stage-cash-pickup'},
+        <String, dynamic>{'id': 'stripe', 'enabled': true, 'mode': 'stage-stripe-test-pickup'},
+      ],
+    });
+    final model = TalaModel(apiClient: api);
+    model.restaurants.add(const Restaurant(
+      id: 4, name: 'Restaurante', category: '', rating: 4.8,
+      eta: '30 min', deliveryFee: 39, image: '', description: '',
+    ));
+    model.cartRestaurantId = 4;
+    model.cart.add(CartLine(item: const FoodItem(
+      id: 12, restaurantId: 4, name: 'Hamburguesa',
+      description: '', price: 260, image: '', category: '',
+    )));
+    model.setDeliveryMode('delivery');
+    await model.refreshPaymentMethods();
+    expect(model.backendPickupOnly, true);
+    expect(model.deliveryCheckoutBlocked, true);
+    await expectLater(model.placeOrder(), throwsA(
+      isA<ApiException>()
+        .having((e) => e.statusCode, 'status', 503)
+        .having((e) => e.message, 'mensaje', contains('Recoger')),
+    ));
+    model.setDeliveryMode('pickup');
+    expect(model.deliveryCheckoutBlocked, false);
+    model.dispose();
+  });
+
+  test('Node deshabilitado no anuncia delivery ni permite pago', () async {
+    final model = TalaModel(apiClient: _BackendPolicyApi(<String, dynamic>{
+      'methods': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 'cash', 'enabled': false, 'mode': 'stage-cash-pickup'},
+        <String, dynamic>{'id': 'stripe', 'enabled': false, 'mode': 'stage-stripe-test-pickup'},
+      ],
+    }));
+    await model.refreshPaymentMethods();
+    expect(model.hasAvailablePaymentMethod, false);
+    expect(model.backendPickupOnly, false);
+    model.dispose();
+  });
 }
