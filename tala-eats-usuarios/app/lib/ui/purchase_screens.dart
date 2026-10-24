@@ -195,12 +195,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   // The quote is a NON-binding server preview. Never cache it across a
   // different cart, payment method, coupon, location or restaurant.
+  AddressEntry? _selectedQuoteAddress() {
+    final TalaModel m = widget.model;
+    if (m.deliveryMode != 'delivery' || m.addresses.isEmpty) return null;
+    return m.addresses[m.selectedAddress.clamp(0, m.addresses.length - 1).toInt()];
+  }
+
   String _quoteFingerprint() {
     final TalaModel m = widget.model;
+    final AddressEntry? address = _selectedQuoteAddress();
     return jsonEncode(<String, dynamic>{
       'restaurant': m.cartRestaurant?.id,
       'method': m.paymentMethod,
       'delivery': m.deliveryMode,
+      'lat': address?.lat,
+      'lng': address?.lng,
+      'tip': m.deliveryMode == 'delivery' ? m.tip : 0,
       'coupon': m.coupon,
       'items': m.cart.map((CartLine line) => <Object?>[
         line.item.id, line.quantity, line.note,
@@ -211,36 +221,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? get _verifiedQuote =>
       _serverQuoteKey == _quoteFingerprint() ? _serverQuote : null;
 
-  Future<Map<String, dynamic>> _requestPickupQuote() async {
+  Future<Map<String, dynamic>> _requestCheckoutQuote() async {
     final TalaModel model = widget.model;
     final Restaurant? restaurant = model.cartRestaurant;
-    if (restaurant == null || model.deliveryMode != 'pickup') {
-      throw ApiException(409, 'Cotización solo disponible para recoger.');
+    if (restaurant == null) {
+      throw ApiException(409, 'No hay restaurante seleccionado.');
     }
-    final Map<String, dynamic> response = await model.api.pickupQuote(
-      <String, dynamic>{
-        'restaurant_id': restaurant.id,
-        'order_type': 'pickup',
-        'payment_method': model.paymentMethod,
-        'items': model.cart.map((CartLine line) => <String, dynamic>{
-          'menu_item_id': line.item.id,
-          'quantity': line.quantity,
-          'options': line.note,
-        }).toList(),
-        'tip': '0',
-        'coupon_code': model.coupon,
-        'delivery_lat': null,
-        'delivery_lng': null,
-      },
-    );
-    final num? amount = num.tryParse('${response['total'] ?? ''}');
+    final bool delivery = model.deliveryMode == 'delivery';
+    final AddressEntry? address = _selectedQuoteAddress();
+    if (delivery &&
+        (!model.deliveryCashSupported || !model.deliveryQuoteSupported ||
+         model.paymentMethod != 'cash' ||
+         address?.lat == null || address?.lng == null)) {
+      throw ApiException(409,
+          'Solo se puede cotizar a domicilio con efectivo, '
+          'repartidor disponible y ubicación exacta.');
+    }
+    final Map<String, dynamic> body = <String, dynamic>{
+      'restaurant_id': restaurant.id,
+      'order_type': delivery ? 'delivery' : 'pickup',
+      'payment_method': model.paymentMethod,
+      'items': model.cart.map((CartLine line) => <String, dynamic>{
+        'menu_item_id': line.item.id,
+        'quantity': line.quantity,
+        'options': line.note,
+      }).toList(),
+      'tip': delivery ? model.tip.toStringAsFixed(2) : '0',
+      'coupon_code': model.coupon,
+      'delivery_lat': delivery ? address!.lat : null,
+      'delivery_lng': delivery ? address!.lng : null,
+    };
+    final Map<String, dynamic> response = delivery
+        ? await model.api.deliveryQuote(body)
+        : await model.api.pickupQuote(body);
+    final num? total = num.tryParse('${response['total'] ?? ''}');
+    final num? shipping = num.tryParse('${response['delivery_fee'] ?? ''}');
     if (response['currency'] != 'MXN' ||
-        response['order_type'] != 'pickup' ||
+        response['order_type'] != (delivery ? 'delivery' : 'pickup') ||
         response['payment_method'] != model.paymentMethod ||
         response['restaurant_id'] != restaurant.id ||
         response['inventory_reserved'] != false ||
         response['quote_is_binding'] != false ||
-        amount == null || !amount.isFinite || amount <= 0) {
+        total == null || !total.isFinite || total <= 0 ||
+        shipping == null || !shipping.isFinite || shipping < 0 ||
+        (delivery && response['shipping_is_road_routing'] != false)) {
       throw ApiException(502, 'El servidor devolvió una cotización inválida.');
     }
     return response;
@@ -269,11 +293,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
     try {
       await widget.model.refreshPaymentMethods();
-      if (widget.model.pickupQuoteSupported &&
-          widget.model.deliveryMode == 'pickup' &&
+      if (((widget.model.pickupQuoteSupported &&
+               widget.model.deliveryMode == 'pickup') ||
+              (widget.model.deliveryQuoteSupported &&
+               widget.model.deliveryMode == 'delivery')) &&
           widget.model.hasAvailablePaymentMethod) {
         final String key = _quoteFingerprint();
-        final Map<String, dynamic> quote = await _requestPickupQuote();
+        final Map<String, dynamic> quote = await _requestCheckoutQuote();
         if (mounted && key == _quoteFingerprint()) {
           setState(() {
             _serverQuote = quote;
@@ -322,7 +348,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // A delayed or changed backend capability must not convert Stripe
       // into cash implicitly, or authorize a previously disabled method.
       await model.verifyCheckoutPaymentMethod(selectedMethod);
-      if (model.pickupQuoteSupported && model.deliveryMode == 'pickup') {
+      if ((model.pickupQuoteSupported && model.deliveryMode == 'pickup') ||
+          (model.deliveryQuoteSupported && model.deliveryMode == 'delivery')) {
         // Verify the live catalog price AGAIN immediately before POST /orders.
         // A changed price requires a second deliberate confirmation, not a
         // silent, unexpected Stripe charge or cash purchase.
@@ -337,7 +364,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (displayed == null ||
             displayed['total'] != fresh['total'] ||
             displayed['service_fee'] != fresh['service_fee'] ||
-            displayed['subtotal'] != fresh['subtotal']) {
+            displayed['subtotal'] != fresh['subtotal'] ||
+            displayed['delivery_fee'] != fresh['delivery_fee'] ||
+            displayed['tip'] != fresh['tip'] ||
+            displayed['distance_km'] != fresh['distance_km']) {
           throw ApiException(409,
               'El servidor actualizó los precios del pedido. '
               'Revisa el nuevo desglose y presiona confirmar nuevamente.');
