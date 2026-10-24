@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/remote_api.dart';
 
 /// Backend-verified accounting entries. A held balance is NOT a bank payout.
@@ -10,10 +11,66 @@ class DriverSettlementBalances extends StatefulWidget {
 }
 class _DriverSettlementBalancesState extends State<DriverSettlementBalances> {
   late Future<dynamic> _future;
+  late Future<dynamic> _connectFuture;
+  bool _openingOnboarding=false;
   @override
   void initState() {super.initState();_refresh();}
-  void _refresh() {_future=widget.api.get('/driver/finance/earnings');}
+  void _refresh() {
+    _future=widget.api.get('/driver/finance/earnings');
+    _connectFuture=widget.api.get('/driver/finance/connect/status');
+  }
   void _retry() => setState(_refresh);
+  Future<void> _openStripeOnboarding() async {
+    if(_openingOnboarding)return;
+    setState(()=>_openingOnboarding=true);
+    try{
+      await widget.api.post('/driver/finance/connect/confirm');
+      final response=await widget.api.post('/driver/finance/connect/onboarding-link');
+      if(response is! Map)throw const FormatException('Missing Connect link');
+      final uri=Uri.tryParse((response['url']??'').toString());
+      if(uri==null||uri.scheme!='https'||
+         !{'connect.stripe.com','dashboard.stripe.com'}.contains(uri.host))
+        throw const FormatException('Connect link is not from Stripe');
+      if(!await launchUrl(uri,mode:LaunchMode.externalApplication))
+        throw const FormatException('Unable to open Stripe');
+    }catch(_){
+      if(mounted){
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:Text('No se pudo abrir Stripe Connect. Reintenta desde tu cuenta.')));
+      }
+    }finally{
+      if(mounted)setState((){_openingOnboarding=false;_refresh();});
+    }
+  }
+  Widget _connectStatus(){
+    return FutureBuilder<dynamic>(
+      future:_connectFuture,
+      builder:(context,snapshot){
+        if(snapshot.connectionState!=ConnectionState.done){
+          return const Padding(padding:EdgeInsets.symmetric(vertical:8),
+            child:LinearProgressIndicator());
+        }
+        if(snapshot.hasError||snapshot.data is! Map){
+          return const Text('Para habilitar depósitos, solicita al administrador '
+            'que registre tu cuenta Stripe Connect.',
+            style:TextStyle(fontSize:12));
+        }
+        final status=Map<dynamic,dynamic>.from(snapshot.data as Map);
+        final complete=status['transfers_active']==true&&
+          status['payouts_enabled']==true&&status['details_submitted']==true;
+        if(complete)return const Text('Stripe Connect: verificación completada. '
+          'Tus ganancias aún requieren conciliación y aprobación.',
+          style:TextStyle(fontSize:12));
+        return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          const Text('Stripe Connect pendiente de verificación bancaria.',
+            style:TextStyle(fontSize:12)),
+          TextButton.icon(onPressed:_openingOnboarding?null:_openStripeOnboarding,
+            icon:const Icon(Icons.open_in_new),
+            label:const Text('Continuar en Stripe')),
+        ]);
+      },
+    );
+  }
   int _total(List<dynamic> rows,String field,{String? state}) {
     var cents=0;
     for(final row in rows){
@@ -60,6 +117,8 @@ class _DriverSettlementBalancesState extends State<DriverSettlementBalances> {
           _line('Pendiente de revisión',_money(held)),
           _line('Revisado (no depositado)',_money(reviewed)),
           _line('Efectivo por rendir',_money(due)),
+          const SizedBox(height:8),
+          _connectStatus(),
           const SizedBox(height:8),
           const Text('Los depósitos bancarios requieren una liquidación confirmada. '
             'El efectivo debe rendirse con evidencia.',
