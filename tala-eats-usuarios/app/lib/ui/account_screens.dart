@@ -684,6 +684,14 @@ class WalletScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
             children: <Widget>[
+              if (model.walletSyncFailed) ...<Widget>[
+                const QuietNote(
+                  icon: Icons.wifi_off_rounded,
+                  text: 'No se pudo verificar el saldo ni los movimientos con el servidor. '
+                      'Los datos pueden estar desactualizados; intenta actualizar más tarde.',
+                ),
+                const SizedBox(height: 14),
+              ],
               Reveal(child: PremiumWalletHero(model: model)),
               const SizedBox(height: 14),
               Reveal(
@@ -692,7 +700,11 @@ class WalletScreen extends StatelessWidget {
                   points: model.points,
                   progress: progress,
                   onRedeem: () async {
-                    final bool ok = await model.redeemReward();
+                     if (model.walletSyncFailed) {
+                       showMessage(context, 'Primero debemos verificar tus puntos con el servidor.');
+                       return;
+                     }
+                     final bool ok = await model.redeemReward();
                     if (!context.mounted) return;
                     HapticFeedback.mediumImpact();
                     showMessage(context, ok ? 'Recompensa canjeada. Tu saldo ya se actualizó.' : (model.lastError.isEmpty ? 'Esta recompensa no está disponible.' : model.lastError));
@@ -702,7 +714,9 @@ class WalletScreen extends StatelessWidget {
               const SizedBox(height: 26),
               const TalaSectionHeader(title: 'Movimientos'),
               const SizedBox(height: 10),
-              if (model.walletTransactions.isEmpty)
+              if (model.walletSyncFailed)
+                const StatusView(icon: Icons.wifi_off_rounded, title: 'Movimientos no disponibles', body: 'No pudimos consultar el historial. No significa que no tengas movimientos.', compact: true)
+              else if (model.walletTransactions.isEmpty)
                 const StatusView(icon: Icons.receipt_long_outlined, title: 'Sin movimientos', body: 'Tus movimientos de saldo y puntos aparecerán aquí.', compact: true)
               else
                 TalaGroup(
@@ -741,9 +755,9 @@ class PremiumWalletHero extends StatelessWidget {
           const SizedBox(height: 16),
           const Text('Saldo disponible', style: TalaText.muted),
           const SizedBox(height: 5),
-          Text(money(model.wallet), maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TalaText.display.copyWith(fontSize: 34)),
+          Text(model.walletSyncFailed ? 'Sin verificar' : money(model.wallet),
+               maxLines: 1, overflow: TextOverflow.ellipsis,
+               style: TalaText.display.copyWith(fontSize: model.walletSyncFailed ? 25 : 34)),
           const SizedBox(height: 12),
           Wrap(
             spacing: 12,
