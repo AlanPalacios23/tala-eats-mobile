@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 import 'dart:io';
 import 'dart:math' as math;
@@ -306,6 +307,7 @@ class TalaModel extends ChangeNotifier {
   // Node RC8.x publica rutas de pago pickup-only. No anunciar delivery pagable
   // hasta que exista una cotización y ruta de creación soportada en backend.
   bool backendPickupOnly = false;
+  bool pickupQuoteSupported = false;
   bool get deliveryCheckoutBlocked => backendPickupOnly && deliveryMode == 'delivery';
   bool paymentMethodsVerified = false;
   int _paymentMethodsRequestEpoch = 0;
@@ -789,6 +791,7 @@ class TalaModel extends ChangeNotifier {
     mercadoPagoPayments = false;
     stripePayments = false;
     backendPickupOnly = false;
+    pickupQuoteSupported = false;
     onlinePayments = false;
     paymentMethod = '';
     customerPricingPolicy = null;
@@ -820,6 +823,7 @@ class TalaModel extends ChangeNotifier {
           activeCheckoutModes.add((row['mode'] ?? '').toString());
         }
       }
+      pickupQuoteSupported = raw['pickup_quote_supported'] == true;
       backendPickupOnly = raw['delivery_checkout_supported'] == false ||
           (activeCheckoutModes.isNotEmpty &&
           activeCheckoutModes.every((String mode) => mode.endsWith('-pickup')));

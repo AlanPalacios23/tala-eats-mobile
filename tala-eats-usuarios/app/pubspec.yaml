@@ -1,7 +1,7 @@
 name: talaeats_users
 description: Tala Eats Usuarios Android production frontend.
 publish_to: 'none'
-version: 1.0.42+53
+version: 1.0.44+55
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
