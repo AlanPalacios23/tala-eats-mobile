@@ -33,6 +33,9 @@ jobs:
       - name: Analyze Flutter source
         run: flutter analyze --no-fatal-infos
         working-directory: tala-eats-${{ matrix.role }}/app
+      - name: Prepare licensed restaurant fonts for widget tests
+        if: matrix.role == 'restaurante'
+        run: python tala-eats-restaurante/ci/prepare_fonts.py
       - name: Widget and unit tests
         run: flutter test
         working-directory: tala-eats-${{ matrix.role }}/app
