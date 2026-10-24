@@ -5,6 +5,7 @@ import '../core/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/motion.dart';
 import '../widgets/withdrawal_preview.dart';
+import 'driver_settlement_balances.dart';
 
 class EarningsScreen extends StatelessWidget {
   const EarningsScreen({super.key, required this.controller});
@@ -32,6 +33,10 @@ class EarningsScreen extends StatelessWidget {
           ),
           const SizedBox(height: Space.l),
           WithdrawalPreviewCard(controller: controller),
+          if (controller.isProduction && controller.connectBackend != null) ...[
+            const SizedBox(height: Space.l),
+            DriverSettlementBalances(api: controller.connectBackend!.api),
+          ],
           const SizedBox(height: Space.xxl),
           Entrance(
             delay: const Duration(milliseconds: 80),

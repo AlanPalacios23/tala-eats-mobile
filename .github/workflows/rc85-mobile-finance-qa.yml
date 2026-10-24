@@ -1,0 +1,47 @@
+name: Tala Eats | RC85 Restaurante y Repartidor Finanzas
+on:
+  push:
+    branches:
+      - feat/rc85-merchant-driver-financial-balances
+    paths:
+      - 'tala-eats-restaurante/app/**'
+      - 'tala-eats-repartidor/app/**'
+      - '.github/workflows/rc85-mobile-finance-qa.yml'
+  pull_request:
+    paths:
+      - 'tala-eats-restaurante/app/**'
+      - 'tala-eats-repartidor/app/**'
+      - '.github/workflows/rc85-mobile-finance-qa.yml'
+  workflow_dispatch:
+jobs:
+  finance_flutter:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [restaurante, repartidor]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Get Flutter dependencies
+        run: flutter pub get
+        working-directory: tala-eats-${{ matrix.role }}/app
+      - name: Analyze Flutter source
+        run: flutter analyze --no-fatal-infos
+        working-directory: tala-eats-${{ matrix.role }}/app
+      - name: Prepare licensed restaurant fonts for widget tests
+        if: matrix.role == 'restaurante'
+        run: python tala-eats-restaurante/ci/prepare_fonts.py
+      - name: Widget and unit tests
+        run: flutter test
+        working-directory: tala-eats-${{ matrix.role }}/app
+      - name: Assert no Stripe server keys in Flutter
+        run: |
+          if grep -R -nE '(sk_live_|rk_live_|whsec_)' tala-eats-${{ matrix.role }}/app/lib; then
+            echo 'Private Stripe secret must never ship to mobile source'
+            exit 1
+          fi
