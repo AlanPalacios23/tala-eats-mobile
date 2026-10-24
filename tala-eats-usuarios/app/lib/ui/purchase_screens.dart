@@ -1016,7 +1016,11 @@ class CustomerCheckoutBreakdown extends StatelessWidget {
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
         _CustomerAmountRow(label: server ? 'Total calculado por el servidor' : 'Total de referencia', amount: referenceTotal, bold: true),
         const SizedBox(height: 7),
-        Text(server
+        Text(server && model.deliveryMode == 'delivery'
+          ? 'Tarifa por distancia geográfica en línea recta, no ruta vial. '
+            'El servidor recalcula el total antes de registrar tu pedido; '
+            'la disponibilidad del repartidor todavía puede cambiar.'
+          : server
           ? 'Importes calculados desde el catálogo del servidor. '
             'Se verifican otra vez al registrar el pedido; no se ha reservado inventario.'
           : preview.disclosure, style: TalaText.caption.copyWith(fontSize: 11)),
