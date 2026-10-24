@@ -1020,7 +1020,17 @@ class NotificationsScreen extends StatelessWidget {
             color: kBrand,
             backgroundColor: Colors.white,
             onRefresh: model.refreshAll,
-            child: model.notifications.isEmpty
+            child: model.notificationsSyncFailed
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const <Widget>[
+                      SizedBox(height: 80),
+                      StatusView(icon: Icons.wifi_off_rounded,
+                        title: 'No se pudieron verificar los avisos',
+                        body: 'Desliza para reintentar. Esto no significa que no tengas notificaciones.'),
+                    ],
+                  )
+                : model.notifications.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: const <Widget>[
