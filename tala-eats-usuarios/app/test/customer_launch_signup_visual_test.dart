@@ -8,11 +8,10 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 680));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const MaterialApp(home: LaunchScreen()));
-    // The loading indicator is deliberately indeterminate; it never settles.
+    // El splash conserva lettering y lema, pero ya no muestra la barra inferior.
     await tester.pump(const Duration(milliseconds: 1200));
     expect(find.text('Pide, disfruta y repite.'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    expect(find.bySemanticsLabel('Preparando Tala Eats'), findsWidgets);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
