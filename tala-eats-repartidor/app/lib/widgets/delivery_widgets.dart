@@ -566,6 +566,22 @@ class _ActiveDeliveryCardState extends State<ActiveDeliveryCard>
                   ),
                   const SizedBox(height: Space.m),
                   _ContextStop(job: job, pickup: pickup),
+                  if (!pickup) ...[
+                    const SizedBox(height: Space.m),
+                    NoticeBanner(
+                      icon: job.isCardPaid
+                          ? Icons.verified_user_rounded
+                          : job.collectsCash
+                              ? Icons.payments_outlined
+                              : Icons.warning_amber_rounded,
+                      message: job.isCardPaid
+                          ? 'Pagado con Stripe. NO cobrar efectivo al cliente.'
+                          : job.collectsCash
+                              ? 'Cobrar ${money(job.total)} en efectivo al entregar.'
+                              : 'No se pudo verificar el método de pago. Contacta soporte.',
+                      tone: Tone.brand,
+                    ),
+                  ],
                   Reveal(
                     visible: !pickup && job.note != null,
                     child: Padding(
@@ -878,6 +894,14 @@ Future<void> showDeliveryDetails(BuildContext context, DeliveryJob job) =>
             emphasize: true,
           ),
           DetailRow(label: 'Total del pedido', value: money(job.total)),
+          DetailRow(
+            label: 'Pago del cliente',
+            value: job.isCardPaid
+                ? 'Tarjeta Stripe — ya pagado'
+                : job.collectsCash
+                    ? 'Efectivo al entregar'
+                    : 'Pendiente de verificar',
+          ),
           if (_navigationTarget(job) != null ||
               (job.customerPhone?.trim().isNotEmpty ?? false)) ...[
             const SizedBox(height: Space.l),
