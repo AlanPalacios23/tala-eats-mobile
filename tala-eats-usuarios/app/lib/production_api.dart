@@ -358,6 +358,7 @@ class TalaApi {
   Future<Map<String, dynamic>> wallet() async => Map<String, dynamic>.from((await get('/platform/wallet')) as Map);
   Future<List<dynamic>> notifications() async => List<dynamic>.from((await get('/platform/notifications')) as List);
 
+  Future<Map<String, dynamic>> deliveryQuote(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await post('/orders/delivery-quote', payload)) as Map);
   Future<Map<String, dynamic>> pickupQuote(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await post('/orders/quote', payload)) as Map);
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> payload) async => Map<String, dynamic>.from((await post('/orders', payload)) as Map);
   Future<Map<String, dynamic>> checkout(int orderId) async => Map<String, dynamic>.from((await post('/payments/mercadopago/orders/$orderId/checkout')) as Map);
