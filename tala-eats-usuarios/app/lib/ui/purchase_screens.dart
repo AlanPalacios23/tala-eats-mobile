@@ -232,6 +232,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // A cached payment method must never authorize an order while rechecking.
     if (placing || refreshingPayment) return;
     final TalaModel model = widget.model;
+    if (model.deliveryCheckoutBlocked) {
+      setState(() => error = 'A domicilio todavía no está disponible en este servidor. '
+          'Elige Recoger antes de confirmar.');
+      return;
+    }
     if (model.deliveryMode == 'delivery' && model.addresses.isEmpty) {
       HapticFeedback.mediumImpact();
       setState(() => error = 'Agrega una dirección de entrega para continuar.');
@@ -265,6 +270,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           error = e.message;
         });
       }
+    }
+  }
+
+  Future<void> reviewPendingOrder() async {
+    if (placing || refreshingPayment) return;
+    setState(() { placing = true; error = ''; });
+    try {
+      final OrderEntry? recovered = await widget.model.checkPendingOrder();
+      if (!mounted) return;
+      if (recovered == null) {
+        setState(() {
+          error = 'Todavía no podemos confirmar qué pasó con ese pedido. '
+              'No se ha enviado otro ni iniciado un segundo cobro. '
+              'Consulta Mis pedidos o contacta soporte.';
+        });
+        return;
+      }
+      Navigator.of(context).pushReplacement(premiumRoute(
+        OrderDetailScreen(model: widget.model, order: recovered),
+      ));
+    } on ApiException catch (e) {
+      if (mounted) setState(() { error = e.message; });
+    } catch (_) {
+      if (mounted) setState(() {
+        error = 'No se pudo consultar el pedido anterior de forma segura.';
+      });
+    } finally {
+      if (mounted) setState(() { placing = false; });
     }
   }
 
@@ -429,6 +462,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
               ),
+              if (model.deliveryCheckoutBlocked) ...<Widget>[
+                const SizedBox(height: 12),
+                const QuietNote(
+                  icon: Icons.info_outline_rounded,
+                  text: 'Este servidor solo permite Recoger por ahora. '
+                      'La entrega por distancia se habilitará cuando el backend '
+                      'pueda cotizarla y confirmarla antes del cobro.',
+                ),
+              ],
               if (delivery) ...<Widget>[
                 const SizedBox(height: 12),
                 Reveal(
@@ -553,6 +595,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const SizedBox(height: 12),
               Reveal(index: 4, child: SummaryCard(model: model)),
+              if (error.toLowerCase().contains('sin confirmar')) ...<Widget>[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: placing ? null : reviewPendingOrder,
+                  icon: const Icon(Icons.manage_search_rounded),
+                  label: const Text('Consultar pedido pendiente'),
+                ),
+              ],
               AnimatedSize(
                 duration: TalaMotion.of(context, TalaMotion.select),
                 curve: TalaMotion.ease,
@@ -566,7 +616,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
           bottomNavigationBar: BottomActionBar(
-            child: model.hasAvailablePaymentMethod && !refreshingPayment
+            child: model.deliveryCheckoutBlocked
+                ? FilledButton(
+                    onPressed: null,
+                    child: const Text('Entrega a domicilio no disponible'),
+                  )
+                : model.hasAvailablePaymentMethod && !refreshingPayment
                 ? FilledButton(
                     onPressed: placing || refreshingPayment ? null : submit,
                     child: BusyLabel(

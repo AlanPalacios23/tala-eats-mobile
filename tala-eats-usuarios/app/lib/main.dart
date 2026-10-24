@@ -282,6 +282,9 @@ class TalaModel extends ChangeNotifier {
   final List<Map<String, dynamic>> promotions = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> coupons = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
+  // No confundir una wallet que respondió 503 con saldo y movimientos cero.
+  bool walletSyncFailed = false;
+  bool notificationsSyncFailed = false;
   int _marketCatalogEpoch = 0;
   final Set<int> _menusLoading = <int>{};
   final Set<int> _menuLoadErrors = <int>{};
@@ -300,6 +303,10 @@ class TalaModel extends ChangeNotifier {
   bool cashPayments = false;
   bool mercadoPagoPayments = false;
   bool stripePayments = false;
+  // Node RC8.x publica rutas de pago pickup-only. No anunciar delivery pagable
+  // hasta que exista una cotización y ruta de creación soportada en backend.
+  bool backendPickupOnly = false;
+  bool get deliveryCheckoutBlocked => backendPickupOnly && deliveryMode == 'delivery';
   bool paymentMethodsVerified = false;
   int _paymentMethodsRequestEpoch = 0;
   String paymentMethod = 'cash';
@@ -386,8 +393,6 @@ class TalaModel extends ChangeNotifier {
         api.addresses(),
         api.orders(),
         api.favorites(),
-        api.wallet(),
-        api.notifications(),
       ]);
       _applyBootstrap(Map<String, dynamic>.from(core[0] as Map));
       if (catalogEpoch == _marketCatalogEpoch && requestedMarket == marketCode) {
@@ -396,9 +401,22 @@ class TalaModel extends ChangeNotifier {
       _applyAddresses(List<dynamic>.from(core[2] as List));
       _applyOrders(List<dynamic>.from(core[3] as List));
       _applyFavorites(List<dynamic>.from(core[4] as List));
-      _applyWallet(Map<String, dynamic>.from(core[5] as Map));
-      _applyNotifications(List<dynamic>.from(core[6] as List));
       online = true;
+      // La falla de una funcion secundaria no debe bloquear el catalogo,
+      // direcciones ni pedidos que ya respondieron correctamente.
+      try {
+        _applyWallet(await api.wallet());
+        walletSyncFailed = false;
+      } catch (_) {
+        walletSyncFailed = true;
+      }
+      try {
+        _applyNotifications(await api.notifications());
+        notificationsSyncFailed = false;
+      } catch (_) {
+        // No confundir un HTTP 503 con una bandeja realmente vacía.
+        notificationsSyncFailed = true;
+      }
 
       // Módulos secundarios degradan de forma independiente.
       try { _applyPrivacy(Map<String, dynamic>.from((await api.privacy()) as Map)); } catch (_) {}
@@ -770,6 +788,7 @@ class TalaModel extends ChangeNotifier {
     cashPayments = false;
     mercadoPagoPayments = false;
     stripePayments = false;
+    backendPickupOnly = false;
     onlinePayments = false;
     paymentMethod = '';
     customerPricingPolicy = null;
@@ -790,13 +809,20 @@ class TalaModel extends ChangeNotifier {
       }
       bool cash = false;
       bool stripe = false;
+      final List<String> activeCheckoutModes = <String>[];
       for (final dynamic row in raw['methods'] as List) {
         if (row is! Map) continue;
         final String id = (row['id'] ?? '').toString();
         final bool enabled = row['enabled'] == true;
         if (id == 'cash') cash = enabled;
         if (id == 'stripe') stripe = enabled;
+        if (enabled && (id == 'cash' || id == 'stripe')) {
+          activeCheckoutModes.add((row['mode'] ?? '').toString());
+        }
       }
+      backendPickupOnly = raw['delivery_checkout_supported'] == false ||
+          (activeCheckoutModes.isNotEmpty &&
+          activeCheckoutModes.every((String mode) => mode.endsWith('-pickup')));
       // Pricing remains a reference only; the backend owns final charges.
       customerPricingPolicy = CheckoutPricingPolicy.fromPaymentMethods(raw);
       cashPayments = cash;
@@ -887,23 +913,34 @@ class TalaModel extends ChangeNotifier {
     } on ApiException catch (e) { lastError = e.message; notifyListeners(); return false; }
   }
 
+  /// Consulta en modo solo lectura la referencia pendiente. Un 404 NO prueba
+  /// que el POST anterior nunca se procesó: el journal sigue cifrado y no
+  /// autorizamos crear otro pedido distinto hasta obtener certeza.
+  Future<OrderEntry?> checkPendingOrder() async {
+    if (!signedIn || userId <= 0) {
+      throw ApiException(401, 'Inicia sesión para consultar el pedido.');
+    }
+    final result = await _orderSubmissionGuard.recover(
+      (String reference) async => Map<String, dynamic>.from(
+        (await api.get('/orders/by-reference/${Uri.encodeComponent(reference)}')) as Map,
+      ),
+    );
+    if (result == null) return null;
+    final OrderEntry order = _orderFromJson(result);
+    if (!orders.any((OrderEntry existing) => existing.id == order.id)) {
+      orders.insert(0, order);
+      notifyListeners();
+    }
+    return order;
+  }
+
   Future<void> _recoverPersistedCheckout() async {
     if (!signedIn || userId <= 0) return;
     try {
-      final result = await _orderSubmissionGuard.recover(
-        (String reference) async => Map<String, dynamic>.from(
-          (await api.get('/orders/by-reference/${Uri.encodeComponent(reference)}')) as Map,
-        ),
-      );
-      if (result == null) return;
-      final order = _orderFromJson(result);
-      if (!orders.any((OrderEntry existing) => existing.id == order.id)) {
-        orders.insert(0, order);
-        notifyListeners();
-      }
+      await checkPendingOrder();
     } on ApiException catch (e) {
-      // Never send another order automatically and never delete the
-      // encrypted journal because an HTTP error could be transient.
+      // Los errores de transporte no prueban que no exista el pedido.
+      // Nunca se elimina la referencia ni se reenvía POST automáticamente.
       lastError = e.message;
       notifyListeners();
     }
@@ -928,6 +965,11 @@ class TalaModel extends ChangeNotifier {
         'No hay un método de pago disponible. Revisa los métodos antes de confirmar.');
     }
     final Restaurant restaurant = cartRestaurant!;
+    if (deliveryCheckoutBlocked) {
+      throw ApiException(503,
+        'El servidor todavía no acepta pedidos a domicilio. '
+        'Elige Recoger para continuar; no se enviará ni cobrará este pedido.');
+    }
     AddressEntry? address;
     if (deliveryMode == 'delivery') {
       if (addresses.isEmpty) throw ApiException(400, 'Agrega una dirección de entrega antes de continuar.');
@@ -1590,20 +1632,7 @@ class _LaunchScreenState extends State<LaunchScreen>
                         letterSpacing: -0.2,
                       ),
                     ),
-                    SizedBox(height: 24),
-                    Semantics(
-                      label: 'Preparando Tala Eats',
-                      liveRegion: true,
-                      child: SizedBox(
-                        width: 110,
-                        child: LinearProgressIndicator(
-                          minHeight: 3,
-                          borderRadius: BorderRadius.all(Radius.circular(6)),
-                          backgroundColor: Color(0xFFFFE9DD),
-                          valueColor: AlwaysStoppedAnimation<Color>(kBrandDeep),
-                        ),
-                      ),
-                    ),
+
                   ],
                 ),
               ),
