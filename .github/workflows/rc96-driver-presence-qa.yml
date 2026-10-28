@@ -1,0 +1,46 @@
+name: RC96 Driver Android LIVE GPS presence QA (NO payment changes)
+on:
+  push:
+    branches: [feat/rc96-driver-gps-heartbeat-20261028]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  driver-presence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tala-eats-repartidor/app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Flutter dependencies
+        run: flutter pub get
+      - name: Analyze production driver controller and API
+        run: flutter analyze lib/core/controller.dart lib/data/driver_backend.dart lib/services/location_service.dart test/rc96_live_driver_presence_test.dart
+      - name: Live presence fake E2E without any real backend writes
+        run: flutter test test/rc96_live_driver_presence_test.dart
+      - name: Full driver Flutter tests
+        run: flutter test
+      - name: Restore Tala Eats official Android scaffold (CI-only)
+        run: python3 ../ci/bootstrap_android.py --role repartidor
+      - name: Build Android debug APK for private driver GPS QA
+        run: flutter build apk --debug --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1
+      - name: Upload temporary internal QA APK (not Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Repartidor-RC96-DEBUG-QA
+          path: tala-eats-repartidor/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
