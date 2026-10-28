@@ -285,7 +285,7 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
     final identifier = json['withdrawal_id'] ?? json['id'];
     final created = DateTime.tryParse((json['created_at'] ?? '').toString());
     final state = (json['state'] ?? '').toString();
-    if (amount != amountCents ||
+    if (amount == null || amount != amountCents ||
         currency.toString().toLowerCase() != 'mxn' ||
         identifier == null || created == null ||
         !const <String>{'reserved', 'submitted', 'unknown', 'review_required'}
