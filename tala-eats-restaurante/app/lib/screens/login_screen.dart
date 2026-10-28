@@ -81,6 +81,57 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  Future<void> _forgotPassword() async {
+    final recoveryEmail = TextEditingController(text: _email.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Recuperar contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Text('Escribe tu correo. Te enviaremos un enlace seguro para cambiar tu contraseña.'),
+            const SizedBox(height: 16),
+            TextField(
+              key: const ValueKey<String>('recoveryEmail'),
+              controller: recoveryEmail,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const <String>[AutofillHints.email],
+              decoration: const InputDecoration(labelText: 'Correo electrónico'),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('recoverySubmit'),
+            onPressed: () => Navigator.of(dialogContext).pop(recoveryEmail.text.trim()),
+            child: const Text('Enviar enlace'),
+          ),
+        ],
+      ),
+    );
+    recoveryEmail.dispose();
+    if (!mounted || email == null) return;
+    if (Validators.email(email) != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Escribe un correo electrónico válido.')),
+      );
+      return;
+    }
+    final failure = await widget.session.requestPasswordRecovery(email);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(failure == null
+        ? 'Si la cuenta existe, recibirás un enlace para restablecer tu contraseña.'
+        : failure.message)),
+    );
+  }
+
   void _openOnboarding() {
     Navigator.of(context).push<void>(
       appRoute<void>(OnboardingScreen(session: widget.session)),
@@ -228,7 +279,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       size: AppButtonSize.large,
                       onPressed: _submit,
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: TextButton(
+                        key: const ValueKey<String>('loginForgotPassword'),
+                        onPressed: _loading ? null : _forgotPassword,
+                        child: const Text('¿Olvidaste tu contraseña?'),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
                     const Divider(),
                     const SizedBox(height: 20),
                     Text(
