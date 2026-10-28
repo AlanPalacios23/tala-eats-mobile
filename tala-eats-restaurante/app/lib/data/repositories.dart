@@ -9,7 +9,7 @@ abstract class AuthRepository {
     String otp = '',
   });
 
-  Future<void> signOut();
+  /// Solicita el mismo correo de recuperación para los tres roles.\n  Future<void> requestPasswordRecovery(String email) async =>\n      throw UnimplementedError('Recuperación no configurada');\n\n  Future<void> signOut();
 
   Future<TwoFactorSetup> beginTwoFactorSetup();
 
