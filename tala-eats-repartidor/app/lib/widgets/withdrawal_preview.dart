@@ -15,9 +15,48 @@ class WithdrawalPreviewCard extends StatefulWidget {
   State<WithdrawalPreviewCard> createState() => _WithdrawalPreviewCardState();
 }
 
-class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
+class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard>
+    with WidgetsBindingObserver {
   bool _loading = false;
   String? _status;
+  bool _awaitingStripeReturn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingStripeReturn) {
+      _awaitingStripeReturn = false;
+      _refreshConnectStatus();
+    }
+  }
+
+  Future<void> _refreshConnectStatus() async {
+    final backend = widget.controller?.connectBackend;
+    if (backend == null) return;
+    try {
+      final who = await backend.api.get('/auth/me');
+      if (who is! Map || who['role'] != 'driver' || who['id'] is! int) return;
+      final status = await backend.api.get(
+        '/withdrawals/driver/${who['id']}/connect/status',
+      );
+      if (mounted && status is Map && status['status'] is String) {
+        setState(() => _status = status['status'] as String);
+      }
+    } catch (_) {
+      // Never infer bank approval from a browser redirect. User may retry in Wallet.
+    }
+  }
 
   Future<void> _openConnect() async {
     if (_loading) return;
@@ -51,10 +90,15 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
           !{'connect.stripe.com', 'dashboard.stripe.com'}.contains(link.host)) {
         throw StateError('Enlace bancario no autorizado');
       }
+      _awaitingStripeReturn = true;
       final opened = await launchUrl(link, mode: LaunchMode.externalApplication);
-      if (!opened) throw StateError('No se pudo abrir Stripe');
-      if (mounted) _message('Completa el registro en Stripe. Vuelve a Ganancias para consultar el estado.');
+      if (!opened) {
+        _awaitingStripeReturn = false;
+        throw StateError('No se pudo abrir Stripe');
+      }
+      if (mounted) _message('Al regresar de Stripe, Ganancias consultará el estado actualizado.');
     } catch (_) {
+      _awaitingStripeReturn = false;
       if (mounted) _message('No pudimos confirmar Stripe Connect. Tu dinero no se movió. Intenta otra vez.');
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -156,7 +200,7 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
       const Text('Vincula tu banco de forma segura con Stripe. Tus ganancias registradas no son saldo retirable.', style: AppText.bodyMuted),
       if (_status != null) ...[
         const SizedBox(height: Space.s),
-        Text('Estado bancario: ${_status == 'verified' ? 'Identidad verificada' : 'Verificación pendiente'}', style: AppText.caption),
+        Text('Estado Stripe Connect: ${_status == 'verified' ? 'Cuenta apta para recibir pagos' : _status == 'not_linked' ? 'Banco sin vincular' : _status == 'restricted' ? 'Cuenta restringida' : 'Verificación pendiente'}', style: AppText.caption),
       ],
       const SizedBox(height: Space.l),
       SizedBox(height: 52, child: OutlinedButton.icon(
