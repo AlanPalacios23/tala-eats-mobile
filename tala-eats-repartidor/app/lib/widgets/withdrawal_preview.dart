@@ -32,16 +32,45 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
       if (who is! Map || who['role'] != 'driver' || who['id'] is! int) {
         throw StateError('Identidad de repartidor no confirmada');
       }
-      final id = who['id'] as int;
-      final status = await backend.api.get('/withdrawals/driver/$id/connect/status');
-      if (status is! Map || status['status'] is! String) {
+      final status = await backend.api.get('/driver/finance/connect/status');
+      if (status is! Map || status['confirmed'] is! bool) {
         throw StateError('Respuesta de Stripe no confirmada');
       }
-      if (mounted) setState(() => _status = status['status'] as String);
+      if (mounted) setState(() => _status = status['confirmed'] == true ? 'verified' : 'pending');
+      if (status['confirmed'] != true) {
+        final approved = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Confirmar mi cuenta Stripe'),
+            content: const Text(
+              'Confirmo que soy el titular de la cuenta Stripe Connect '
+              'asociada a mi perfil de repartidor.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Confirmar titularidad'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || approved != true) return;
+        final confirmation = await backend.api.post(
+          '/driver/finance/connect/confirm', body: {},
+        );
+        if (confirmation is! Map ||
+            confirmation['owner_confirmed'] != true) {
+          throw StateError('No se confirmó la titularidad de la cuenta');
+        }
+      }
       // Every banking link requires fresh TOTP step-up (including first registration).
       final otp = await _bankStepUpDialog();
       if (!mounted || otp == null) return;
-      final response = await backend.api.post('/withdrawals/driver/$id/connect/onboarding',
+      final response = await backend.api.post('/driver/finance/connect/onboarding-link',
         body: {'totp': otp});
       if (response is! Map || response['url'] is! String) {
         throw StateError('Enlace bancario ausente');
