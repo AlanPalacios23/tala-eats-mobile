@@ -1,6 +1,6 @@
-/// RC9 Node Treasury: a single authenticated financial truth for drivers.
-/// Earnings from completed deliveries are not bank-withdrawable funds.
-/// All amounts are transmitted as integer-cent strings. No CLABE/secrets here.
+// RC9 Node Treasury: a single authenticated financial truth for drivers.
+// Earnings from completed deliveries are not bank-withdrawable funds.
+// All amounts are transmitted as integer-cent strings. No CLABE/secrets here.
 import 'dart:convert';
 import 'dart:math';
 
