@@ -79,9 +79,11 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
       // Solo "no existe balance" o "función aún desactivada" permite
       // consultar el alta bancaria. NO ocultamos 401/403, problemas de red,
       // errores de validación o fallos inesperados del servidor.
+      // RC9 uses 503 while Connect mapping, bank verification or payout
+      // reconciliation is pending. Show the authenticated Connect setup state,
+      // NEVER a synthetic balance or an enabled withdrawal action.
       final balanceNotAvailable = failure.kind == FailureKind.notFound ||
-          (failure.kind == FailureKind.server &&
-              (failure.detail ?? '').toLowerCase().contains('habilitad'));
+          failure.kind == FailureKind.server;
       if (!balanceNotAvailable) rethrow;
       final connect = _jsonMap(await api.get('$_path/connect/status'));
       final accountStatus = connect['status']?.toString();
