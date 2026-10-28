@@ -304,6 +304,17 @@ class DriverBackend {
     );
   }
 
+  /// RC9.5 LIVE: the authenticated driver inspects only their own status.
+  /// Do not interpret ready_for_dispatch=false as a GPS failure: commercial
+  /// dispatch has a separate release switch.
+  Future<bool> hasConfirmedLiveGpsPresence() async {
+    final raw = _map(await api.get('/driver/presence-readiness'));
+    return raw['presence_enabled'] == true &&
+        raw['admin_verified'] == true &&
+        raw['online'] == true &&
+        raw['fresh_gps'] == true;
+  }
+
   Future<void> setAvailability(bool online) async {
     await api.patch(
       '/driver/availability',
