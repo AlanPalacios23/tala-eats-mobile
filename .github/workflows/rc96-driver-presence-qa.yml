@@ -33,6 +33,8 @@ jobs:
         run: flutter test test/rc96_live_driver_presence_test.dart
       - name: Full driver Flutter tests
         run: flutter test
+      - name: Restore Tala Eats official Android scaffold (CI-only)
+        run: python3 ../ci/bootstrap_android.py --role repartidor
       - name: Build Android debug APK for private driver GPS QA
         run: flutter build apk --debug --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1
       - name: Upload temporary internal QA APK (not Play Store)
