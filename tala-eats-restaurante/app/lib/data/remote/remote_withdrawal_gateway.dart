@@ -83,12 +83,14 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
           (failure.kind == FailureKind.server &&
               (failure.detail ?? '').toLowerCase().contains('habilitad'));
       if (!balanceNotAvailable) rethrow;
-      final connect = _jsonMap(await api.get('$_path/connect/status'));
-      final accountStatus = connect['status']?.toString();
-      final bankInfo = connect['bank'];
-      final bankStatus = bankInfo is Map<String, dynamic>
-          ? bankInfo['status']?.toString()
-          : null;
+      final restaurant = recipientId;
+      if (restaurant == null || restaurant <= 0) rethrow;
+      // RC9 Node Connect uses merchant-owner endpoints, not Python /withdrawals.
+      final connect = _jsonMap(await api.get(
+          '/owner/finance/connect/$restaurant/status'));
+      final accountStatus = connect['ready'] == true
+          ? 'pending_verification' : 'not_linked';
+      final bankStatus = 'pending_review';
       // En v1.6.4 incluso una cuenta Stripe lista no es un banco autorizado
       // para retiros; siempre permanece bloqueado hasta la conciliación.
       return WithdrawalOverview(
@@ -163,11 +165,13 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
   @override
   Future<List<WithdrawalRecord>> fetchHistory() async {
     final raw = await api.get('$_path/history');
-    if (raw is! List) {
+    // Node RC9 returns {withdrawals: [...]}; older Python returned a list.
+    final items = raw is Map<String, dynamic> ? raw['withdrawals'] : raw;
+    if (items is! List) {
       throw const AppFailure(FailureKind.server,
           'Historial de retiros no disponible.');
     }
-    return List<WithdrawalRecord>.unmodifiable(raw.map((item) {
+    return List<WithdrawalRecord>.unmodifiable(items.map((item) {
       if (item is! Map<String, dynamic>) {
         throw const FormatException('Historial de retiros inválido');
       }
@@ -177,10 +181,16 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
 
   @override
   Future<bool> bankAccessRequiresTotp() async {
-    final status = _jsonMap(await api.get('$_path/connect/status'));
-    final value = status['status'];
-    if (value is! String) {
-      throw const AppFailure(FailureKind.server, 'No fue posible validar el estado bancario.');
+    final id = recipientId;
+    if (id == null || id < 1) {
+      throw const AppFailure(FailureKind.permissionDenied,
+          'No se confirmó el restaurante para validar el banco.');
+    }
+    final status = _jsonMap(await api.get(
+        '/owner/finance/connect/$id/status'));
+    if (status['owner_approved'] is! bool) {
+      throw const AppFailure(FailureKind.server,
+          'No fue posible validar el estado de Stripe Connect.');
     }
     return true; // Backend v1.6.4 exige step-up en el alta y en el acceso.
   }
@@ -191,7 +201,7 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
       throw const AppFailure(FailureKind.validation, 'Código 2FA inválido.');
     }
     final result = _jsonMap(await api.post(
-      '$_path/connect/onboarding',
+      '/owner/finance/connect/$recipientId/onboarding-link',
       body: <String, dynamic>{'totp': totp},
     ));
     final raw = result['url'];
@@ -224,10 +234,22 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
       throw const AppFailure(FailureKind.permissionDenied,
           'Restaurante no autenticado para retiros.');
     }
-    // Escribir la misma llave antes de hacer red: si Android se cierra tras
-    // enviar dinero, el siguiente intento NO fabrica otra solicitud.
+    // Node RC9 requires a stable UUID-shaped client key. Keep the original
+    // 128-bit random bytes from our secure generator; never regenerate on retry.
+    final uuid = idempotencyKey.length == 32 &&
+            RegExp(r'^[a-fA-F0-9]{32}$').hasMatch(idempotencyKey)
+        ? '${idempotencyKey.substring(0, 8)}-'
+          '${idempotencyKey.substring(8, 12)}-'
+          '${idempotencyKey.substring(12, 16)}-'
+          '${idempotencyKey.substring(16, 20)}-'
+          '${idempotencyKey.substring(20, 32)}'.toLowerCase()
+        : idempotencyKey;
+    if (!RegExp(r'^[a-fA-F0-9-]{36}$').hasMatch(uuid)) {
+      throw const AppFailure(FailureKind.validation,
+          'Identificador de solicitud inválido.');
+    }
     final previous = await journal.read(id);
-    var effectiveKey = idempotencyKey;
+    var effectiveKey = uuid;
     if (previous != null) {
       Map<String, dynamic> saved;
       try {
@@ -238,7 +260,7 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
       }
       if (saved['amount_cents'] != amountCents ||
           saved['idempotency_key'] is! String ||
-          !RegExp(r'^[A-Za-z0-9][A-Za-z0-9:_-]{15,95}$')
+          !RegExp(r'^[a-fA-F0-9-]{36}$')
               .hasMatch(saved['idempotency_key'] as String)) {
         throw const AppFailure(FailureKind.conflict,
             'Existe una solicitud anterior por revisar. Consulta el historial antes de otro retiro.');
@@ -252,21 +274,40 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
     }
     final json = _jsonMap(await api.post('$_path/request',
       idempotencyKey: effectiveKey,
-      body: <String, dynamic>{'amount_cents': amountCents, 'totp': totp},
+      body: <String, dynamic>{
+        'amount_cents': amountCents.toString(),
+        'request_key': effectiveKey,
+        'totp': totp,
+      },
     ));
-    final amount = json['amount_cents'];
+    final amount = _intOrNull(json['amount_cents']);
     final currency = json['currency'];
-    final identifier = json['id'];
+    final identifier = json['withdrawal_id'] ?? json['id'];
     final created = DateTime.tryParse((json['created_at'] ?? '').toString());
+    final state = (json['state'] ?? '').toString();
     if (amount != amountCents ||
         currency.toString().toLowerCase() != 'mxn' ||
-        identifier == null || created == null) {
-      // El proveedor puede haber aceptado la petición; no liberamos la llave.
+        identifier == null || created == null ||
+        !const <String>{'reserved', 'submitted', 'unknown', 'review_required'}
+            .contains(state) ||
+        json['bank_payout_created'] != false) {
+      // The bank may have received a request. Retain its idempotency key
+      // rather than interpreting a malformed 202 as successful transfer.
       throw const AppFailure(FailureKind.server,
           'El estado del retiro es incierto. Revisa el historial antes de repetir.');
     }
     await journal.clear(id);
-    return WithdrawalReceipt(id: identifier.toString(), amountCents: amount,
-        currency: 'mxn', receivedAt: created.toLocal());
+    return WithdrawalReceipt(
+      id: identifier.toString(), amountCents: amount,
+      currency: 'mxn', receivedAt: created.toLocal(),
+    );
   }
+}
+
+int? _intOrNull(Object? raw) {
+  if (raw is int && raw >= 0) return raw;
+  if (raw is String && RegExp(r'^\\d{1,12}$').hasMatch(raw)) {
+    return int.tryParse(raw);
+  }
+  return null;
 }
