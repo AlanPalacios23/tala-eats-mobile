@@ -33,15 +33,15 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
         throw StateError('Identidad de repartidor no confirmada');
       }
       final id = who['id'] as int;
-      final status = await backend.api.get('/withdrawals/driver/$id/connect/status');
-      if (status is! Map || status['status'] is! String) {
+      final status = await backend.api.get('/driver/finance/connect/status');
+      if (status is! Map || status['confirmed'] is! bool) {
         throw StateError('Respuesta de Stripe no confirmada');
       }
-      if (mounted) setState(() => _status = status['status'] as String);
+      if (mounted) setState(() => _status = status['confirmed'] == true ? 'verified' : 'pending');
       // Every banking link requires fresh TOTP step-up (including first registration).
       final otp = await _bankStepUpDialog();
       if (!mounted || otp == null) return;
-      final response = await backend.api.post('/withdrawals/driver/$id/connect/onboarding',
+      final response = await backend.api.post('/driver/finance/connect/onboarding-link',
         body: {'totp': otp});
       if (response is! Map || response['url'] is! String) {
         throw StateError('Enlace bancario ausente');
