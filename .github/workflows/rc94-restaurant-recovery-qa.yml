@@ -1,0 +1,37 @@
+name: RC9.4 Restaurante | Recovery QA
+on:
+  push:
+    branches: [fix/restaurant-password-recovery-rc94-20261028]
+    paths:
+      - 'tala-eats-restaurante/app/lib/**'
+      - 'tala-eats-restaurante/app/test/**'
+      - '.github/workflows/rc94-restaurant-recovery-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flutter-restaurant:
+    name: Flutter recovery screens and regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tala-eats-restaurante/app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Prepare local bundled fonts
+        working-directory: .
+        run: python3 tala-eats-restaurante/ci/prepare_fonts.py
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze recovery contracts
+        run: flutter analyze --no-fatal-infos lib/data/repositories.dart lib/data/remote/remote_repositories.dart lib/data/local/local_repositories.dart lib/state/session_controller.dart lib/screens/login_screen.dart
+      - name: Run complete Flutter test suite
+        run: flutter test
