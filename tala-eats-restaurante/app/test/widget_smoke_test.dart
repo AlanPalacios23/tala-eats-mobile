@@ -124,7 +124,9 @@ void main() {
 
     expect(find.text('Escribe tu correo.'), findsOneWidget);
     expect(find.text('Escribe tu contraseña.'), findsOneWidget);
-    expect(find.text('Bienvenido de vuelta'), findsOneWidget);
+    // Flutter can scroll the long login form to the invalid fields. Check
+    // that its submit control remains rather than requiring a visible header.
+    expect(find.byKey(const ValueKey<String>('loginSubmitButton')), findsOneWidget);
   });
 
   testWidgets('login con error muestra mensaje de producto', (tester) async {
