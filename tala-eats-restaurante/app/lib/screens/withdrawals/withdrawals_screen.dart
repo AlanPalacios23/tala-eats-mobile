@@ -36,20 +36,34 @@ class WithdrawalsScreen extends StatefulWidget {
   State<WithdrawalsScreen> createState() => _WithdrawalsScreenState();
 }
 
-class _WithdrawalsScreenState extends State<WithdrawalsScreen> {
+class _WithdrawalsScreenState extends State<WithdrawalsScreen>
+    with WidgetsBindingObserver {
+  bool _awaitingStripeReturn = false;
   late final WithdrawalController _controller =
       WithdrawalController(widget.gateway);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller.load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
+  }
+
+  // Chrome/Stripe is external. The callback page never grants banking rights:
+  // always re-read the authenticated server state when Android resumes.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingStripeReturn && mounted) {
+      _awaitingStripeReturn = false;
+      _controller.load();
+    }
   }
 
   void _openNew() {
@@ -98,11 +112,13 @@ class _WithdrawalsScreenState extends State<WithdrawalsScreen> {
         (Uri link) => launchUrl(link, mode: LaunchMode.externalApplication);
     if (uri != null) {
       bool opened;
+      _awaitingStripeReturn = true;
       try {
         opened = await opener(uri);
       } catch (_) {
         opened = false;
       }
+      if (!opened) _awaitingStripeReturn = false;
       if (!mounted) return;
       if (!opened) {
         showAppSnack(
@@ -112,7 +128,7 @@ class _WithdrawalsScreenState extends State<WithdrawalsScreen> {
         );
       }
       if (opened) {
-        showAppSnack(context, 'Al finalizar en Stripe, vuelve a esta pantalla y desliza para actualizar.');
+        showAppSnack(context, 'Al regresar de Stripe, revisaremos de nuevo tu banco. Si no cambia, desliza para actualizar.');
       }
       return;
     }

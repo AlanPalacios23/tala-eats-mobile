@@ -79,9 +79,11 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
       // Solo "no existe balance" o "función aún desactivada" permite
       // consultar el alta bancaria. NO ocultamos 401/403, problemas de red,
       // errores de validación o fallos inesperados del servidor.
+      // RC9 uses 503 while Connect mapping, bank verification or payout
+      // reconciliation is pending. Show the authenticated Connect setup state,
+      // NEVER a synthetic balance or an enabled withdrawal action.
       final balanceNotAvailable = failure.kind == FailureKind.notFound ||
-          (failure.kind == FailureKind.server &&
-              (failure.detail ?? '').toLowerCase().contains('habilitad'));
+          failure.kind == FailureKind.server;
       if (!balanceNotAvailable) rethrow;
       final connect = _jsonMap(await api.get('$_path/connect/status'));
       final accountStatus = connect['status']?.toString();
@@ -96,12 +98,14 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
         bank: BankAccountSummary(
           status: accountStatus == 'not_linked'
               ? BankAccountStatus.notLinked
-              : <String>{'pending_verification', 'verified'}
-                      .contains(accountStatus) &&
-                  <String>{'pending_review', 'not_linked'}
-                      .contains(bankStatus)
-                  ? BankAccountStatus.pendingVerification
-                  : BankAccountStatus.unavailable,
+              : accountStatus == 'restricted'
+                  ? BankAccountStatus.restricted
+                  : accountStatus == 'verified' && bankStatus == 'verified'
+                      ? BankAccountStatus.verified
+                      : <String>{'pending_verification', 'pending_review', 'verified'}
+                              .contains(accountStatus)
+                          ? BankAccountStatus.pendingVerification
+                          : BankAccountStatus.unavailable,
           bankName: null,
           last4: null,
         ),
@@ -252,9 +256,17 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
     }
     final json = _jsonMap(await api.post('$_path/request',
       idempotencyKey: effectiveKey,
-      body: <String, dynamic>{'amount_cents': amountCents, 'totp': totp},
+      // RC9 commits request_key in PostgreSQL before any bank operation.
+      // A 32-hex token is generated once and persisted on this device.
+      body: <String, dynamic>{
+        'amount_cents': amountCents.toString(),
+        'request_key': effectiveKey,
+        'totp': totp,
+      },
     ));
-    final amount = json['amount_cents'];
+    final rawAmount = json['amount_cents'];
+    final amount = rawAmount is int ? rawAmount :
+        rawAmount is String ? int.tryParse(rawAmount) : null;
     final currency = json['currency'];
     final identifier = json['id'];
     final created = DateTime.tryParse((json['created_at'] ?? '').toString());
@@ -266,7 +278,7 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
           'El estado del retiro es incierto. Revisa el historial antes de repetir.');
     }
     await journal.clear(id);
-    return WithdrawalReceipt(id: identifier.toString(), amountCents: amount,
+    return WithdrawalReceipt(id: identifier.toString(), amountCents: amountCents,
         currency: 'mxn', receivedAt: created.toLocal());
   }
 }

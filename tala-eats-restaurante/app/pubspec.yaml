@@ -1,7 +1,7 @@
 name: talaeats_restaurant
 description: Tala Eats Restaurante - frontend premium conectado al backend productivo Tala Eats.
 publish_to: 'none'
-version: 0.7.6+46
+version: 0.7.7+47
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

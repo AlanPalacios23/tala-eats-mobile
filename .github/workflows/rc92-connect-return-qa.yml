@@ -1,0 +1,58 @@
+name: Tala Eats RC9.2 | Stripe Connect return Wallet QA
+
+on:
+  push:
+    branches:
+      - feat/rc9-connect-wallet-contract-20261028
+    paths:
+      - 'tala-eats-restaurante/app/lib/**'
+      - 'tala-eats-restaurante/app/test/**'
+      - 'tala-eats-repartidor/app/lib/**'
+      - 'tala-eats-repartidor/app/test/**'
+      - '.github/workflows/rc92-connect-return-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-wallet-return:
+    name: Flutter Wallet onboarding return | ${{ matrix.role }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [restaurante, repartidor]
+    defaults:
+      run:
+        working-directory: tala-eats-${{ matrix.role }}/app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Prepare locally bundled restaurant fonts
+        if: matrix.role == 'restaurante'
+        working-directory: .
+        run: python3 tala-eats-restaurante/ci/prepare_fonts.py
+      - name: Dependencies
+        run: flutter pub get
+      - name: Analyze Wallet return code
+        run: |
+          if [ "${{ matrix.role }}" = restaurante ]; then
+            flutter analyze --no-fatal-infos lib/screens/withdrawals/withdrawals_screen.dart lib/data/remote/remote_withdrawal_gateway.dart test/withdrawal_flow_test.dart test/remote_withdrawal_gateway_test.dart
+          else
+            flutter analyze --no-fatal-infos lib/widgets/withdrawal_preview.dart test/withdrawal_preview_test.dart
+          fi
+      - name: Wallet return regression suite
+        run: |
+          if [ "${{ matrix.role }}" = restaurante ]; then
+            flutter test test/withdrawal_flow_test.dart test/remote_withdrawal_gateway_test.dart
+          else
+            flutter test test/withdrawal_preview_test.dart
+          fi

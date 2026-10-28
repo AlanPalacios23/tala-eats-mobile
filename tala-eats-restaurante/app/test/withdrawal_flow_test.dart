@@ -32,12 +32,15 @@ class _FakeGateway extends WithdrawalGateway {
     this.overview = const WithdrawalOverview.notConnected(),
     this.records = const <WithdrawalRecord>[],
     this.onboardingError,
+    this.onboardingLink,
   });
 
-  final WithdrawalOverview overview;
+  WithdrawalOverview overview;
   final List<WithdrawalRecord> records;
   final AppFailure? onboardingError;
+  final Uri? onboardingLink;
   Completer<WithdrawalReceipt>? pending;
+  int overviewCalls = 0;
   int requestCalls = 0;
   int linkCalls = 0;
   final List<String> keys = <String>[];
@@ -47,7 +50,10 @@ class _FakeGateway extends WithdrawalGateway {
   bool get isConnected => true;
 
   @override
-  Future<WithdrawalOverview> fetchOverview() async => overview;
+  Future<WithdrawalOverview> fetchOverview() async {
+    overviewCalls++;
+    return overview;
+  }
 
   @override
   Future<List<WithdrawalRecord>> fetchHistory() async => records;
@@ -56,7 +62,7 @@ class _FakeGateway extends WithdrawalGateway {
   Future<Uri?> createBankOnboardingLink({String? totp}) async {
     linkCalls++;
     if (onboardingError != null) throw onboardingError!;
-    return null;
+    return onboardingLink;
   }
 
   @override
@@ -480,6 +486,37 @@ void main() {
       await _confirmBankTotp(tester);
       expect(gateway.linkCalls, 1);
       expect(find.text('Registro bancario seguro'), findsOneWidget);
+    });
+
+    testWidgets('al volver de Stripe Android recarga el estado del banco sin mover dinero',
+        (tester) async {
+      final gateway = _FakeGateway(
+        overview: _connected(bank: const BankAccountSummary.notLinked()),
+        onboardingLink: Uri.parse('https://connect.stripe.com/setup/test'),
+      );
+      var opens = 0;
+      await tester.pumpWidget(_app(WithdrawalsScreen(
+        gateway: gateway,
+        openLink: (link) async {
+          opens++;
+          expect(link.host, 'connect.stripe.com');
+          return true;
+        },
+      )));
+      await tester.pumpAndSettle();
+      final initial = gateway.overviewCalls;
+      await _tapKey(tester, 'connect-register-now');
+      await _confirmBankTotp(tester);
+      expect(opens, 1);
+      expect(gateway.overviewCalls, initial);
+      gateway.overview = _connected(bank: _verifiedBank);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(gateway.overviewCalls, greaterThan(initial));
+      expect(find.text('Verificada'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('withdrawals-disabled-notice')),
+          findsOneWidget);
     });
 
     testWidgets('un 403 de Connect se muestra sin decir retiros desactivados',
