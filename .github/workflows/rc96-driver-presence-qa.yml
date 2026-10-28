@@ -21,6 +21,10 @@ jobs:
           flutter-version: '3.47.6'
           channel: stable
           cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Flutter dependencies
         run: flutter pub get
       - name: Analyze production driver controller and API
@@ -29,3 +33,12 @@ jobs:
         run: flutter test test/rc96_live_driver_presence_test.dart
       - name: Full driver Flutter tests
         run: flutter test
+      - name: Build Android debug APK for private driver GPS QA
+        run: flutter build apk --debug --dart-define=TALA_EATS_API_BASE=https://talaeats.alan-palacios-dev.com/api/v1
+      - name: Upload temporary internal QA APK (not Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TalaEats-Repartidor-RC96-DEBUG-QA
+          path: tala-eats-repartidor/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
