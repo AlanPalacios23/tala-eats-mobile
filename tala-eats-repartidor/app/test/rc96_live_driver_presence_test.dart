@@ -28,9 +28,10 @@ class _FakeBackend extends DriverBackend {
   }
   @override
   Future<void> updateLocation(double lat, double lng) async {
-    expect(online, true, reason: 'RC9.5 prohibits GPS before ONLINE');
-    expect(lat, closeTo(20.653, .00001));
-    expect(lng, closeTo(-103.7, .00001));
+    if (!online || (lat - 20.653).abs() > .00001 ||
+        (lng + 103.7).abs() > .00001) {
+      throw StateError('GPS must only be written with correct ONLINE location');
+    }
     events.add('gps');
     gpsWrites++;
   }
@@ -80,6 +81,7 @@ void main() {
     final before = backend.gpsWrites;
     await tester.pump(const Duration(seconds: 41));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
     expect(backend.gpsWrites, greaterThan(before),
         reason: 'GPS must refresh even when the driver is stationary');
     expect(await driver.setOnlineAsync(false), true);
