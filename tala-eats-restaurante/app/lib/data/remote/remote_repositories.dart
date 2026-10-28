@@ -90,6 +90,13 @@ class RemoteAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> requestPasswordRecovery(String email) async {
+    await api.post('/auth/password/forgot',
+      auth: false,
+      body: <String, dynamic>{'email': email.trim().toLowerCase()});
+  }
+
+  @override
   Future<void> signOut() async {
     try {
       await api.post('/auth/logout', body: const <String, dynamic>{});
