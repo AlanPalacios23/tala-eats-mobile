@@ -866,7 +866,9 @@ class DriverController extends ChangeNotifier {
 
   Future<void> _refreshGpsHeartbeat() async {
     if (_gpsHeartbeatBusy || !_signedIn || !_online || _disposed ||
-        !isProduction) return;
+        !isProduction) {
+      return;
+    }
     _gpsHeartbeatBusy = true;
     try {
       final location = await _productionLocation.ensureCurrent();
