@@ -98,12 +98,14 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
         bank: BankAccountSummary(
           status: accountStatus == 'not_linked'
               ? BankAccountStatus.notLinked
-              : <String>{'pending_verification', 'verified'}
-                      .contains(accountStatus) &&
-                  <String>{'pending_review', 'not_linked'}
-                      .contains(bankStatus)
-                  ? BankAccountStatus.pendingVerification
-                  : BankAccountStatus.unavailable,
+              : accountStatus == 'restricted'
+                  ? BankAccountStatus.restricted
+                  : accountStatus == 'verified' && bankStatus == 'verified'
+                      ? BankAccountStatus.verified
+                      : <String>{'pending_verification', 'pending_review', 'verified'}
+                              .contains(accountStatus)
+                          ? BankAccountStatus.pendingVerification
+                          : BankAccountStatus.unavailable,
           bankName: null,
           last4: null,
         ),
