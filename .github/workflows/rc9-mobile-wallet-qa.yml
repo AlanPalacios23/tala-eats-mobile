@@ -1,0 +1,56 @@
+name: Tala Eats RC9 — Wallet Restaurante y Repartidor (Flutter QA)
+on:
+  push:
+    branches:
+      - feat/rc9-mobile-wallet-restaurant-driver-20261028
+    paths:
+      - 'tala-eats-restaurante/app/lib/**'
+      - 'tala-eats-repartidor/app/lib/**'
+      - 'tala-eats-restaurante/app/test/**'
+      - 'tala-eats-repartidor/app/test/**'
+      - '.github/workflows/rc9-mobile-wallet-qa.yml'
+  pull_request:
+    paths:
+      - 'tala-eats-restaurante/app/lib/**'
+      - 'tala-eats-repartidor/app/lib/**'
+      - 'tala-eats-restaurante/app/test/**'
+      - 'tala-eats-repartidor/app/test/**'
+      - '.github/workflows/rc9-mobile-wallet-qa.yml'
+permissions:
+  contents: read
+jobs:
+  flutter-qa:
+    name: ${{ matrix.role }} — Flutter 3.47.6 analyze & test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - role: Restaurante
+            dir: tala-eats-restaurante/app
+          - role: Repartidor
+            dir: tala-eats-repartidor/app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Install project deps
+        working-directory: ${{ matrix.dir }}
+        run: flutter pub get
+      - name: Analyze app
+        working-directory: ${{ matrix.dir }}
+        run: flutter analyze --no-fatal-infos
+      - name: Run all widget/data tests
+        working-directory: ${{ matrix.dir }}
+        run: flutter test --reporter expanded
+      - name: Validate money launch flags are OFF by default
+        run: |
+          grep -q 'defaultValue: false' tala-eats-restaurante/app/lib/data/withdrawal_gateway.dart
+          grep -q 'defaultValue: false' tala-eats-repartidor/app/lib/data/driver_treasury_gateway.dart
+          grep -q 'server_allows_requests' tala-eats-repartidor/app/lib/data/driver_treasury_gateway.dart
