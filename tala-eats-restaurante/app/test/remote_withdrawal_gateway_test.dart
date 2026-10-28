@@ -80,6 +80,32 @@ void main() {
     await expectLater(gateway.fetchOverview(), throwsA(isA<AppFailure>()));
   });
 
+  test('RC9 503 sin saldo permite consultar onboarding pero nunca habilita dinero', () async {
+    final calls = <String>[];
+    final api = RemoteApi(session: _Session(), client: MockClient((request) async {
+      calls.add(request.url.path);
+      if (request.url.path.endsWith('/balance')) {
+        return http.Response(jsonEncode(<String, dynamic>{
+          'error': 'WITHDRAWAL_BALANCE_RECONCILIATION_HOLD',
+        }), 503);
+      }
+      return http.Response(jsonEncode(<String, dynamic>{
+        'status': 'pending_verification',
+        'bank': <String, dynamic>{'status': 'pending_review'},
+        'server_allows_requests': false,
+      }), 200);
+    }));
+    final gateway = RemoteWithdrawalGateway(api, recipientId: 7, journal: _Journal());
+    final status = await gateway.fetchOverview();
+    expect(status.balance, isNull);
+    expect(status.bank.status, BankAccountStatus.pendingVerification);
+    expect(status.serverAllowsRequests, false);
+    expect(calls, <String>[
+      '/api/v1/withdrawals/restaurant/7/balance',
+      '/api/v1/withdrawals/restaurant/7/connect/status',
+    ]);
+  });
+
   test('401 en saldo no se oculta intentando consultar Connect', () async {
     var calls = 0;
     final api = RemoteApi(session: _Session(), client: MockClient((_) async {
@@ -114,17 +140,21 @@ void main() {
       expect(request.method, 'POST');
       expect(request.url.path, '/api/v1/withdrawals/restaurant/7/request');
       expect(request.headers['authorization'], 'Bearer token-de-prueba');
-      expect(request.headers['idempotency-key'], 'restaurant_payout_1234567890123');
+      expect(request.headers['idempotency-key'], 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
       final body = jsonDecode(request.body) as Map<String, dynamic>;
-      expect(body, <String, dynamic>{'amount_cents': 24000, 'totp': '123456'});
+      expect(body, <String, dynamic>{
+        'amount_cents': '24000',
+        'request_key': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'totp': '123456',
+      });
       return http.Response(jsonEncode(<String, dynamic>{
-        'id': 25, 'amount_cents': 24000, 'currency': 'MXN',
+        'id': '25', 'amount_cents': '24000', 'currency': 'MXN',
         'status': 'submitted', 'created_at': '2026-10-12T12:30:00Z',
       }), 202);
     }));
     final gateway = RemoteWithdrawalGateway(api, recipientId: 7, journal: journal);
     final result = await gateway.requestWithdrawal(amountCents: 24000,
-        totp: '123456', idempotencyKey: 'restaurant_payout_1234567890123');
+        totp: '123456', idempotencyKey: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     expect(result.status, WithdrawalStatus.requested);
     expect(calls, 1);
     expect(journal.saved, isEmpty);
@@ -138,14 +168,14 @@ void main() {
       return http.Response('indeterminado', 503);
     }));
     final gateway = RemoteWithdrawalGateway(api, recipientId: 7, journal: journal);
-    for (final key in ['clave_retiro_a_12345678', 'clave_retiro_b_12345678']) {
+    for (final key in ['bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccccccccc']) {
       await expectLater(gateway.requestWithdrawal(amountCents: 20000,
           totp: '123456', idempotencyKey: key), throwsA(isA<AppFailure>()));
     }
-    expect(keys, <String>['clave_retiro_a_12345678','clave_retiro_a_12345678']);
+    expect(keys, <String>['bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']);
     expect(journal.saved.containsKey(7), true);
     await expectLater(gateway.requestWithdrawal(amountCents: 21000,
-        totp: '123456', idempotencyKey: 'clave_retiro_c_12345678'),
+        totp: '123456', idempotencyKey: 'dddddddddddddddddddddddddddddddd'),
         throwsA(isA<AppFailure>()));
     expect(keys.length, 2);
   });
