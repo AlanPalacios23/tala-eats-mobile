@@ -65,6 +65,15 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<AppFailure?> requestPasswordRecovery(String email) async {
+    try {
+      await services.auth.requestPasswordRecovery(email);
+      return null;
+    } catch (error) {
+      return AppFailure.from(error);
+    }
+  }
+
   Future<AppFailure?> _routeUser(UserSession session) async {
     user = session;
     if (session.role == 'owner') {
