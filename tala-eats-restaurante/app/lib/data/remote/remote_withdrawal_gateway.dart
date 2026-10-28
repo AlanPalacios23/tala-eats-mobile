@@ -254,9 +254,17 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
     }
     final json = _jsonMap(await api.post('$_path/request',
       idempotencyKey: effectiveKey,
-      body: <String, dynamic>{'amount_cents': amountCents, 'totp': totp},
+      // RC9 commits request_key in PostgreSQL before any bank operation.
+      // A 32-hex token is generated once and persisted on this device.
+      body: <String, dynamic>{
+        'amount_cents': amountCents.toString(),
+        'request_key': effectiveKey,
+        'totp': totp,
+      },
     ));
-    final amount = json['amount_cents'];
+    final rawAmount = json['amount_cents'];
+    final amount = rawAmount is int ? rawAmount :
+        rawAmount is String ? int.tryParse(rawAmount) : null;
     final currency = json['currency'];
     final identifier = json['id'];
     final created = DateTime.tryParse((json['created_at'] ?? '').toString());
