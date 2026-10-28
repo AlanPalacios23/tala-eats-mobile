@@ -278,7 +278,7 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
           'El estado del retiro es incierto. Revisa el historial antes de repetir.');
     }
     await journal.clear(id);
-    return WithdrawalReceipt(id: identifier.toString(), amountCents: amount,
+    return WithdrawalReceipt(id: identifier.toString(), amountCents: amountCents,
         currency: 'mxn', receivedAt: created.toLocal());
   }
 }
