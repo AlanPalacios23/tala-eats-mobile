@@ -150,6 +150,8 @@ class DriverController extends ChangeNotifier {
   final Map<String, String> _uploadedProofUrls = <String, String>{};
   final Set<Timer> _timers = <Timer>{};
   Timer? _pollTimer;
+  Timer? _gpsHeartbeatTimer;
+  bool _gpsHeartbeatBusy = false;
   WebSocket? _orderSocket;
   StreamSubscription<dynamic>? _socketSubscription;
   int? _socketOrderId;
@@ -377,7 +379,12 @@ class DriverController extends ChangeNotifier {
     notifyListeners();
     try {
       await _stopRealtime();
+      _stopGpsHeartbeat();
       await _productionLocation.stop();
+      if (_online) {
+        // A verified driver must not stay online after sign-out.
+        await _productionBackend.setAvailability(false);
+      }
       await _productionBackend.logout();
       _signedIn = false;
       _online = false;
@@ -431,16 +438,40 @@ class DriverController extends ChangeNotifier {
     notifyListeners();
     try {
       if (value) {
+        // RC9.5 requires ONLINE approval before it will accept a GPS write.
+        // A position obtained first is kept local until the server accepts
+        // availability. If location/readiness fails, revoke ONLINE.
         final location = await _productionLocation.ensureCurrent();
-        await _productionBackend.updateLocation(location.lat, location.lng);
-      }
-      await _productionBackend.setAvailability(value);
-      _online = value;
-      if (value) {
+        await _productionBackend.setAvailability(true);
+        try {
+          await _productionBackend.updateLocation(location.lat, location.lng);
+          if (!await _productionBackend.hasConfirmedLiveGpsPresence()) {
+            throw const AppFailure(
+              FailureKind.server,
+              'Tu conexión no tiene GPS vigente. Verifica permisos y vuelve a intentarlo.',
+            );
+          }
+        } on AppFailure {
+          try {
+            await _productionBackend.setAvailability(false);
+          } catch (_) {
+            // Redis GPS expires by TTL, and the server fail-closes dispatch.
+          }
+          rethrow;
+        }
+        _online = true;
         await _hydrateDashboard(silent: true);
         await _startLocationTracking();
+        if (!_online) {
+          throw const AppFailure(FailureKind.permissionDenied,
+              'No fue posible mantener la ubicación del repartidor.');
+        }
         _startPolling();
       } else {
+        // The server must confirm OFFLINE before clearing the local state.
+        await _productionBackend.setAvailability(false);
+        _online = false;
+        _stopGpsHeartbeat();
         await _productionLocation.stop();
         _locationIssue = null;
       }
@@ -805,7 +836,9 @@ class DriverController extends ChangeNotifier {
           notifyListeners();
         }
       });
+      _startGpsHeartbeat();
     } on AppFailure catch (error) {
+      _stopGpsHeartbeat();
       _locationIssue = _messageFor(error);
       if (_active == null && _online) {
         try {
@@ -814,6 +847,44 @@ class DriverController extends ChangeNotifier {
         } catch (_) {}
       }
       notifyListeners();
+    }
+  }
+
+  // GPS Redis location has a 120s TTL. A stationary driver may not trigger
+  // position-stream updates, so renew current GPS every 40 seconds.
+  void _startGpsHeartbeat() {
+    _gpsHeartbeatTimer?.cancel();
+    _gpsHeartbeatTimer = Timer.periodic(const Duration(seconds: 40), (_) {
+      unawaited(_refreshGpsHeartbeat());
+    });
+  }
+
+  void _stopGpsHeartbeat() {
+    _gpsHeartbeatTimer?.cancel();
+    _gpsHeartbeatTimer = null;
+  }
+
+  Future<void> _refreshGpsHeartbeat() async {
+    if (_gpsHeartbeatBusy || !_signedIn || !_online || _disposed ||
+        !isProduction) return;
+    _gpsHeartbeatBusy = true;
+    try {
+      final location = await _productionLocation.ensureCurrent();
+      if (!_signedIn || !_online || _disposed) return;
+      await _productionBackend.updateLocation(location.lat, location.lng);
+      if (!await _productionBackend.hasConfirmedLiveGpsPresence()) {
+        throw const AppFailure(FailureKind.server,
+            'No se confirmó el GPS del repartidor. Intentando reconectar.');
+      }
+      if (_locationIssue != null) {
+        _locationIssue = null;
+        notifyListeners();
+      }
+    } on AppFailure catch (error) {
+      _locationIssue = _messageFor(error);
+      notifyListeners();
+    } finally {
+      _gpsHeartbeatBusy = false;
     }
   }
 
@@ -869,6 +940,7 @@ class DriverController extends ChangeNotifier {
   }
 
   Future<void> _expireSession() async {
+    _stopGpsHeartbeat();
     await _stopRealtime();
     await _location?.stop();
     await _backend?.api.session.clear();
@@ -932,6 +1004,7 @@ class DriverController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _pollTimer?.cancel();
+    _stopGpsHeartbeat();
     for (final timer in _timers) {
       timer.cancel();
     }
