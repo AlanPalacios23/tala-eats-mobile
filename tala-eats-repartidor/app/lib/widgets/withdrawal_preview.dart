@@ -32,7 +32,6 @@ class _WithdrawalPreviewCardState extends State<WithdrawalPreviewCard> {
       if (who is! Map || who['role'] != 'driver' || who['id'] is! int) {
         throw StateError('Identidad de repartidor no confirmada');
       }
-      final id = who['id'] as int;
       final status = await backend.api.get('/driver/finance/connect/status');
       if (status is! Map || status['confirmed'] is! bool) {
         throw StateError('Respuesta de Stripe no confirmada');
