@@ -306,7 +306,12 @@ class RemoteWithdrawalGateway extends WithdrawalGateway {
 
 int? _intOrNull(Object? raw) {
   if (raw is int && raw >= 0) return raw;
-  if (raw is String && RegExp(r'^\\d{1,12}$').hasMatch(raw)) {
+  if (raw is String && RegExp(r'^\d{1,12}).hasMatch(raw)) {
+    return int.tryParse(raw);
+  }
+  return null;
+}
+).hasMatch(raw)) {
     return int.tryParse(raw);
   }
   return null;
