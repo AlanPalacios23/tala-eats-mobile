@@ -27,6 +27,14 @@ class LocalAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> requestPasswordRecovery(String email) async {
+    await backend.simulateWrite();
+    if (!email.contains('@')) {
+      throw const AppFailure(FailureKind.invalidCredentials);
+    }
+  }
+
+  @override
   Future<UserSession> signIn({
     required String email,
     required String password,
